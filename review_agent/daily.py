@@ -16,6 +16,14 @@ from types import SimpleNamespace
 from .evidence import EvidenceError, canonical, digest
 from .product_policy import has_trade_recommendation
 
+# 复盘要跑五位分析师再加汇总结论，是多次 AI 调用，原先吃 Runtime 全局的 360s
+# 单次预算，模型慢一点就报「所选订阅响应超时」（review_agent/subscription_bridge.py
+# 的 agent_timeout —— 运行桥按这个预算把引擎掐断，不是网络问题）。
+# 两项得一起放宽：只提单次预算会因为多次调用累加，改在整场时限上失败
+# （「复盘超过时限」）——用户看到的错误换了，但照样出不来报告。
+_SINGLE_BUDGET = 900      # 单次 AI 调用预算（秒）
+_TOTAL_BUDGET = 2400      # 整场复盘总时限（秒）
+
 
 def atomic_write(path, payload):
     target = Path(path)
@@ -81,10 +89,14 @@ def has_unsupported_flow_total(text):
 
 
 class DailyLLM:
-    def __init__(self, runtime, source, key, directory, date, cancel, check, purpose="daily"):
+    def __init__(self, runtime, source, key, directory, date, cancel, check, purpose="daily", timeout=None):
         self.runtime, self.source, self.key = runtime, source, key
         self.directory, self.date, self.cancel, self.check = directory, date, cancel, check
         self.purpose = purpose
+        # 单次 AI 调用预算的上限；None 表示沿用 Runtime 全局值。
+        # 单独留这个口子是因为多空辩论/个股深挖一次要写完整份分析，比复盘单节更久，
+        # 但全局调大又会吃掉聊天（总时限只有 600s）留给纠错的余量。
+        self.timeout = timeout
 
     def invoke(self, prompt, _correction=False):
         from duanxian.llm_errors import LlmConfigError
@@ -100,8 +112,9 @@ class DailyLLM:
                            "龙虎榜单日榜与三日榜区间可能重叠，禁止跨记录累计净买卖额；上榜记录不代表全市场净流入，也不能推断主力意图。"
                            "直接报告事实、依据与缺口，不复述被禁止的交易措辞，也不添加参与倾向。\n")
             options = {} if self.purpose == "daily" else {"task_kind": self.purpose}
+            budget = min(remaining, self.timeout or self.runtime.timeout)
             text = self.runtime._invoke(run, self.source, self.key, prefix + prompt,
-                self.cancel, lambda message: None, min(remaining, self.runtime.timeout), text_only=True, **options)
+                self.cancel, lambda message: None, budget, text_only=True, **options)
             self.check()
             # Daily JSON is checked field-by-field by request_checked, including
             # the action gate, so content errors can use its bounded correction.
@@ -254,7 +267,7 @@ class Daily:
         from duanxian import preflight, review_store
         from duanxian.llm_errors import LlmConfigError
         from .grounding import generate_grounded, SOURCES
-        deadline = time.monotonic() + 1200
+        deadline = time.monotonic() + _TOTAL_BUDGET
         def check():
             if self.cancel_event.is_set():
                 raise EvidenceError("复盘已取消；原报告已保留")
@@ -270,7 +283,8 @@ class Daily:
             check()
             if not pre["ok"]:
                 raise EvidenceError(preflight.refuse_reason(pre, date))
-            llm = DailyLLM(self.manager.runtime, source, key, directory, date, self.cancel_event, check)
+            llm = DailyLLM(self.manager.runtime, source, key, directory, date, self.cancel_event, check,
+                           timeout=_SINGLE_BUDGET)
             state = generate_grounded(llm, inputs, date, check, lambda stage: self._update(stage=stage))
             check()
             warnings = list(pre["warnings"])

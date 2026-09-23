@@ -9,6 +9,13 @@ from pathlib import Path
 from .daily import Daily, DailyLLM, atomic_write
 from .evidence import EvidenceError, digest
 
+# 多空辩论/个股深挖要连写四位分析师的完整分析再汇总结论，每次调用都比复盘单节
+# 更长，原先吃 Runtime 全局的 360s 单次预算，模型慢一点就会报「所选订阅响应超时」。
+# 两项要一起加：只加单次预算，会改在别处超时（「深挖超过时限」）——四个分项加结论
+# 是多次调用，单次放宽后总额度也得跟着放宽。
+_SINGLE_BUDGET = 900      # 单次 AI 调用预算（秒）
+_TOTAL_BUDGET = 2400      # 整场深挖总时限（秒）
+
 
 class FrozenStockInputs:
     def __init__(self, directory, check):
@@ -79,7 +86,7 @@ class DeepDive(Daily):
         from duanxian.deepdive.store import serialize
         from duanxian.llm_errors import LlmConfigError
         from duanxian.util import china_today, is_degraded_report
-        deadline = time.monotonic() + 1200
+        deadline = time.monotonic() + _TOTAL_BUDGET
         def check():
             if self.cancel_event.is_set():
                 raise LlmConfigError("深挖已取消；原报告已保留")
@@ -92,7 +99,8 @@ class DeepDive(Daily):
             directory.mkdir(mode=0o700)
             inputs = FrozenStockInputs(directory, check)
             date = china_today()
-            llm = DailyLLM(self.manager.runtime, source, key, directory, date, self.cancel_event, check, purpose="stock")
+            llm = DailyLLM(self.manager.runtime, source, key, directory, date, self.cancel_event, check,
+                           purpose="stock", timeout=_SINGLE_BUDGET)
             final = run(stock, date, llm=llm, data_source=inputs, check=check, pack=RESEARCH_PACK,
                         progress=lambda stage: self._update(stage=stage))
             check()
