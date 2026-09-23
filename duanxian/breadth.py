@@ -78,6 +78,64 @@ def _index_breadth() -> Optional[dict]:
         return None
 
 
+def _env_value(key: str) -> str:
+    """读单个配置键：环境变量优先，回退仓库根 .env（不写回 os.environ）。"""
+    v = (os.environ.get(key) or "").strip().strip('"').strip("'")
+    if v:
+        return v
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(os.path.join(root, ".env"), encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if line.startswith("export "):
+                    line = line[len("export "):]
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, val = line.split("=", 1)
+                if k.strip() == key:
+                    return val.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def _tushare_breadth(date: str) -> Optional[dict]:
+    """东财取不到时的降级源（Tushare 日线）。未配置/报错 → None。
+
+    ⚠️ 口径与东财**不同**，调用方必须如实改掉 scope 文案，不能沿用东财那句：
+    涨跌家数与成交额按「沪深 A 股全体」统计（剔除北交所），
+    东财原口径是指数成分口径；分布两项仍是全 A 含北交所，与东财一致。
+    """
+    token = _env_value("TUSHARE_TOKEN")
+    if not token:
+        return None
+    try:
+        import tushare as ts
+    except Exception:  # noqa: BLE001  没装 tushare 就不降级
+        return None
+    try:
+        pro = ts.pro_api(token)
+        df = pro.daily(trade_date=date.replace("-", ""), fields="ts_code,pct_chg,amount")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Tushare 宽度降级失败：%s: %s", type(exc).__name__, exc)
+        return None
+    if df is None or df.empty:
+        return None
+    code = df["ts_code"].astype(str)
+    hs = df[~code.str.endswith(".BJ")]         # 沪深 A 股（不含北交所）
+    pct = hs["pct_chg"].dropna()
+    all_pct = df["pct_chg"].dropna()
+    amount = float(hs["amount"].dropna().sum()) * 1000   # 千元 → 元
+    return {
+        "up": int((pct > 0).sum()), "down": int((pct < 0).sum()), "flat": int((pct == 0).sum()),
+        "amount_yi": round(amount / 1e8, 1),
+        "universe": int(len(df)),
+        "deep_up_5_incl": int((all_pct >= 5).sum()),
+        "deep_down_5": int((all_pct < -5).sum()),
+    }
+
+
 def _page(pn: int) -> tuple[int, list[float]]:
     """按涨跌幅**升序**的第 pn 页。返回 `(全市场只数, 可用涨跌幅列表, 原始行数)`"""
     url = (f"{_HOST}/api/qt/clist/get?pn={pn}&pz={_PZ}&po=0&np=1&fltt=2&invt=2"
@@ -207,31 +265,52 @@ def market_breadth(date: str) -> dict:
     calls = [0]
     idx = _index_breadth()
     calls[0] += 1
+    fb = None
     if idx is None:
-        return {"available": False, "reason": "取全市场涨跌家数失败（数据源不可用）"}
+        # 东财不可达 → Tushare 日线降级（口径不同，见 _tushare_breadth 注释）
+        fb = _tushare_breadth(date)
+        calls[0] += 1
+        if fb is None:
+            return {"available": False, "reason": "取全市场涨跌家数失败（数据源不可用）"}
+        idx = fb
 
     total = 0
-    try:
-        total, _, _ = _page(1)
-        calls[0] += 1
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("取全市场只数失败，分布这几项本次不给：%s: %s", type(exc).__name__, exc)
-
-    down5 = _rank_below(total, -5.0, calls) if total else None
-    up5_below = _rank_below(total, 5.0, calls) if total else None
-    up5 = (total - up5_below) if (total and up5_below is not None) else None
+    up5 = down5 = None
+    dist_scope = "全 A（含北交所）"
+    if fb is not None:
+        # 降级源一次就拿到全市场，不需要分页二分
+        total, up5, down5 = fb["universe"], fb["deep_up_5_incl"], fb["deep_down_5"]
+    else:
+        try:
+            total, _, _ = _page(1)
+            calls[0] += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("取全市场只数失败，分布这几项本次不给：%s: %s", type(exc).__name__, exc)
+        if total:
+            down5 = _rank_below(total, -5.0, calls)
+            up5_below = _rank_below(total, 5.0, calls)
+            up5 = (total - up5_below) if up5_below is not None else None
+        else:
+            # 涨跌家数走的是 ulist.np（可能通），分布走 clist（可能不通）——
+            # 只补分布这三项，家数仍用已取到的东财口径，两边的 scope 分开写清楚。
+            dist = _tushare_breadth(date)
+            calls[0] += 1
+            if dist is not None:
+                total, up5, down5 = dist["universe"], dist["deep_up_5_incl"], dist["deep_down_5"]
+                dist_scope = "全 A（含北交所，Tushare 降级源）"
 
     out = {
         "available": True,
         "date": date,
-        # 沪深两市（不含北交所）—— 口径如实写出来，别声称"全市场"
+        # 口径如实写出来，别声称"全市场"；降级源的统计范围不同，也必须换掉这句
         "up": idx["up"], "down": idx["down"], "flat": idx["flat"],
-        "up_down_scope": "沪深两市（不含北交所）",
+        "up_down_scope": ("沪深 A 股全体（Tushare 降级源，剔除北交所）" if fb is not None
+                          else "沪深两市（不含北交所）"),
         "amount_yi": idx["amount_yi"],
         # 下面三项是全 A（含北交所）的排名统计
         "universe": total,
         "deep_up_5_incl": up5, "deep_down_5": down5,
-        "dist_scope": "全 A（含北交所）",
+        "dist_scope": dist_scope,
         "dist_available": any(v is not None for v in (up5, down5)),
         "dist_partial": any(v is None for v in (up5, down5)),
         "requests": calls[0],

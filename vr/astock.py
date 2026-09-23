@@ -448,6 +448,44 @@ _EM_SESSIONS: dict = {}         # {direct(bool): requests.Session}
 _em_mode = ["proxy" if os.environ.get("VR_DATA_PROXY", "").strip().lower() in ("1", "true", "yes") else "auto"]
 
 
+# 产品适配（非上游 a-stock-data）：东财 WAF 对**不带 cookie 的请求直接掐断连接**，
+# 表现为 ConnectionError（远端关闭连接）而不是 403，于是 clist / fflow / slist 等
+# 行情接口全部取不到数，成交额榜之类就显示"尚无有效成交额"。
+# 在 .env 配 EASTMONEY_COOKIE="ct=...;ut=..." 即可恢复。凭据只进请求头：
+# 不打日志、不进异常消息、不写回 os.environ（它会沿 subprocess 传给 AI 引擎）。
+_EM_COOKIE_KEY = "EASTMONEY_COOKIE"
+_EM_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _env_value(key: str) -> str:
+    """读单个配置键：环境变量优先，回退仓库根 .env（只取这一个键）。
+
+    刻意**不写回 os.environ**：本进程环境会沿 subprocess 传给 AI 引擎子进程。
+    凭据类配置（cookie / token）都走这里，避免各自复制一份解析逻辑。
+    """
+    value = (os.environ.get(key) or "").strip().strip('"').strip("'")
+    if value:
+        return value
+    try:
+        text = (_EM_ROOT / ".env").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("export "):
+            line = line[len("export "):]
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, val = line.split("=", 1)
+        if name.strip() == key:
+            return val.strip().strip('"').strip("'")
+    return ""
+
+
+def _em_cookie() -> str:
+    return _env_value(_EM_COOKIE_KEY)
+
+
 def _em_session(direct: bool):
     """东财专用会话。direct=True → `trust_env=False` 忽略 HTTP(S)_PROXY 环境变量、直连。
 
@@ -459,6 +497,10 @@ def _em_session(direct: bool):
 
     s = requests.Session()
     s.headers.update({"User-Agent": UA})
+    # 惰性读取：此时 .env 早已被 duanxian.fetchers 灌进 os.environ。
+    cookie = _em_cookie()
+    if cookie:
+        s.headers["Cookie"] = cookie
     s.trust_env = not direct     # 直连会话不读环境里的代理配置
     try:
         from requests.adapters import HTTPAdapter
@@ -534,10 +576,74 @@ def _numf(v):
     return v if isinstance(v, (int, float)) else None
 
 
-def market_turnover_rank(n: int = 20) -> list[dict]:
+# 产品适配（非上游）：东财 clist 对无凭据请求直接掐连接，某些网络下完全取不到数。
+# 配 TUSHARE_TOKEN 后，成交额榜降级走 Tushare 日线 —— 口径与东财一致（已核对同日
+# 同标的的收盘价、涨跌幅、行业完全一致），只是拿不到市值（留 None，页面显示「—」）。
+_TUSHARE_BASIC: dict = {}      # {YYYYMMDD: {ts_code: (name, industry)}}
+
+
+def _tushare_basic(pro) -> dict:
+    """股票名称/行业表，按天缓存（一天一次，避免反复拉 5000+ 行）。"""
+    key = datetime.now().strftime("%Y%m%d")
+    if key in _TUSHARE_BASIC:
+        return _TUSHARE_BASIC[key]
+    table: dict = {}
+    try:
+        b = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name,industry")
+        if b is not None and not b.empty:
+            table = {str(r.ts_code): (str(r.name or ""), str(r.industry or ""))
+                     for r in b.itertuples(index=False)}
+    except Exception:
+        table = {}
+    _TUSHARE_BASIC[key] = table
+    return table
+
+
+def _tushare_turnover_rank(n: int, trade_date: str) -> list[dict]:
+    """成交额榜降级源（Tushare 日线）。未配置/未安装/报错 → 返回 []。"""
+    token = _env_value("TUSHARE_TOKEN")
+    if not token:
+        return []
+    try:
+        import tushare as ts
+    except Exception:
+        return []
+    day = (trade_date or "").replace("-", "")
+    if not day:
+        return []
+    try:
+        pro = ts.pro_api(token)
+        df = pro.daily(trade_date=day, fields="ts_code,close,pct_chg,amount")
+        if df is None or df.empty:
+            return []
+        df = df.sort_values("amount", ascending=False).head(n)
+    except Exception:
+        return []
+    basic = _tushare_basic(pro)
+    out = []
+    for row in df.itertuples(index=False):
+        ts_code = str(row.ts_code)
+        code = ts_code.split(".")[0]
+        name, industry = basic.get(ts_code, ("", ""))
+        # amount 单位是千元 → 转成元，与东财口径一致
+        amount = getattr(row, "amount", None)
+        out.append({
+            "code": code, "name": name or code,
+            "price": _numf(getattr(row, "close", None)),
+            "pct": _numf(getattr(row, "pct_chg", None)),
+            "amount": float(amount) * 1000 if isinstance(amount, (int, float)) else None,
+            "mcap": None, "float_cap": None, "industry": industry or "",
+        })
+    return out
+
+
+def market_turnover_rank(n: int = 20, trade_date: str = "") -> list[dict]:
     """全市场成交额榜（沪深京 A 股按成交额降序 TopN）。
 
-    东财行情中心 clist。**push2(实时) 不可达时降级 push2delay(延迟行情，日榜场景足够)**。
+    东财行情中心 clist。**push2(实时) 不可达时降级 push2delay(延迟行情，日榜场景足够)**；
+    两者都拿不到时再降级 Tushare 日线（需 TUSHARE_TOKEN，见 `_tushare_turnover_rank`）。
+    `trade_date` 只在降级时用（YYYY-MM-DD 或 YYYYMMDD 均可）。
+
     返回每只: code / name / price / pct / amount(成交额,元) / mcap(总市值,元) /
     float_cap(流通市值,元) / industry。
     ⚠️ 这是客观公开榜单数据（东财/同花顺同款），产品侧只做客观展示——非推荐、非预测、不评分。
@@ -555,6 +661,8 @@ def market_turnover_rank(n: int = 20) -> list[dict]:
                 break
         except Exception:
             continue
+    if not diff:
+        return _tushare_turnover_rank(n, trade_date)
     return [{
         "code": str(d.get("f12", "")), "name": d.get("f14", ""),
         "price": _numf(d.get("f2")), "pct": _numf(d.get("f3")),

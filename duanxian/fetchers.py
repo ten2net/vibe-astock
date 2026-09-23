@@ -550,20 +550,88 @@ def fetch_turnover_top20(top=20):
 #    今日(f62) / 5日(f164) / 10日(f174) 三个累计窗口各一次 clist 全量拉,
 #    无需逐板块拉 daykline (push2his 历史接口本机被封, daykline 镜像只给当日)
 # ----------------------------------------------------------------------------
+_TUSHARE_SECTOR: dict = {}
+
+
+def _tushare_sector_flow() -> list[dict]:
+    """行业资金流降级源（Tushare moneyflow 按 industry 聚合）。
+
+    ⚠️ 口径与东财板块**不同**，不能当成同一份数据解读：
+      · 分类是 Tushare 行业，不是东财行业/概念板块
+      · 只有今日净额 —— 5日/10日累计缺失，返回 None（不拿今日值充数）
+      · 涨跌幅是成分股等权平均，不是板块指数涨跌幅
+    未配置 TUSHARE_TOKEN / 未装 tushare / 报错 → []，由调用方继续走"取不到"分支。
+    """
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        return []
+    try:
+        import tushare as ts
+    except Exception:  # noqa: BLE001
+        return []
+    from .util import china_today
+    day = china_today()
+    if _TUSHARE_SECTOR.get("day") == day:
+        return _TUSHARE_SECTOR.get("rows", [])
+    try:
+        pro = ts.pro_api(token)
+        d = day.replace("-", "")
+        mf = pro.moneyflow(trade_date=d, fields="ts_code,net_mf_amount")
+        daily = pro.daily(trade_date=d, fields="ts_code,pct_chg")
+        basic = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name,industry")
+    except Exception:  # noqa: BLE001
+        return []
+    if mf is None or mf.empty or daily is None or daily.empty:
+        return []
+    df = mf.merge(daily, on="ts_code", how="inner").merge(basic, on="ts_code", how="inner")
+    df = df[df["industry"].notna() & (df["industry"] != "")]
+    rows = []
+    for ind, g in df.groupby("industry"):
+        net = g["net_mf_amount"].dropna()
+        if net.empty:
+            continue
+        pct = g["pct_chg"].dropna()
+        lead = ""
+        if not pct.empty:
+            lead = str(g.loc[pct.idxmax(), "name"] or "")
+        rows.append({
+            "bk_code": "ts:" + str(ind), "name": str(ind),
+            "change_pct": round(float(pct.mean()), 2) if not pct.empty else None,
+            "inflow_raw": float(net.sum()) * 1e4,   # 万元 → 元
+            "in5_raw": None, "in10_raw": None,      # 降级源没有，不给
+            "lead_stock": lead, "source": "tushare",
+        })
+    rows.sort(key=lambda r: r["inflow_raw"], reverse=True)
+    _TUSHARE_SECTOR.update(day=day, rows=rows)
+    return rows
+
+
 def fetch_sector_flow(sector_t):
     """
     sector_t: '2'=行业, '3'=概念
     一次性拿全部板块的 今日/5日/10日 主力净额 + 涨跌幅 + 领涨股.
     返回 list[dict]: bk_code/name/change_pct/inflow_raw/in5_raw/in10_raw/lead_stock
+
+    东财取不到时，行业('2')降级 Tushare（口径不同，见 `_tushare_sector_flow`）；
+    概念('3')没有对应的 Tushare 分类，不降级 —— 返回空，由调用方如实说"取不到"。
     """
     fs = f"m:90 t:{sector_t}"
+
+    def _try(fs_, fid, fields):
+        """取不到就当空 —— `_clist` 重试耗尽会 raise，别让它把降级分支整个跳过。"""
+        try:
+            return _clist(fs_, fid, fields, ut=UT_FUND, pz=100, max_pages=10)
+        except Exception:  # noqa: BLE001
+            return []
+
     # 今日: fid=f62, 带涨跌幅 f3 + 领涨股 f128
-    today_rows = _clist(fs, "f62", "f12,f14,f3,f62,f128",
-                        ut=UT_FUND, pz=100, max_pages=10)
+    today_rows = _try(fs, "f62", "f12,f14,f3,f62,f128")
+    if not today_rows and sector_t == "2":
+        return _tushare_sector_flow()   # 东财板块取不到 → Tushare 行业降级（口径见函数注释）
     # 5日累计主力净额: f164
-    five_rows = _clist(fs, "f164", "f12,f164", ut=UT_FUND, pz=100, max_pages=10)
+    five_rows = _try(fs, "f164", "f12,f164")
     # 10日累计主力净额: f174
-    ten_rows = _clist(fs, "f174", "f12,f174", ut=UT_FUND, pz=100, max_pages=10)
+    ten_rows = _try(fs, "f174", "f12,f174")
 
     five_map = {str(r.get("f12")): _f(r.get("f164")) for r in five_rows}
     ten_map = {str(r.get("f12")): _f(r.get("f174")) for r in ten_rows}

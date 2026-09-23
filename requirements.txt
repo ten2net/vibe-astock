@@ -33,3 +33,7 @@ mcp==1.26.0
 numpy>=1.26
 pandas>=2.2
 baostock>=0.8.9
+
+# 成交额榜降级源：东财 clist 对无凭据请求会直接掐连接，部分网络下完全取不到数。
+# 配 TUSHARE_TOKEN 后可自动降级（不配也能跑，只是榜会空）。需要 Tushare 积分权限。
+tushare>=1.4

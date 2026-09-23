@@ -227,10 +227,14 @@ def get_capital_data(date: str) -> str:
             xs.sort(key=lambda s: s["inflow_today"], reverse=rev)
             return xs[:n]
 
+        # 降级源（Tushare）拿不到 5日/10日累计，直接拼会输出「5日None亿」——如实省略
+        def _win(label, v):
+            return f"/{label}{v}亿" if v is not None else f"/{label}缺"
+
         lines = ["行业主力净流入 TOP："]
         for s in _top(ind):
             lines.append(
-                f"  {s['name']} 今{s['inflow_today']}亿/5日{s['inflow_5d']}亿 "
+                f"  {s['name']} 今{s['inflow_today']}亿{_win('5日', s['inflow_5d'])} "
                 f"涨{s['change_pct']}% 领涨{s['lead_stock']}"
             )
         lines.append("行业主力净流出 TOP：")

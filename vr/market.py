@@ -183,7 +183,7 @@ def get_turnover_top() -> dict:
     """全市场成交额榜 Top20（客观公开榜单，含缓存 5 分钟）。"""
     def build():
         import math
-        rows = astock.market_turnover_rank(20)
+        rows = astock.market_turnover_rank(20, quote_day)
         rows = [r for r in rows if isinstance(r.get("amount"), (int, float))
                 and math.isfinite(r["amount"]) and r["amount"] > 0]
         rows.sort(key=lambda r: r["amount"], reverse=True)
