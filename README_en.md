@@ -134,7 +134,14 @@ Windows uses the same local browser interface. Install Python (including the `py
 
 The default address is `http://127.0.0.1:8910`, bound to the local loopback interface. If the port is occupied, use `sh scripts/start --port 8911`. Development previews may use other ports; the interface does not depend on a particular development port.
 
-If you change the binding to a LAN address or place the service behind a reverse proxy, list the Host values used for access in the `VIBE_ALLOW_HOSTS` environment variable (comma separated, may be placed in `.env`), for example `VIBE_ALLOW_HOSTS=192.168.1.10,astock.example.com`. Any Host not listed is rejected by every endpoint with 403, which appears in the interface as widespread read failures. `127.0.0.1`, `::1` and `localhost` are always allowed and need not be listed; other loopback addresses such as `127.0.0.2` are not in the default set.
+Opening the interface from a LAN IP requires both settings; either alone is not enough (both may live in `.env`):
+
+1. `VIBE_HOST=0.0.0.0` — binds the service beyond loopback. The default is `127.0.0.1`, where a request to the LAN IP is **connection refused** before it ever reaches the application.
+2. `VIBE_ALLOW_HOSTS=192.168.1.10` — adds the Host actually used for access to the allowlist (replace the sample IP with your own). Setting this without the one above still leaves the service unreachable.
+
+Step 1 can also be passed as `sh scripts/start --host 0.0.0.0`.
+
+The allowlist itself: if you change the binding to a LAN address or place the service behind a reverse proxy, list the Host values used for access in the `VIBE_ALLOW_HOSTS` environment variable (comma separated, may be placed in `.env`), for example `VIBE_ALLOW_HOSTS=192.168.1.10,astock.example.com`. Any Host not listed is rejected by every endpoint with 403, which appears in the interface as widespread read failures. `127.0.0.1`, `::1` and `localhost` are always allowed and need not be listed; other loopback addresses such as `127.0.0.2` are not in the default set.
 
 Open Connect AI to sign in or enter your own API configuration, test it, and save it. Viewing quotes and existing records does not require generating an AI report first. Starting the service does not automatically generate a review. Connection tests and AI tasks may consume the selected service's quota.
 

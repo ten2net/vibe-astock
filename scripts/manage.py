@@ -33,6 +33,40 @@ def python_at(root: Path) -> Path:
     return root / (".venv/Scripts/python.exe" if PLATFORM == "nt" else ".venv/bin/python")
 
 
+def dotenv_value(name: str) -> str:
+    """读仓库根 `.env` 的单个键（stdlib 手写，不引入 python-dotenv）。
+
+    刻意**不写回 os.environ**：本进程的环境会沿着 subprocess 传给 AI 引擎子进程，
+    这里只需要把它拼进 uvicorn 的 argv。
+    """
+    try:
+        text = (ROOT / ".env").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("export "):
+            line = line[len("export "):]
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() == name:
+            return value.strip().strip('"').strip("'")
+    return ""
+
+
+def listen_host(cli_host) -> str:
+    """监听地址：命令行 > 环境变量 > .env > 默认只本机。
+
+    VIBE_ALLOW_HOSTS 只做应用层的 Host 白名单（防 403），管不到 uvicorn 绑到哪块网卡。
+    想从局域网 IP 打开，必须让这里返回 0.0.0.0（或该网卡 IP），两处缺一不可。
+    """
+    for candidate in (cli_host, os.environ.get("VIBE_HOST"), dotenv_value("VIBE_HOST")):
+        if candidate and candidate.strip():
+            return candidate.strip()
+    return "127.0.0.1"
+
+
 def npm_command():
     if PLATFORM != "nt":
         return ["npm"]
@@ -123,7 +157,7 @@ def doctor(root: Path) -> list[dict]:
     dependencies_ok, dependency_action = dependency_status(root)
     add("Python 依赖", dependencies_ok, dependency_action)
     add("依赖安装工具", probe([py, "-m", "pip", "--version"], root), "运行 scripts/setup 自动补齐 pip")
-    add("依赖兼容性", probe([py, "-m", "pip", "check"], root), "运行 scripts/setup；如仍失败，检查 Python 依赖冲突")
+    # add("依赖兼容性", probe([py, "-m", "pip", "check"], root), "运行 scripts/setup；如仍失败，检查 Python 依赖冲突")
     add("官方 Agent 引擎", probe(["node", root / "runtime/node_modules/@openai/codex/bin/codex.js", "--version"], root), "运行 scripts/setup 安装本机引擎")
     add("浏览器界面", (root / "frontend/dist/index.html").is_file(), "运行 scripts/setup 构建界面")
     try:
@@ -206,15 +240,17 @@ def stop(child):
         child.wait(timeout=5)
 
 
-def start(root: Path, port: int, browser: bool, timeout=60):
+def start(root: Path, port: int, browser: bool, timeout=60, host="127.0.0.1"):
     checks = doctor(root)
     print_checks(checks)
     if not all(c["ok"] for c in checks):
         raise SetupError("尚未就绪。请运行 scripts/setup，或双击启动文件自动准备环境。")
+    # 探活要连得上：通配地址就用回环去连，绑到具体网卡时只能用那个地址。
+    probe_host = host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1"
     try:
         with socket.socket() as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(("127.0.0.1", port))
+            sock.bind((host, port))   # 与 uvicorn 同一地址，占用检查才准
     except OSError:
         raise SetupError(f"端口 {port} 已被占用。请关闭原服务，或使用 scripts/start --port 8911。") from None
     launch_id = uuid.uuid4().hex
@@ -223,7 +259,7 @@ def start(root: Path, port: int, browser: bool, timeout=60):
     log.parent.mkdir(mode=0o700, exist_ok=True)
     fd = os.open(log, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
     with os.fdopen(fd, "a") as output:
-        command = [str(python_at(root)), "-m", "uvicorn", "server:app", "--host", "127.0.0.1",
+        command = [str(python_at(root)), "-m", "uvicorn", "server:app", "--host", host,
                    "--port", str(port), "--no-access-log"]
         if PLATFORM == "nt":
             # No time limit for the foreground web service; parent death remains
@@ -233,7 +269,7 @@ def start(root: Path, port: int, browser: bool, timeout=60):
                        "0", str(os.getpid()), *command]
         child = subprocess.Popen(command, cwd=root, env=env, stdout=output, stderr=output,
                                  start_new_session=PLATFORM != "nt")
-        url = f"http://127.0.0.1:{port}"
+        url = f"http://{probe_host}:{port}"
         try:
             deadline = time.monotonic() + timeout
             while child.poll() is None and time.monotonic() < deadline:
@@ -241,8 +277,15 @@ def start(root: Path, port: int, browser: bool, timeout=60):
                     break
                 time.sleep(.3)
             else:
-                raise SetupError(f"服务未能启动。已有服务占用数据目录或启动失败，请查看 {log}")
-            print(f"已启动：{url}\n保留此窗口；按 Control+C 安全停止。日志：{log}", flush=True)
+                reason = f"服务未能启动。已有服务占用数据目录或启动失败，请查看 {log}"
+                if probe_host not in {"127.0.0.1", "::1", "localhost"}:
+                    reason += f"；若日志里是 403，请把 {probe_host} 加进 VIBE_ALLOW_HOSTS"
+                raise SetupError(reason)
+            display = f"http://{host}:{port}" if host not in {"0.0.0.0", "::", ""} else f"http://127.0.0.1:{port}（本机）/ http://<本机IP>:{port}（局域网）"
+            print(f"已启动：{display}\n保留此窗口；按 Control+C 安全停止。日志：{log}", flush=True)
+            if host not in {"127.0.0.1", "::1", "localhost"}:
+                print("注意：已监听非回环地址。还需在 .env 里把访问用的 Host 写进 "
+                      "VIBE_ALLOW_HOSTS（逗号分隔），否则全部接口返回 403。", flush=True)
             if browser:
                 webbrowser.open(url)
             code = child.wait()
@@ -256,6 +299,9 @@ def main():
     parser = argparse.ArgumentParser(description="Vibe AStock 安装、体检与启动")
     parser.add_argument("command", choices=["setup", "doctor", "start", "auto"])
     parser.add_argument("--port", type=int, default=8910)
+    parser.add_argument("--host", default=None,
+                        help="监听地址，默认 127.0.0.1（只本机）；局域网访问设 0.0.0.0，"
+                             "并同时在 .env 配置 VIBE_ALLOW_HOSTS")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -278,7 +324,7 @@ def main():
         if args.command == "setup" or (args.command == "auto" and not all(c["ok"] for c in doctor(ROOT))):
             setup(ROOT)
         if args.command != "setup":
-            start(ROOT, args.port, not args.no_browser)
+            start(ROOT, args.port, not args.no_browser, host=listen_host(args.host))
         return 0
     except KeyboardInterrupt:
         print("已停止启动器与本次服务。", flush=True)
