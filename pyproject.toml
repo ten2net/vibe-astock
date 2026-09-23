@@ -1,0 +1,24 @@
+[project]
+name = "vibe-astock"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "akshare>=1.18",
+    "baostock>=0.8.9",
+    "beautifulsoup4>=4.12",
+    "fastapi>=0.110",
+    "langchain-core>=0.3",
+    "langchain-openai>=0.3",
+    "langgraph>=0.6",
+    "mcp==1.26.0",
+    "mini-racer>=0.12",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pydantic>=2",
+    "pytest>=8",
+    "python-dotenv>=1",
+    "requests>=2.34.2",
+    "uvicorn>=0.29",
+]
