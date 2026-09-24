@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import random
@@ -637,6 +638,63 @@ def _tushare_turnover_rank(n: int, trade_date: str) -> list[dict]:
     return out
 
 
+# 腾讯财经全 A 成交额榜（降级源）。board_code=aStock，按 turnover 降序，一次取够。
+_TENCENT_TURNOVER = ("https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList"
+                     "?board_code=aStock&sort_type=turnover&direct=down&offset=0&count={n}")
+
+
+def _fnum(v):
+    """腾讯字段是字符串，转成 float；空值/'-' → None。"""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _tencent_turnover_rank(n: int) -> list[dict]:
+    """成交额榜降级源（腾讯财经，**盘中即时值**）。
+
+    为什么需要它：东财 clist 在本机会被间歇性掐连接；而 Tushare daily 是**收盘后**
+    才更新，盘中按当日取数是 0 行 —— 也就是说盘中东财一挂，榜就是空的。
+    腾讯这份盘中可用，已核对与东财同标的完全一致（中际旭创：成交额 100.79 亿、
+    最新价 906.00、涨跌幅 -1.79%，两边相同）。
+
+    单位换算：turnover 万元→元，zsz/ltsz 亿元→元，与东财那份口径一致。
+    腾讯没有行业字段，industry 留空（页面显示「—」）。
+    """
+    try:
+        req = urllib.request.Request(_TENCENT_TURNOVER.format(n=n),
+                                     headers={"User-Agent": UA, "Referer": "https://gu.qq.com/"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8", "replace"))
+        rows = ((body.get("data") or {}).get("rank_list") or [])
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        raw = str(r.get("code") or "")
+        # sz300308 / sh600699 → 300308 / 600699
+        code = raw[2:] if raw[:2] in ("sh", "sz", "bj", "hk", "us") else raw
+        if not code:
+            continue
+        amount = _fnum(r.get("turnover"))
+        mcap = _fnum(r.get("zsz"))
+        float_cap = _fnum(r.get("ltsz"))
+        out.append({
+            "code": code,
+            "name": str(r.get("name") or ""),
+            "price": _fnum(r.get("zxj")),
+            "pct": _fnum(r.get("zdf")),
+            "amount": amount * 1e4 if amount is not None else None,     # 万元 → 元
+            "mcap": mcap * 1e8 if mcap is not None else None,           # 亿元 → 元
+            "float_cap": float_cap * 1e8 if float_cap is not None else None,
+            "industry": "",
+            "source": "tencent",
+        })
+    out.sort(key=lambda r: r["amount"] if r["amount"] is not None else -1, reverse=True)
+    return out[:n]
+
+
 def market_turnover_rank(n: int = 20, trade_date: str = "") -> list[dict]:
     """全市场成交额榜（沪深京 A 股按成交额降序 TopN）。
 
@@ -661,14 +719,18 @@ def market_turnover_rank(n: int = 20, trade_date: str = "") -> list[dict]:
                 break
         except Exception:
             continue
-    if not diff:
-        return _tushare_turnover_rank(n, trade_date)
-    return [{
-        "code": str(d.get("f12", "")), "name": d.get("f14", ""),
-        "price": _numf(d.get("f2")), "pct": _numf(d.get("f3")),
-        "amount": _numf(d.get("f6")), "mcap": _numf(d.get("f20")),
-        "float_cap": _numf(d.get("f21")), "industry": d.get("f100", "") or "",
-    } for d in diff]
+    if diff:
+        return [{
+            "code": str(d.get("f12", "")), "name": d.get("f14", ""),
+            "price": _numf(d.get("f2")), "pct": _numf(d.get("f3")),
+            "amount": _numf(d.get("f6")), "mcap": _numf(d.get("f20")),
+            "float_cap": _numf(d.get("f21")), "industry": d.get("f100", "") or "",
+            "source": "eastmoney",
+        } for d in diff]
+    # 东财取不到 → 腾讯（盘中即时，字段与东财一致）→ Tushare（收盘后才有当日数据，
+    # 作为最后兜底，且它没有市值字段）
+    rows = _tencent_turnover_rank(n)
+    return rows if rows else _tushare_turnover_rank(n, trade_date)
 
 
 def eastmoney_datacenter(report_name: str, columns: str = "ALL", filter_str: str = "",

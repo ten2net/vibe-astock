@@ -684,7 +684,7 @@ export function DailyReview() {
                     </td>
                     <td className="whitespace-nowrap px-2 py-2 font-mono">{yi(s.amount)}</td>
                     <td className="whitespace-nowrap px-2 py-2 font-mono text-muted-foreground">{yi(s.mcap)}</td>
-                    <td className="whitespace-nowrap px-2 py-2 text-xs text-muted-foreground">{s.industry}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-xs text-muted-foreground">{s.industry || "—"}</td>
                   </tr>
                 ))}
               </tbody>
