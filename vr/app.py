@@ -522,13 +522,23 @@ def finance(code: str = Query(...)):
 _DC_CACHE: dict = {}  # key=(endpoint, code) -> (ts, data)
 
 
-def _cached(endpoint: str, code: str, ttl: int, fetch):
+_EMPTY_TTL = 60  # 取数失败时的短缓存：既不每次请求都打源，也不把空结果钉满整个 TTL
+
+
+def _cached(endpoint: str, code: str, ttl: int, fetch, valid=bool):
+    """个股级缓存。
+
+    与 vr/market.py 的 _cached 同一套约定：取数失败的空结果**只短暂缓存**。
+    否则数据源一故障，空数据就被钉满 TTL（这里原本是 15~30 分钟），页面长时间
+    显示「暂无数据」而看不到重试。
+    """
     key = (endpoint, code)
     hit = _DC_CACHE.get(key)
     if hit and _time.time() - hit[0] < ttl:
         return hit[1]
     data = fetch()
-    _DC_CACHE[key] = (_time.time(), data)
+    _DC_CACHE[key] = (_time.time(), data) if valid(data) else (
+        _time.time() - ttl + _EMPTY_TTL, data)
     return data
 
 
