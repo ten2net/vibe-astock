@@ -12,6 +12,7 @@ import remarkGfm from "remark-gfm";
 import { cleanAutoLinks } from "./cleanAutoLinks";
 
 import { cn } from "@/lib/utils";
+import { remarkStockLinks } from "@/lib/stock-link";
 export interface AiMsg { role: "user" | "assistant"; content: string; partial?: boolean; id?: string }
 
 export interface AiMessagesProps {
@@ -55,7 +56,7 @@ export function AiMessages({
           )}>
             {m.role === "assistant" ? (
               <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground">
-                {renderReply ? renderReply(m.content) : <ReactMarkdown remarkPlugins={[remarkGfm, cleanAutoLinks]}>{m.content}</ReactMarkdown>}
+                {renderReply ? renderReply(m.content) : <ReactMarkdown remarkPlugins={[remarkGfm, cleanAutoLinks, remarkStockLinks]}>{m.content}</ReactMarkdown>}
               </div>
             ) : (
               <p className="whitespace-pre-wrap break-words">{m.content}</p>

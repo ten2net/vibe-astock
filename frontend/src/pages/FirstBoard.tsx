@@ -6,6 +6,7 @@ import { Caliber } from "@/components/ui/Caliber";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useDeepDive, DeepDivePanel, RunAllButton, type DiveItem } from "@/components/ui/DeepDive";
 import { api, type FirstBoardData, type FirstBoardStock } from "@/lib/api";
+import { StockNameLink } from "@/lib/stock-link";
 
 const fmt = (v: number) => v.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 const yi = (v: number | null) => (v == null ? "—" : `${fmt(v / 1e8)} 亿`); // 元 → 亿
@@ -113,7 +114,7 @@ export function FirstBoard() {
                   <Fragment key={s.code}>
                     <tr className="border-b border-border/30">
                       <td className="whitespace-nowrap px-2 py-2">
-                        <span className="font-medium">{s.name}</span>{" "}
+                        <StockNameLink code={s.code} name={s.name} className="font-medium" />{" "}
                         <span className="text-xs text-muted-foreground/50">{s.code}</span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 font-mono text-muted-foreground">{s.seal_time || "—"}</td>

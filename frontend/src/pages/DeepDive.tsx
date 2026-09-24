@@ -6,6 +6,7 @@ import { agentRequest, AgentRequestError, loadAgentConnection, type AgentConnect
 import { useWorkspace } from "@/lib/workspace/state";
 import { AgentChat } from "@/components/AgentChat";
 import { agentFetch, safeArray, type DeepDiveData, type JobStatus } from "@/lib/agent";
+import { StockNameLink } from "@/lib/stock-link";
 
 const DISCLAIMER =
   "本页由多 agent AI 基于公开数据现场生成，结论为 AI 判断，仅供参考，不构成投资建议；市场有风险，决策与盈亏自负。";
@@ -133,7 +134,7 @@ export function DeepDive() {
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Microscope className="h-6 w-6 text-primary" /> 多空辩论</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             题材、资金、技术、风险四类分析 → 多空双方论证与证据核对
-            {data && ` · ${data.name}（${data.code}）· 生成于 ${data.generated_at}`}
+            {data && <> · <StockNameLink code={data.code} name={data.name || data.code || ""} />（{data.code}）· 生成于 {data.generated_at}</>}
             {data?.ai_source && ` · ${data.ai_source.provider} / ${data.ai_source.model}`}
           </p>
         </div>

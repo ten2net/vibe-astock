@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { loadNotes, deleteNote, type Note } from '@/lib/notes';
+import { remarkStockLinks } from "@/lib/stock-link";
 
 export function ResearchNotes() {
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export function ResearchNotes() {
     {error && <p role="alert" className="text-danger">{error}</p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
       <div className="space-y-2">{notes.filter(n => `${n.title} ${n.content}`.includes(query)).map(n => <button key={n.id} onClick={() => setSelected(n.id)} className="block w-full rounded-xl border border-border bg-card p-3 text-left"><b>{n.title}</b><span className="block text-xs text-muted-foreground">{n.kind} · {new Date(n.ts).toLocaleString('zh-CN')}</span></button>)}{notes.length === 0 && <p>暂无记录；可在分析结果下点击“存入研究记录”。</p>}</div>
-      {current ? <article className="rounded-xl border border-border bg-card p-5"><div className="mb-4 flex justify-between gap-3"><h2>{current.title}</h2><button className="text-danger" onClick={() => remove(current.id)}>删除</button></div><div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{current.content}</ReactMarkdown></div></article> : <p className="text-muted-foreground">选择一篇记录阅读。</p>}
+      {current ? <article className="rounded-xl border border-border bg-card p-5"><div className="mb-4 flex justify-between gap-3"><h2>{current.title}</h2><button className="text-danger" onClick={() => remove(current.id)}>删除</button></div><div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm, remarkStockLinks]}>{current.content}</ReactMarkdown></div></article> : <p className="text-muted-foreground">选择一篇记录阅读。</p>}
     </div>
   </div>;
 }

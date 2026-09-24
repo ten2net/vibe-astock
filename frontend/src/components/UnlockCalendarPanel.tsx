@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type UnlockCalendar } from "@/lib/api";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { StockNameLink } from "@/lib/stock-link";
 
 export function UnlockCalendarPanel({ watchCodes }: { watchCodes: string[] }) {
   const [window, setWindow] = useState<"upcoming" | "recent">("upcoming");
@@ -34,7 +35,7 @@ export function UnlockCalendarPanel({ watchCodes }: { watchCodes: string[] }) {
           <caption className="sr-only">限售解禁计划；数量为万股，占比为占总股本百分比</caption>
           <thead><tr>{["日期", "标的", "类型", "本次解禁（万股）", "占总股本"].map(text => <th scope="col" key={text} className="whitespace-nowrap px-2 py-2">{text}</th>)}</tr></thead>
           <tbody>{events.map((row, i) => <tr key={`${row.code}-${row.date}-${i}`} className="border-t border-border/50">
-            <td className="whitespace-nowrap px-2 py-2">{row.date}</td><td className="whitespace-nowrap px-2 py-2">{row.name} {row.code}{watchCodes.includes(row.code) && <span className="ml-1 text-primary">自选</span>}</td>
+            <td className="whitespace-nowrap px-2 py-2">{row.date}</td><td className="whitespace-nowrap px-2 py-2"><StockNameLink code={row.code} name={row.name} /> {row.code}{watchCodes.includes(row.code) && <span className="ml-1 text-primary">自选</span>}</td>
             <td className="px-2 py-2">{row.type}</td><td className="px-2 py-2">{number(row.shares)}</td><td className="px-2 py-2">{row.ratio == null ? "—" : `${number(row.ratio)}%`}</td>
           </tr>)}</tbody>
         </table></div>}

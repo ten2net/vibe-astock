@@ -12,6 +12,8 @@ import { api, ApiError, type RadarData, type Industry, type Announcement, type N
 import { loadWatch } from "@/lib/watchlist";
 import { hasLlm, chatStream } from "@/lib/llm";
 import { cn } from "@/lib/utils";
+import { StockNameLink } from "@/lib/stock-link";
+import { remarkStockLinks } from "@/lib/stock-link";
 
 const TABS = [
   // ⚠️ planned = 还没接数据源。看起来可点、点进去却什么都没有的入口，
@@ -151,7 +153,7 @@ function InvestmentNewsPanel() {
                   <>
                     {dg.loading && <p className="text-xs text-muted-foreground">正在生成…</p>}
                     {dg.err && <p role="alert" className="text-sm text-destructive">生成中断：{dg.err}（下方为未完成内容）</p>}
-                    <div className="prose prose-sm prose-invert max-w-none text-foreground"><ReactMarkdown remarkPlugins={[remarkGfm]}>{dg.text}</ReactMarkdown></div>
+                    <div className="prose prose-sm prose-invert max-w-none text-foreground"><ReactMarkdown remarkPlugins={[remarkGfm, remarkStockLinks]}>{dg.text}</ReactMarkdown></div>
                     {!dg.loading && !dg.err && <div className="mt-2"><SaveNoteButton kind="近7日要点" title={`${cur.name} 近7日要点`} content={dg.text} /></div>}
                   </>
                 ) : dg?.needKey ? (
@@ -296,7 +298,7 @@ function WatchlistFeed({ kind }: { kind: "filings" | "news" }) {
             <a key={i} href={r.url || undefined} target={r.url ? "_blank" : undefined} rel="noreferrer"
               className={cn("group flex items-baseline gap-3 border-b border-border/30 pb-2 text-sm last:border-0", r.url && "cursor-pointer")}>
               <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground/70">{(r.when || "").slice(kind === "filings" ? 0 : 5, kind === "filings" ? 10 : 16)}</span>
-              <span className="w-16 shrink-0 truncate text-xs text-primary/90" title={r.code}>{r.name}</span>
+              <span className="w-16 shrink-0 truncate text-xs text-primary/90" title={r.code}><StockNameLink code={r.code} name={r.name} /></span>
               {kind === "filings" && r.meta && <span className="hidden w-20 shrink-0 truncate text-xs text-muted-foreground sm:block">{r.meta}</span>}
               <span className="flex-1 group-hover:text-primary">{r.title}</span>
               {r.url && <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/0 group-hover:text-primary/60" />}

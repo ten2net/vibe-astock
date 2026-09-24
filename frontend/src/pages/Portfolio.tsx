@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { agentFetch, agentPost, safeArray, type PositionsReport, type PositionRow } from "@/lib/agent";
+import { StockNameLink } from "@/lib/stock-link";
 
 /** 持仓股 —— **交易日志的一个视图**，不是另一本账。
  *
@@ -22,7 +23,7 @@ function Row({ h }: { h: PositionRow }) {
   return (
     <tr className="border-b border-border/40 last:border-0">
       <td className="px-2 py-2">
-        <b>{h.name || h.code}</b>
+        <b><StockNameLink code={h.code} name={h.name || h.code} /></b>
         <span className="ml-1 text-[10px] text-muted-foreground">{h.code}</span>
         {h.playbooks.length > 0 && (
           <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">{h.playbooks[0]}</span>

@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { GroundedFinding, GroundedReport } from "@/lib/report-grounding";
+import { remarkStockLinks } from "@/lib/stock-link";
 
 export function EvidenceReferences({ finding, report }: { finding?: GroundedFinding; report?: GroundedReport }) {
   if (!finding || !report || !Array.isArray(finding.citations) || !Array.isArray(report.records)) return null;
@@ -41,7 +42,7 @@ export function GroundedAnalysis({ report }: { report?: GroundedReport }) {
             <h3 className="mb-3 font-semibold">{section.title}</h3>
             {section.findings.map((finding, i) => (
               <div key={i} className="mb-4 text-sm leading-relaxed">
-                <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{finding.text}</ReactMarkdown></div>
+                <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm, remarkStockLinks]}>{finding.text}</ReactMarkdown></div>
                 <EvidenceReferences finding={finding} report={report} />
               </div>
             ))}

@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { api, type MonitorSnapshot, type WatchRow } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
+import { StockNameLink } from "@/lib/stock-link";
 
 const fmt = (v: number) => v.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 const yi = (v: number | null | undefined) => (v == null ? "—" : `${fmt(v / 1e8)} 亿`);
@@ -64,7 +65,7 @@ function QuoteTable({ rows, cols, watch, onToggleWatch, onRemove }: QuoteTablePr
           {rows.map((r) => (
             <tr key={r.code} className="border-b border-border/30">
               <td className="whitespace-nowrap px-2 py-1.5">
-                <span className="font-medium">{r.name || r.code}</span>{" "}
+                <StockNameLink code={r.code} name={r.name || r.code} className="font-medium" />{" "}
                 <span className="text-xs text-muted-foreground/50">{r.code}</span>
                 {r.is_limit === true && <span className="ml-1 rounded border border-primary/50 bg-primary/10 px-1 text-[10px] text-primary">封</span>}
                 {r.is_limit === false && <span className="ml-1 rounded border border-secondary/50 bg-secondary/10 px-1 text-[10px] text-secondary">开</span>}
@@ -184,7 +185,7 @@ export function DailyWatch({ view = "live" }: { view?: "live" | "yesterday" }) {
               <div key={`${a.ts}-${a.code}-${i}`} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-mono text-xs text-muted-foreground">{a.ts}</span>
                 <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${KIND_STYLE[a.kind] || "border-border/60"}`}>{a.kind}</span>
-                <span className="font-medium">{a.name}</span>
+                <StockNameLink code={a.code} name={a.name} className="font-medium" />
                 <span className="text-xs text-muted-foreground/50">{a.code}</span>
                 <WatchStar code={a.code} watch={watch} onToggle={toggleWatch} />
                 <span className="text-xs text-muted-foreground">{a.msg}</span>

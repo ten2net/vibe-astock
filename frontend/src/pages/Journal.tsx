@@ -9,6 +9,7 @@ import type {
   Fill, Inbox, InboxItem, JournalStats, ModePerf, ModesResponse, QuadrantCell,
   RiskReport, RiskRules, Rolling, Trade, Violation, WindowStats,
 } from "@/lib/agent";
+import { StockNameLink } from "@/lib/stock-link";
 
 /** 交易日志：记录自己的每一笔交易，并附上成交当天的市场环境快照。
  *
@@ -403,7 +404,7 @@ function AtRiskPanel({ revision }: { revision: number }) {
                 <tr key={p.id} className="border-b border-border/40 last:border-0">
                   <td className="py-1 pr-2 text-muted-foreground">{p.date}</td>
                   <td className="px-2 py-1">
-                    {p.name} <span className="text-[10px] text-muted-foreground">{p.code}</span>
+                    <StockNameLink code={p.code} name={p.name} /> <span className="text-[10px] text-muted-foreground">{p.code}</span>
                   </td>
                   <td className="px-2 py-1 text-right">{p.shares.toLocaleString()}</td>
                   <td className="px-2 py-1 text-right">{p.avg_cost}</td>
@@ -1572,7 +1573,7 @@ export function Journal() {
                   <tr className="border-b border-border/40 last:border-0">
                     <td className="px-2 py-2">{t.date}</td>
                     <td className="px-2 py-2">
-                      <b>{t.name || t.code}</b>
+                      <b><StockNameLink code={t.code} name={t.name || t.code} /></b>
                       <span className="ml-1 text-[10px] text-muted-foreground">{t.code}</span>
                     </td>
                     <td className="px-2 py-2">

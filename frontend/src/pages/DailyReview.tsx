@@ -13,6 +13,7 @@ import { api, type IndexQuote, type Quote, type MarketOverview, type ShortTermEm
 import { useDeepDive, DeepDivePanel, RunAllButton, type DiveItem } from "@/components/ui/DeepDive";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
+import { StockNameLink } from "@/lib/stock-link";
 
 // A股红涨绿跌。全球市场（美股/港股指数）**也沿用红涨**——与整个看板及东财等中国平台一致，
 // A 股惯例：红涨绿跌。与国际绿涨惯例相反，是有意选择，全站必须一致，勿改。
@@ -597,7 +598,7 @@ export function DailyReview() {
                       {emotion.lianban_stocks.map((s) => (
                         <Fragment key={s.code}>
                           <tr className="border-b border-border/30">
-                            <td className="px-2 py-2"><span className="font-medium">{s.name}</span> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
+                            <td className="px-2 py-2"><StockNameLink code={s.code} name={s.name} className="font-medium" /> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
                             <td className="whitespace-nowrap px-2 py-2 font-mono font-bold text-primary">{s.boards} 板</td>
                             <td className="px-2 py-2 font-mono">
                               {lianbanQuotes[s.code]?.price ?? (
@@ -676,7 +677,7 @@ export function DailyReview() {
                 {turnover.stocks.map((s, i) => (
                   <tr key={s.code} className="border-b border-border/30">
                     <td className="px-2 py-2 font-mono text-xs text-muted-foreground/50">{i + 1}</td>
-                    <td className="px-2 py-2"><span className="font-medium">{s.name}</span> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
+                    <td className="px-2 py-2"><StockNameLink code={s.code} name={s.name} className="font-medium" /> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
                     <td className="px-2 py-2 font-mono">{s.price ?? "—"}</td>
                     <td className={cn("px-2 py-2 font-mono", s.pct == null ? "text-muted-foreground" : pctColor(s.pct))}>
                       {s.pct == null ? "—" : `${s.pct > 0 ? "+" : ""}${s.pct}%`}

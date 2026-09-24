@@ -8,6 +8,7 @@ import { AskAiButton } from "@/components/ui/AskAiButton";
 import { api, type Quote } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
+import { StockNameLink } from "@/lib/stock-link";
 
 const color = pctColor;   // 红涨绿跌口径见 lib/colors.ts
 const pct = (v: number | undefined) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);
@@ -138,7 +139,7 @@ export function Watchlist({ embedded = false }: { embedded?: boolean }) {
                   const q = quotes[c];
                   return (
                     <tr key={c} className="border-b border-border/30">
-                      <td className="px-2 py-2.5 font-medium">{q?.name || "—"}</td>
+                      <td className="px-2 py-2.5 font-medium"><StockNameLink code={c} name={q?.name || "—"} /></td>
                       <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground">{c}</td>
                       <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? q.price : "—"}</td>
                       <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? pct(q.change_pct) : "—"}</td>

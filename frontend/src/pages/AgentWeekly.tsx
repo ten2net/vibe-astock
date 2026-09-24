@@ -3,6 +3,7 @@ import { CalendarRange, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Caliber } from "@/components/ui/Caliber";
 import { agentFetch, finite, pct, safeArray, type WeeklyData, type LineageLeader } from "@/lib/agent";
+import { StockNameLink } from "@/lib/stock-link";
 
 function Sparkline({ leader }: { leader: LineageLeader }) {
   const s = leader.series;
@@ -126,7 +127,7 @@ export function AgentWeekly() {
                     dd == null ? "border-l-border" : atPeak ? "border-l-success" : "border-l-danger")}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="flex items-baseline gap-1.5 text-[15px] font-bold">
-                        {l.name}
+                        <StockNameLink code={l.code} name={l.name} />
                         <span className="text-xs font-normal text-muted-foreground">{l.code}</span>
                         {/* 只标一个「当前最高标」，不写板数。
                             后端按**最近一个交易日**的最高标判定，不是按板数最大 —— 前几天的

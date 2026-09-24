@@ -18,6 +18,7 @@ import {
   type GlobalStock, type Quote,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { StockNameLink } from "@/lib/stock-link";
 
 // 金额格式化（后端资金单位：元 / 万元）
 const yi = (v: number) => `${(v / 1e8).toFixed(2)} 亿`;
@@ -328,7 +329,7 @@ export function StockData() {
         <>
           <GlassCard glow className="mb-4">
             <div className="mb-4 flex items-baseline gap-2">
-              <h2 className="text-xl font-bold">{val.name}</h2>
+              <h2 className="text-xl font-bold"><StockNameLink code={val.code} name={val.name} /></h2>
               <span className="text-xs text-muted-foreground">行情及即时估值时点（北京时间）：{val.quote_time?.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/, "$1-$2-$3 $4:$5:$6") || "来源未提供"}</span>
               <span className="font-mono text-sm text-muted-foreground">{val.code}</span>
               {val.analyst_count > 0 && (

@@ -3,6 +3,7 @@ import { pctColor } from "@/lib/colors";
 import { Sunrise, Activity, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { agentFetch, safeArray, safeRecord, finite } from "@/lib/agent";
+import { StockNameLink } from "@/lib/stock-link";
 
 /** 开盘核验 —— 昨晚的判断，今早开盘就见分晓的那部分。
  *
@@ -183,7 +184,7 @@ export function Intraday() {
                 <div className="flex flex-wrap gap-2">
                   {safeArray<TopBoard>(auction?.top_boards).map((t) => (
                     <span key={t.code} className="rounded-lg border border-border px-2.5 py-1 text-[12px]">
-                      <b>{t.name}</b> <span className="text-muted-foreground">{t.code} · {t.sector}</span>
+                      <b><StockNameLink code={t.code} name={t.name} /></b> <span className="text-muted-foreground">{t.code} · {t.sector}</span>
                       <b className={cn("ml-1.5 tabular-nums", tone(t.pct))}>{signed(t.pct)}</b>
                     </span>
                   ))}
