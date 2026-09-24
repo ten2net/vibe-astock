@@ -156,15 +156,20 @@ def _turnover_file() -> Path:
 
 
 def _turnover_top10_live() -> list[dict]:
+    """昨日成交额前十的实时兜底。东财 clist 取不到时降级腾讯财经（盘中即时值）。"""
     url = ("https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&np=1"
            "&fltt=2&invt=2&fid=f6&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048"
            "&fields=f12,f14,f6")
     try:
         r = astock.em_get(url, headers={"User-Agent": UA}, timeout=10)
         diff = (r.json().get("data") or {}).get("diff") or []
-        return [{"code": str(p.get("f12", "")), "name": p.get("f14", "")} for p in diff]
+        if diff:
+            return [{"code": str(p.get("f12", "")), "name": p.get("f14", "")} for p in diff]
     except Exception:  # noqa: BLE001
-        return []
+        pass
+    # 东财 clist 在本机会被掐连接 → 腾讯（同 astock._tencent_turnover_rank 那份口径）
+    return [{"code": s["code"], "name": s["name"]}
+            for s in astock._tencent_turnover_rank(10)]
 
 
 def _turnover_yesterday() -> tuple[str, list[dict]]:

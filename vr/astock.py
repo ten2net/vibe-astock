@@ -1030,21 +1030,57 @@ def investor_qa(code: str, page_size: int = 30) -> list[dict]:
     return out
 
 
+def _tencent_industry_comparison(top_n: int) -> dict:
+    """行业涨跌幅排名降级源（腾讯财经）。东财取不到时用。
+
+    ⚠️ 口径与东财不同：腾讯是**一级行业**（约 31 个），东财是细分行业（约 100 个），
+    粒度更粗。腾讯这份没有涨跌家数，up_count/down_count 给 None —— 不能填 0，
+    那会被读成「0 家上涨」。
+    """
+    try:
+        req = urllib.request.Request(
+            "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank"
+            "?board_type=hy&sort_type=price&direct=down&offset=0&count=100",
+            headers={"User-Agent": UA, "Referer": "https://gu.qq.com/"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8", "replace"))
+        rows = ((body.get("data") or {}).get("rank_list") or [])
+    except Exception:
+        return {"top": [], "bottom": [], "total": 0}
+    items = []
+    for r in rows:
+        pct = _fnum(r.get("zdf"))
+        name = str(r.get("name") or "").strip()
+        if pct is None or not name:
+            continue
+        items.append({"name": name, "change_pct": pct})
+    items.sort(key=lambda x: x["change_pct"], reverse=True)
+    ranked = [{"rank": i + 1, "name": it["name"], "change_pct": it["change_pct"],
+               "code": "", "up_count": None, "down_count": None}
+              for i, it in enumerate(items)]
+    return {"top": ranked[:top_n], "bottom": ranked[-top_n:] if top_n else [],
+            "total": len(ranked)}
+
+
 def industry_comparison(top_n: int = 20) -> dict:
-    """全行业涨跌幅排名（东财行业板块，~100 个行业）：板块级涨跌 / 涨跌家数 / 领涨。"""
+    """全行业涨跌幅排名（东财行业板块，~100 个行业）：板块级涨跌 / 涨跌家数 / 领涨。
+
+    东财 clist 取不到时降级腾讯财经（口径更粗，见 `_tencent_industry_comparison`）。"""
     params = {"pn": "1", "pz": "100", "po": "1", "np": "1", "fltt": "2", "invt": "2",
               "fid": "f3",  # fid=f3 + po=1：按涨跌幅降序，否则 top/bottom 切片非涨幅序（a-stock-data §3.7）
               "fs": "m:90+t:2", "fields": "f2,f3,f4,f12,f13,f14,f104,f105,f128,f136,f140,f141,f207"}
     try:
         d = em_get("https://push2.eastmoney.com/api/qt/clist/get",
                    params=params, headers={"User-Agent": UA}, timeout=15).json()
+        items = d.get("data", {}).get("diff", [])
     except Exception:
-        return {"top": [], "bottom": [], "total": 0}
-    items = d.get("data", {}).get("diff", [])
+        # 东财多半是掐连接（ConnectionError），不是返回空 —— 异常分支也要能降级，
+        # 否则「取不到」就永远停在空结果上
+        items = []
     if isinstance(items, dict):
         items = list(items.values())
     if not items:
-        return {"top": [], "bottom": [], "total": 0}
+        return _tencent_industry_comparison(top_n)
     rows = [{
         "rank": i + 1, "name": it.get("f14", ""), "change_pct": it.get("f3", 0),
         "code": it.get("f12", ""), "up_count": it.get("f104", 0), "down_count": it.get("f105", 0),
