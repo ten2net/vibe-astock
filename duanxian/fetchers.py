@@ -526,10 +526,57 @@ def fetch_individual_fund_flow():
 # 4b. 成交额 TOP20 (push2delay) — 全市场热度温度计
 #     clist 按 f6(成交额) 降序, f100 直接带所属行业, 只取前20 (不翻全量)
 # ----------------------------------------------------------------------------
+# 腾讯财经全 A 成交额榜（降级源）。board_code=aStock，按 turnover 降序，一次取够。
+# 与 vr/astock.py 的 _tencent_turnover_rank 是同一个接口，输出字段按本模块口径
+# （amount 亿元、sector）；两个模块各自持有一份，是为了不让 vendored 的 vr/ 反向
+# 依赖 duanxian，也不让 duanxian 依赖 vr 的 sys.path 技巧。
+_TENCENT_TURNOVER = ("https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList"
+                     "?board_code=aStock&sort_type=turnover&direct=down&offset=0&count={n}")
+
+
+def _tencent_turnover_top(top=20) -> list[dict]:
+    """成交额榜降级源（腾讯财经，**盘中即时值**）。
+
+    为什么需要它：东财 clist 在本机会被掐连接；Tushare daily 是收盘后才更新，
+    盘中按当日取数是 0 行 —— 盘中东财一挂就没有兜底了。
+    单位：turnover 万元 → amount 亿元。腾讯这份没有行业，sector 为 None。
+    """
+    try:
+        r = requests.get(_TENCENT_TURNOVER.format(n=top),
+                         headers={"User-Agent": HEADERS["User-Agent"],
+                                  "Referer": "https://gu.qq.com/"},
+                         timeout=15)
+        rows = ((r.json().get("data") or {}).get("rank_list") or [])
+    except Exception:
+        return []
+    out = []
+    for row in rows[:top]:
+        raw = str(row.get("code") or "")
+        amt = _f(row.get("turnover"))          # 万元
+        out.append({
+            "code": raw[2:] if raw[:2] in ("sh", "sz", "bj", "hk", "us") else raw,
+            "name": str(row.get("name") or ""),
+            "price": _f(row.get("zxj")),
+            "change_pct": _f(row.get("zdf")),
+            "amount": round(amt / 1e4, 2) if amt is not None else None,   # 万元 → 亿元
+            "sector": None,
+        })
+    return out
+
+
 def fetch_turnover_top20(top=20):
-    """返回 [{code,name,price,change_pct,amount(亿),sector}], 按成交额降序."""
-    rows = _clist(ALL_A_FS, "f6", "f12,f14,f2,f3,f6,f100",
-                  ut=UT_FUND, pz=top, max_pages=1)
+    """返回 [{code,name,price,change_pct,amount(亿),sector}], 按成交额降序.
+
+    东财 clist 取不到时降级腾讯财经。**`_clist` 重试耗尽会 raise**，必须在这里
+    接住 —— 否则异常会冒到 data.py，让资金面把成交额榜整块跳过。
+    """
+    try:
+        rows = _clist(ALL_A_FS, "f6", "f12,f14,f2,f3,f6,f100",
+                      ut=UT_FUND, pz=top, max_pages=1)
+    except Exception:
+        rows = []
+    if not rows:
+        return _tencent_turnover_top(top)
     out = []
     for r in rows[:top]:
         amt = _f(r.get("f6"))
