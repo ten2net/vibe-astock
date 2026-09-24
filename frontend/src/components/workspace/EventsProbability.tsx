@@ -17,7 +17,11 @@ export function EventsProbability() {
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={near} onChange={e => setNear(e.target.checked)} />只看未来 30 天内结算（按源站日期筛选；未给时刻的仅精确到日，日期不明的保留在全部清单）</label>
     {near && !items.length && <p className="text-sm">当前快照无日期可确认的近 30 天事件；取消筛选可查看全部宏观背景。</p>}
     {data && <><p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">{data.guard.replace(/\*\*/g, "")}</p>
-      {(partial||data.stale) && <p role="status" className="text-sm text-warning">{data.refresh_error || '部分来源未完整查完，当前是采样清单，不能据此断言未出现的事件没有市场报价。'}</p>}
+      {(partial||data.stale) && <p role="status" className="text-sm text-warning">{data.refresh_error ||
+        (!data.items.length && data.errors.length
+          /* 两个源都失败时不能说「部分未完整」——那是全军覆没，措辞要对齐事实 */
+          ? '两个预测市场源本轮都没取到数据，清单为空。展开下方「数据覆盖说明」看具体原因（常见于 Kalshi / Polymarket 境外站点不可达，需要代理）。'
+          : '部分来源未完整查完，当前是采样清单，不能据此断言未出现的事件没有市场报价。')}</p>}
       {!data.items.length && <p>本轮没有取得符合条件的合约报价，不代表没有相关事件。</p>}
       {[...new Set(items.map(i=>i.module))].map(group=><section key={group}><h4 className="mb-2 font-semibold">{group}</h4><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="text-muted-foreground">{['合约 / 情形','市场概率','结算日期','24h 成交量','来源 / 采集时间'].map(x=><th key={x} className="px-3 py-2 font-normal">{x}</th>)}</tr></thead><tbody>{items.filter(i=>i.module===group).map(i=><tr key={JSON.stringify([i.venue,i.ticker,i.leg])} className="border-t border-border/60"><td className="min-w-56 px-3 py-3">{i.title}<div className="text-xs text-muted-foreground">{i.leg}</div></td><td className="whitespace-nowrap px-3 text-primary">{i.prob==null?'未覆盖':`${(i.prob*100).toFixed(1)}%`}</td><td className="whitespace-nowrap px-3">{beijingTime(i.close)}</td><td className="px-3">{i.volume_missing?'未覆盖':i.volume.toLocaleString()}</td><td className="px-3 text-xs text-muted-foreground">{i.venue}{i.source_url && /^https:\/\/(api\.elections\.kalshi\.com|gamma-api\.polymarket\.com)\//.test(i.source_url) && <a className="ml-2 text-primary underline" href={i.source_url} target="_blank" rel="noopener noreferrer">源站当前数据</a>}<div className="whitespace-nowrap">{beijingTime(i.as_of)}</div></td></tr>)}</tbody></table></div></section>)}
       {partial && <details className="text-xs text-muted-foreground"><summary>查看数据覆盖说明</summary>{[...data.warnings,...data.errors].map((s,i)=><p key={i} className="mt-2">{s}</p>)}</details>}</>}
