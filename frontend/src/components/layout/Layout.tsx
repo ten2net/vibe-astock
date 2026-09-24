@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { ChevronsLeft, ChevronsRight, Globe, Github, Cog, Menu, Moon, Sparkles, Sun, X } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Globe, Github, Cog, Menu, Moon, Sparkles, Sun, X ,Sparkle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { moduleFor, chatPageFor, navigationPath } from '@/lib/workspace/modules';
@@ -52,9 +52,9 @@ function Shell() {
     <div className={cn('border-t border-border', compact ? 'p-1.5' : 'p-3')}>
       <Link to="/settings" title="接入 AI" aria-label="接入 AI" aria-current={pathname === '/settings' ? 'page' : undefined} onClick={() => setMobileOpen(false)} className={cn('mb-2 flex min-h-10 items-center gap-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground', compact ? 'justify-center' : 'px-3')}><Cog className="h-4 w-4" />{!compact && '接入 AI'}</Link>
       <div className={cn('flex items-center text-muted-foreground', compact ? 'flex-col gap-3' : 'justify-between gap-2')}>
-        <a href="https://phoenixtree.ai/" target="_blank" rel="noopener noreferrer" aria-label="Phoenix Tree AI 官网（新标签页打开）" title="Phoenix Tree AI 官网" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary"><Globe className="h-3.5 w-3.5 shrink-0" />{!compact && <span>phoenixtree.ai</span>}</a>
-        <a href="https://x.com/linsizhen" target="_blank" rel="noopener noreferrer" aria-label="X · 联系作者" title="X @linsizhen" className="p-1 hover:text-foreground"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.64 7.584H.47l8.6-9.835L0 1.154h7.594l5.243 6.932 6.064-6.933ZM17.61 20.644h2.039L6.486 3.24H4.298L17.61 20.644Z" /></svg></a>
-        <a href="https://github.com/simonlin1212/vibe-astock" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="p-1 hover:text-foreground"><Github className="h-3.5 w-3.5" /></a>
+        <a href="http://192.168.15.131:8080/" target="_blank" rel="noopener noreferrer" aria-label="LGBM量化" title="LGBM量化" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary"><Globe className="h-3.5 w-3.5 shrink-0" />{!compact && <span>LGBM量化</span>}</a>
+        <a href="http://192.168.15.131:3000/" target="_blank" rel="noopener noreferrer" aria-label="A股热力图" title="A股热力图" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary"><Sparkle className="h-3.5 w-3.5 shrink-0" />{!compact && <span>热力图</span>}</a>
+        <a href="https://github.com/ten2net/vibe-astock" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="p-1 hover:text-foreground"><Github className="h-3.5 w-3.5" /></a>
         {!mobile && <button type="button" onClick={collapse} aria-label={compact ? '展开侧栏' : '收起侧栏'} className="p-1">{compact ? <ChevronsRight className="h-3.5 w-3.5" /> : <ChevronsLeft className="h-3.5 w-3.5" />}</button>}
       </div>{storageError && <p role="alert" className="text-xs text-destructive">{storageError}</p>}
     </div>
