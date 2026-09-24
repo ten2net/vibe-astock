@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { pctColor } from "@/lib/colors";
 import { Plus, X, RefreshCw, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -8,7 +9,7 @@ import { AskAiButton } from "@/components/ui/AskAiButton";
 import { api, type Quote } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
-import { StockNameLink } from "@/lib/stock-link";
+import { StockExternalBadge } from "@/lib/stock-link";
 
 const color = pctColor;   // 红涨绿跌口径见 lib/colors.ts
 const pct = (v: number | undefined) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);
@@ -139,7 +140,11 @@ export function Watchlist({ embedded = false }: { embedded?: boolean }) {
                   const q = quotes[c];
                   return (
                     <tr key={c} className="border-b border-border/30">
-                      <td className="px-2 py-2.5 font-medium"><StockNameLink code={c} name={q?.name || "—"} /></td>
+                      <td className="px-2 py-2.5 font-medium">
+                        {/* 名称走站内个股页；雪球图标放在 <Link> 外面，避免 <a> 套 <a> */}
+                        <Link to={`/stock-data?symbol=${c}`} className="hover:text-primary">{q?.name || "—"}</Link>
+                        <StockExternalBadge code={c} name={q?.name} />
+                      </td>
                       <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground">{c}</td>
                       <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? q.price : "—"}</td>
                       <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? pct(q.change_pct) : "—"}</td>
