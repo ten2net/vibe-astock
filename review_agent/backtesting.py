@@ -6,7 +6,7 @@ import contextlib
 import io
 import json
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -104,11 +104,24 @@ def probability():
     import tempfile
     # Called only inside the disposable data worker; never changes the API's import path.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'research_data'))
-    from sources.probability import macro_probability
+    from sources.probability import macro_probability, ProbabilityError, GUARD
     from sources._http import capture
     with tempfile.TemporaryDirectory(prefix='astock-probability-') as tmp:
         with capture(tmp, 'prediction-markets', 'macro_probability'):
-            data = macro_probability()
+            try:
+                data = macro_probability()
+            except ProbabilityError as exc:
+                # 两个预测市场（Kalshi / Polymarket）都取不到。这里**不能抛**：
+                # 抛出会让数据 worker 直接崩掉、result 事件缺失，上层只能报一句笼统的
+                # 「公开资料取数未完整完成」，真正的原因就丢了。改成返回结构完整的
+                # 空快照、把原因放进 errors —— 页面才说得清是境外源不可达。
+                now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                return {
+                    "today": now[:10], "as_of": now, "fetch_started": now,
+                    "items": [], "sources_ok": [], "sources_partial": [],
+                    "raw_refs": [], "warnings": [], "errors": [str(exc)],
+                    "guard": GUARD, "raw_retained": False,
+                }
     # Raw captures are ephemeral here; do not return dangling file references.
     data.pop('raw_refs', None)
     for item in data.get('items', []):
