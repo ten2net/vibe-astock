@@ -697,11 +697,16 @@ export function DailyReview() {
       <div className="mb-3 flex items-center gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground"><TrendingUp className="h-4 w-4" /> 板块资金趋势榜</h3>
         <Caliber text={
-          "净流入 / 流入 / 流出取自同花顺行业资金流的**盘中即时值**，单位亿元，净流入 = 流入 − 流出。\n" +
-          "⚠️ 那边没说明这是主力资金还是全部成交资金，所以**不能当作主力净流入**来读。\n" +
+          (sectors[0]?.source === "tencent"
+            ? "当前为**腾讯财经**降级源：净流入是主力资金口径，单位亿元，净流入 = 流入 − 流出。\n" +
+              "⚠️ 腾讯是**一级行业**（约 31 个），比常规来源的行业分类粗，不能与细分行业榜逐项对齐。\n"
+            : "净流入 / 流入 / 流出取自**东方财富**行业资金流的盘中即时值，单位亿元，净流入 = 流入 − 流出。\n" +
+              "⚠️ 那边没说明这是主力资金还是全部成交资金，所以**不能当作主力净流入**来读。\n") +
           "涨跌% 是行业整体涨幅；成分股数是这个行业的公司总数，不是上涨家数、也不是涨停家数。"
         } />
-        <span className="text-[11px] text-muted-foreground/50">行业 · 按今日净流入排序</span>
+        <span className="text-[11px] text-muted-foreground/50">
+          行业 · 按今日净流入排序{sectors[0]?.source === "tencent" && " · 腾讯一级行业（降级源）"}
+        </span>
       </div>
       <GlassCard className="mb-6">
         {sectors.length === 0 ? (
@@ -724,7 +729,7 @@ export function DailyReview() {
                     <td className={cn("px-2 py-2 font-mono", pctColor(s.net))}>{s.net > 0 ? "+" : ""}{fmt(s.net)} 亿</td>
                     <td className="px-2 py-2 font-mono text-muted-foreground">{fmt(s.inflow)}</td>
                     <td className="px-2 py-2 font-mono text-muted-foreground">{fmt(s.outflow)}</td>
-                    <td className="px-2 py-2 font-mono text-muted-foreground">{s.firms}</td>
+                    <td className="px-2 py-2 font-mono text-muted-foreground">{s.firms ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

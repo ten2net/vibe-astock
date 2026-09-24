@@ -6,7 +6,10 @@
 
 from __future__ import annotations
 
+import json
+import threading
 import time
+import urllib.request
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
@@ -17,16 +20,24 @@ BEIJING = timezone(timedelta(hours=8))
 _CACHE: dict = {}
 _TTL = 300  # 5 分钟；全站共享，省数据源压力
 
+# akshare 不是线程安全的：并发调用 stock_fund_flow_industry 会直接段错误
+# （实测 6 线程并发即 core dump）。FastAPI 用线程池处理请求，所以所有 akshare
+# 调用必须串行，否则「板块资金趋势榜」会随机变空，严重时整个进程被带崩。
+_AK_LOCK = threading.Lock()
 
-def _cached(key: str, fn, valid=bool):
-    """TTL 缓存。数据源故障的空结果不缓存（valid 判否），下次请求直接重试。"""
+
+def _cached(key: str, fn, valid=bool, empty_ttl: float = 0):
+    """TTL 缓存。
+
+    valid 判否的结果**默认不缓存**（下次请求立即重试）；给了 empty_ttl 则只缓存
+    这么久 —— 故障期既要避免每次请求都打数据源，也不能把空结果钉住 5 分钟。
+    """
     now = time.time()
     hit = _CACHE.get(key)
     if hit and now - hit[0] < _TTL:
         return hit[1]
     val = fn()
-    if valid(val):
-        _CACHE[key] = (now, val)
+    _CACHE[key] = (now if valid(val) else now - _TTL + empty_ttl, val)
     return val
 
 
@@ -41,7 +52,8 @@ def _sentiment() -> dict:
     """市场情绪：涨跌家数/涨停跌停/活跃度 + 大盘宽度、题材投机（客观数据机械分档）。"""
     try:
         # akshare 惰性导入（同 astock 模式）：未装时降级返回空，不挡整个服务启动
-        df = astock._akshare().stock_market_activity_legu()
+        with _AK_LOCK:      # akshare 非线程安全，见 _AK_LOCK 注释
+            df = astock._akshare().stock_market_activity_legu()
         d = {row["item"]: row["value"] for _, row in df.iterrows()}
     except Exception:
         return {}
@@ -69,35 +81,98 @@ def _sentiment() -> dict:
     }
 
 
-def _sectors() -> list[dict]:
-    """行业资金流（按净额降序）。不含领涨股等个股字段。"""
+# 腾讯财经行业榜（降级源）。board_type=hy 是一级行业，一次取全量。
+_TENCENT_SECTORS = ("https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank"
+                    "?board_type=hy&sort_type=price&direct=down&offset=0&count=100")
+
+
+def _tencent_sectors() -> list[dict]:
+    """行业资金流降级源（腾讯财经）。东财取不到时用。
+
+    ⚠️ 口径与东财那份**不同**，两者不能混着读，返回里带 source 供页面标注：
+      · 腾讯是**一级行业**（约 31 个），东财是细分行业（约 90 个）
+      · 接口单位是万元，这里换算成亿元，与东财那份的 net/inflow/outflow 一致
+      · 没有成分股数（firms 为 None，页面显示「—」）
+    """
     try:
-        f = astock._akshare().stock_fund_flow_industry(symbol="即时")
-        f = f.sort_values("净额", ascending=False)
+        req = urllib.request.Request(_TENCENT_SECTORS,
+                                     headers={"User-Agent": astock.UA, "Referer": "https://gu.qq.com/"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8", "replace"))
+        rows = ((body.get("data") or {}).get("rank_list") or [])
     except Exception:
         return []
+
+    def yi(v):
+        """万元 → 亿元"""
+        try:
+            return round(float(v) / 1e4, 2)
+        except (TypeError, ValueError):
+            return None
+
+    def pct(v):
+        try:
+            return round(float(v), 2)
+        except (TypeError, ValueError):
+            return None
+
     out = []
-    for _, row in f.iterrows():
+    for r in rows:
+        name = str(r.get("name") or "").strip()
+        if not name:
+            continue
         out.append({
-            "name": str(row["行业"]),
-            "pct": round(float(row.get("行业-涨跌幅", 0) or 0), 2),
-            "net": round(float(row.get("净额", 0) or 0), 2),
-            "inflow": round(float(row.get("流入资金", 0) or 0), 2),
-            "outflow": round(float(row.get("流出资金", 0) or 0), 2),
-            "firms": _num(row.get("公司家数")),
+            "name": name,
+            "pct": pct(r.get("zdf")),
+            "net": yi(r.get("zljlr")),      # 主力净流入
+            "inflow": yi(r.get("zllr")),    # 主力流入
+            "outflow": yi(r.get("zllc")),   # 主力流出
+            "firms": None,
+            "source": "tencent",
         })
+    out.sort(key=lambda r: r["net"] if r["net"] is not None else float("-inf"), reverse=True)
     return out
 
 
+def _sectors() -> list[dict]:
+    """行业资金流（按净额降序）。不含领涨股等个股字段。
+
+    东财（akshare）取不到时降级腾讯财经 —— 东财那个接口在本机会被间歇性掐连接，
+    拿不到就整块空着，页面只显示「数据源暂时不可用」。
+    """
+    try:
+        with _AK_LOCK:      # akshare 非线程安全，见 _AK_LOCK 注释
+            f = astock._akshare().stock_fund_flow_industry(symbol="即时")
+        f = f.sort_values("净额", ascending=False)
+        out = []
+        for _, row in f.iterrows():
+            out.append({
+                "name": str(row["行业"]),
+                "pct": round(float(row.get("行业-涨跌幅", 0) or 0), 2),
+                "net": round(float(row.get("净额", 0) or 0), 2),
+                "inflow": round(float(row.get("流入资金", 0) or 0), 2),
+                "outflow": round(float(row.get("流出资金", 0) or 0), 2),
+                "firms": _num(row.get("公司家数")),
+                "source": "eastmoney",
+            })
+        if out:
+            return out
+    except Exception:
+        pass
+    return _tencent_sectors()
+
+
 def get_overview() -> dict:
-    """市场情绪 + 板块资金（含缓存）。资金轮动由前端从 sectors 头尾取。"""
-    def build():
-        return {
-            "sentiment": _sentiment(),
-            "sectors": _sectors(),
-            "updated": datetime.now(BEIJING).strftime("%Y-%m-%d %H:%M"),
-        }
-    return _cached("overview", build, valid=lambda v: bool(v.get("sentiment") or v.get("sectors")))
+    """市场情绪 + 板块资金（各自缓存）。资金轮动由前端从 sectors 头尾取。
+
+    情绪与板块资金**分开**缓存：原先合并成一个 key、用 `sentiment or sectors`
+    判有效，于是情绪成功而板块资金失败时，空 sectors 会被一起钉住 5 分钟。
+    """
+    return {
+        "sentiment": _cached("sentiment", _sentiment, valid=bool, empty_ttl=30),
+        "sectors": _cached("sectors", _sectors, valid=bool, empty_ttl=30),
+        "updated": datetime.now(BEIJING).strftime("%Y-%m-%d %H:%M"),
+    }
 
 
 def _emotion() -> dict:

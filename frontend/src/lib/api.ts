@@ -144,7 +144,12 @@ export interface MarketSentiment {
   active: string; breadth: string; speculation: string; date: string;
 }
 export interface SectorFlow {
-  name: string; pct: number; net: number; inflow: number; outflow: number; firms: number;
+  name: string; pct: number; net: number; inflow: number; outflow: number;
+  // 腾讯降级源没有成分股数 → null，页面显示「—」
+  firms: number | null;
+  // 实际取数来源：eastmoney（细分行业，约 90 个）/ tencent（一级行业，约 31 个）。
+  // 两者行业分类粒度不同，不能混着读，页面据此标注。
+  source?: string;
 }
 export interface MarketOverview {
   sentiment: MarketSentiment; sectors: SectorFlow[]; updated: string;
