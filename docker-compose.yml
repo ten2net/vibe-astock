@@ -32,6 +32,17 @@ services:
       VR_DATA_DIR: /data/market
       # 容器内必须监听全部网卡，只绑 127.0.0.1 的话宿主机的端口映射连不进来
       VIBE_HOST: 0.0.0.0
+      # 代理：境外数据源（事件概率用 Kalshi / Polymarket）走它。
+      # 刻意**不写进 .env** —— .env 会被 duanxian/fetchers.py 读进 os.environ，而
+      # 测试会检查代码有没有擅自改 NO_PROXY，写了会被误判。部署参数放这里更合适。
+      # 不需要代理的部署，删掉这六行即可。
+      http_proxy: http://192.168.200.24:7890
+      https_proxy: http://192.168.200.24:7890
+      HTTP_PROXY: http://192.168.200.24:7890
+      HTTPS_PROXY: http://192.168.200.24:7890
+      # 国内源不走代理，否则绕远且可能失败
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
 
     volumes:
       - astock-agent:/data/agent        # Agent 会话、任务、证据账本、产品登录
