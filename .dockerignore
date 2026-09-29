@@ -1,0 +1,26 @@
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.local
+*.log
+
+# 依赖目录默认排除，但 frontend/runtime 这两个例外：它们由宿主机提供后复制进镜像。
+# 原因见 Dockerfile —— 在容器内 npm ci 拉取 @openai/codex 引擎（数百 MB）实测会
+# 卡住二十分钟以上，而宿主机已经装好且平台一致（linux-x64）。
+node_modules
+!frontend/node_modules
+!runtime/node_modules
+
+# 构建产物由镜像构建阶段生成
+frontend/dist
+
+# 业务数据走 compose 命名卷，绝不能进镜像
+.vibe-astock-agent
+.duanxian-agents
+
+.DS_Store

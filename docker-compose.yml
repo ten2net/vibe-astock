@@ -1,0 +1,58 @@
+# Vibe AStock —— 本地网页工作台
+#
+#   docker compose up -d --build    # 构建并启动（首次较慢，要装依赖 + 构建前端）
+#   docker compose logs -f          # 看日志
+#   docker compose ps               # 看健康状态
+#   docker compose down             # 停止并移除容器（数据保留在卷里）
+#   docker compose down -v          # 连卷一起删（会丢全部业务数据，慎用）
+#
+# 业务数据落在三个命名卷，容器重建不丢。.env 里的凭据、局域网 Host 白名单与代理
+# 配置通过 env_file 原样生效。
+
+services:
+  vibe-astock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vibe-astock:local
+    container_name: vibe-astock
+    restart: unless-stopped
+
+    ports:
+      # 与当前本机部署一致：对局域网开放。只想本机访问时改成 "127.0.0.1:8910:8910"
+      - "8910:8910"
+
+    env_file:
+      - .env
+
+    environment:
+      # 业务数据重定向到 /data 并挂卷；默认路径在 home 下，容器重建会丢
+      ASTOCK_AGENT_HOME: /data/agent
+      ASTOCK_DATA_HOME: /data/duanxian
+      VR_DATA_DIR: /data/market
+      # 容器内必须监听全部网卡，只绑 127.0.0.1 的话宿主机的端口映射连不进来
+      VIBE_HOST: 0.0.0.0
+
+    volumes:
+      - astock-agent:/data/agent        # Agent 会话、任务、证据账本、产品登录
+      - astock-duanxian:/data/duanxian  # 复盘、版本、交易日志、原始归档
+      - astock-market:/data/market      # 市场资料、盯盘缓存、研报
+      # CodeBuddy 订阅接入：登录态与 CLI 本体都要持久化，否则容器重建就得重新 OAuth。
+      # 容器内 OAuth 默认回调 127.0.0.1，与宿主机不互通，登录方式见 README「容器内登录 CodeBuddy」一节。
+      - astock-codebuddy:/root/.codebuddy
+      - astock-codebuddy-cli:/root/.local
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8910/api/astock/health', timeout=8).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  astock-agent:
+  astock-duanxian:
+  astock-market:
+  astock-codebuddy:      # CodeBuddy 登录态
+  astock-codebuddy-cli:  # CodeBuddy CLI 本体（含版本目录）
