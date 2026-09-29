@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="#产品定位">产品定位</a> · <a href="#七个工作模块">功能</a> ·
-  <a href="#快速开始">快速开始</a> · <a href="#接入-ai">接入 AI</a> ·
+  <a href="#快速开始">快速开始</a> · <a href="#docker-compose-部署">Docker 部署</a> · <a href="#接入-ai">接入 AI</a> ·
   <a href="#数据与隐私">数据与隐私</a> · <a href="#验证范围">验证范围</a> ·
   <a href="CHANGELOG.md">更新日志</a>
 </p>
@@ -148,6 +148,53 @@ Windows 也在本机浏览器中使用；需要安装 Python（含 `py` 启动�
 源码更新前停止服务并备份下节列出的数据；保留本地修改，更新后重新运行 `sh scripts/setup` 与 `sh scripts/doctor`。日志位于 `.local/startup.log`，分享日志前检查个人信息。
 
 本地后台提供 macOS、Linux 和 Windows 启动路径。Windows 原生安装、进程清理和网页重启的自动验收结果见[验证范围](#验证范围)；各供应商需使用自己的账户或密钥完成连接测试。
+
+## Docker Compose 部署
+
+也可以不装本机环境，直接用容器跑：
+
+```bash
+docker compose up -d --build   # 首次较慢：装 Python/Node 依赖并构建前端
+docker compose logs -f
+docker compose down            # 停止并移除容器，数据保留在卷里
+```
+
+镜像里同时有 Python 3.12 与 Node 22 两个运行时 —— AI 引擎（固定版本的 Codex CLI）由 Node 拉起，不是构建完就不用了。启动后同样是 `http://127.0.0.1:8910`。
+
+业务数据落在三个命名卷 `astock-agent`、`astock-duanxian`、`astock-market`，容器重建不丢；`docker compose down -v` 会连卷一起删，慎用。
+
+容器内监听地址固定 `0.0.0.0`（只绑回环的话宿主机的端口映射连不进来），Host 白名单仍由 `VIBE_ALLOW_HOSTS` 决定。只想本机访问时，把 `docker-compose.yml` 里的端口改写为 `127.0.0.1:8910:8910`。
+
+### 在容器里登录 CodeBuddy
+
+CodeBuddy 的 OAuth 回调默认绑定 `127.0.0.1`，而容器的回环地址与宿主机不互通 —— 浏览器回调打不进容器，登录会卡住。它也没有 `login` 子命令，登录要在 Web UI 里完成，所以先用 `--host 0.0.0.0` 把服务暴露出来：
+
+```bash
+# 1) 把宿主机已装好的 CodeBuddy 复制进持久化卷（省去容器内重新下载）
+docker run --rm -v "$HOME/.local:/src:ro" -v astock-codebuddy-cli:/dst \
+  alpine sh -c "cp -a /src/. /dst/"
+
+# 2) 启动一次性登录服务
+docker run -d --name vibe-cb-login -p 8920:8920 \
+  -v astock-codebuddy:/root/.codebuddy \
+  -v astock-codebuddy-cli:/root/.local \
+  vibe-astock:local \
+  sh -c "/root/.local/bin/codebuddy --serve --host 0.0.0.0 --port 8920"
+
+# 3) 看它给出的 Web UI 地址与一次性密码
+docker logs vibe-cb-login
+```
+
+在**宿主机浏览器**打开 `http://127.0.0.1:8920`（日志里会带 password），在页面里完成登录。登录态写入 `astock-codebuddy` 卷。
+
+```bash
+docker rm -f vibe-cb-login     # 登录完成后收掉这个一次性容器
+docker compose up -d           # 正常启动
+```
+
+之后在页面的「接入 AI」里选 WorkBuddy / CodeBuddy 订阅即可。若提示找不到 CLI，在 `.env` 里补一行 `CODEBUDDY_BIN=/root/.local/bin/codebuddy`。
+
+登录态与 CLI 本体都挂在卷上，容器重建不需要重新登录；但换机器或删卷后要重做一次这个流程。
 
 ## 接入 AI
 
