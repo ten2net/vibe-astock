@@ -170,14 +170,21 @@ docker compose down            # 停止并移除容器，数据保留在卷里
 CodeBuddy 的 OAuth 回调默认绑定 `127.0.0.1`，而容器的回环地址与宿主机不互通 —— 浏览器回调打不进容器，登录会卡住。它也没有 `login` 子命令，登录要在 Web UI 里完成，所以先用 `--host 0.0.0.0` 把服务暴露出来：
 
 ```bash
-# 1) 把宿主机已装好的 CodeBuddy 复制进持久化卷（省去容器内重新下载）
-docker run --rm -v "$HOME/.local:/src:ro" -v astock-codebuddy-cli:/dst \
-  alpine sh -c "cp -a /src/. /dst/"
+# 1) 把宿主机已装好的 CodeBuddy 复制进持久化卷（省去容器内重新下载）。
+#    只复制当前版本 —— 整份 ~/.local 常有几个 GB。
+CB_VER=$(ls ~/.local/share/codebuddy/versions | tail -1)
+#    卷名带 compose 项目名前缀，用 docker volume ls 确认；这里是默认的 vibe-astock_
+docker run --rm \
+  -v "$HOME/.local/share/codebuddy/versions/$CB_VER:/srcdir:ro" \
+  -v vibe-astock_astock-codebuddy-cli:/dst \
+  alpine sh -c "mkdir -p /dst/share/codebuddy/versions/$CB_VER /dst/bin \
+    && cp -a /srcdir/. /dst/share/codebuddy/versions/$CB_VER/ \
+    && ln -sf /root/.local/share/codebuddy/versions/$CB_VER/codebuddy /dst/bin/codebuddy"
 
 # 2) 启动一次性登录服务
 docker run -d --name vibe-cb-login -p 8920:8920 \
-  -v astock-codebuddy:/root/.codebuddy \
-  -v astock-codebuddy-cli:/root/.local \
+  -v vibe-astock_astock-codebuddy:/root/.codebuddy \
+  -v vibe-astock_astock-codebuddy-cli:/root/.local \
   vibe-astock:local \
   sh -c "/root/.local/bin/codebuddy --serve --host 0.0.0.0 --port 8920"
 
@@ -185,7 +192,7 @@ docker run -d --name vibe-cb-login -p 8920:8920 \
 docker logs vibe-cb-login
 ```
 
-在**宿主机浏览器**打开 `http://127.0.0.1:8920`（日志里会带 password），在页面里完成登录。登录态写入 `astock-codebuddy` 卷。
+在**宿主机浏览器**打开 `http://127.0.0.1:8920`（日志里会带 password），在页面里完成登录。登录态写入 `vibe-astock_astock-codebuddy` 卷。
 
 ```bash
 docker rm -f vibe-cb-login     # 登录完成后收掉这个一次性容器

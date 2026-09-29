@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="#purpose">Purpose</a> · <a href="#seven-work-modules">Features</a> ·
-  <a href="#quick-start">Quick start</a> · <a href="#connect-ai">Connect AI</a> ·
+  <a href="#quick-start">Quick start</a> · <a href="#docker-compose-deployment">Docker</a> · <a href="#connect-ai">Connect AI</a> ·
   <a href="#data-and-privacy">Data and privacy</a> · <a href="#validation-scope">Validation</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -148,6 +148,61 @@ Open Connect AI to sign in or enter your own API configuration, test it, and sav
 Before updating source code, stop the service and back up the data listed below. Preserve local modifications; after updating, rerun `sh scripts/setup` and `sh scripts/doctor`. Startup logs are in `.local/startup.log`; check for personal information before sharing logs.
 
 The local backend has startup paths for macOS, Linux, and Windows. See [Validation scope](#validation-scope) for native Windows installation, cleanup, and web-restart tests. Test each provider with your own account or key.
+
+## Docker Compose deployment
+
+You can also run it in a container without installing the local environment:
+
+```bash
+docker compose up -d --build   # slower the first time: installs deps and builds the frontend
+docker compose logs -f
+docker compose down            # stops and removes the container; data stays in the volumes
+```
+
+The image carries two runtimes: Python 3.12 and Node 22. The AI engine (a pinned Codex CLI) is launched by Node at run time, so Node is still needed after the build. Once started, the address is again `http://127.0.0.1:8910`.
+
+Business data lives in three named volumes — `astock-agent`, `astock-duanxian`, `astock-market` — and survives container rebuilds. `docker compose down -v` also deletes the volumes; use with care.
+
+The container always listens on `0.0.0.0` (binding only to loopback would make the host port mapping unreachable). The Host allowlist is still governed by `VIBE_ALLOW_HOSTS`. For local-only access, change the port in `docker-compose.yml` to `127.0.0.1:8910:8910`.
+
+### Signing in to CodeBuddy inside the container
+
+CodeBuddy's OAuth callback binds to `127.0.0.1` by default, and the container's loopback is not the host's — the browser cannot complete the callback and sign-in stalls. It also has no `login` subcommand; sign-in happens in the web UI. So expose the service first with `--host 0.0.0.0`:
+
+```bash
+# 1) Copy the host's existing CodeBuddy into the persistent volume (avoids re-downloading).
+#    Only the current version — a full ~/.local is often several GB.
+CB_VER=$(ls ~/.local/share/codebuddy/versions | tail -1)
+#    Volume names carry the compose project prefix; confirm with docker volume ls.
+#    The default project name gives vibe-astock_ here.
+docker run --rm \
+  -v "$HOME/.local/share/codebuddy/versions/$CB_VER:/srcdir:ro" \
+  -v vibe-astock_astock-codebuddy-cli:/dst \
+  alpine sh -c "mkdir -p /dst/share/codebuddy/versions/$CB_VER /dst/bin \
+    && cp -a /srcdir/. /dst/share/codebuddy/versions/$CB_VER/ \
+    && ln -sf /root/.local/share/codebuddy/versions/$CB_VER/codebuddy /dst/bin/codebuddy"
+
+# 2) Start a one-off sign-in server
+docker run -d --name vibe-cb-login -p 8920:8920 \
+  -v vibe-astock_astock-codebuddy:/root/.codebuddy \
+  -v vibe-astock_astock-codebuddy-cli:/root/.local \
+  vibe-astock:local \
+  sh -c "/root/.local/bin/codebuddy --serve --host 0.0.0.0 --port 8920"
+
+# 3) Read the Web UI URL and one-time password it prints
+docker logs vibe-cb-login
+```
+
+Open `http://127.0.0.1:8920` in the **host browser** (the log includes the password) and complete sign-in in the page. The session is written to the `vibe-astock_astock-codebuddy` volume.
+
+```bash
+docker rm -f vibe-cb-login     # remove the one-off container once signed in
+docker compose up -d           # start normally
+```
+
+Then select the WorkBuddy / CodeBuddy subscription under Connect AI. If the CLI cannot be found, add `CODEBUDDY_BIN=/root/.local/bin/codebuddy` to `.env`.
+
+Both the session and the CLI itself live on volumes, so rebuilding the container does not require signing in again — but you must repeat this flow on another machine or after deleting the volumes.
 
 ## Connect AI
 
