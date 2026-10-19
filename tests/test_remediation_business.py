@@ -168,10 +168,11 @@ def test_filtered_auction_explains_present_but_invalid_archive(monkeypatch):
  assert result['warnings']
 
 
-def test_single_stock_timing_does_not_claim_identical_drawdown():
+def test_single_stock_timing_carries_drawdown_caveat_note():
+ # 上游 v2.1 重写了单票提示语(原"不能等同于标的自身回撤"),意图不变:单票方案必须带回撤警示
  from backtest.gate import plan_backtest
  plan = plan_backtest(codes=['600519.SH'], start='2025-01-01', end='2025-12-31', style='swing')
- assert any('不能等同于标的自身回撤' in n for n in plan.notes)
+ assert any('单只标的' in n and '回撤' in n for n in plan.notes)
 
 
 def test_corrupt_intraday_file_is_preserved_and_explained(tmp_path, monkeypatch):
