@@ -1,10 +1,68 @@
-#!/bin/sh
+#!/usr/bin/env sh
+# macOS / Linux 一键安装：只写仓库内依赖、.venv 与产品私有数据层，不改任何 Agent CLI 的全局配置或登录。
 set -eu
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-for PY in "$ROOT/.venv/bin/python" python3.12 python3.11 python3; do
-  if "$PY" -c 'import sys; sys.exit(sys.version_info < (3,10))' >/dev/null 2>&1; then
-    exec "$PY" "$ROOT/scripts/manage.py" setup "$@"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SKIP_DOCTOR=0
+
+usage() {
+  echo "用法: scripts/setup [--skip-doctor]"
+  echo "  --skip-doctor  安装后暂不运行产品体检"
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --skip-doctor) SKIP_DOCTOR=1 ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "[setup] 未知参数:$arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+command -v node >/dev/null 2>&1 || { echo "[setup] 未找到 Node.js，请先安装 Node.js 22 或更高版本。" >&2; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo "[setup] 未找到 npm，请重新安装 Node.js。" >&2; exit 1; }
+node "$ROOT/scripts/check-node.mjs"
+
+PYTHON=""
+for candidate in python3.12 python3.11 python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    PYTHON="$(command -v "$candidate")"
+    break
   fi
 done
-printf '%s\n' '请先安装 Python 3.10 或更高版本（推荐 3.12），再重新打开启动器。' >&2
-exit 1
+if [ -z "$PYTHON" ]; then
+  echo "[setup] 未找到 Python 3.11 或更高版本（推荐 3.12）。" >&2
+  exit 1
+fi
+
+VENV_PYTHON="$ROOT/.venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+  echo "[setup] 创建 Python 虚拟环境…"
+  "$PYTHON" -m venv "$ROOT/.venv"
+fi
+"$VENV_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' || {
+  echo "[setup] 现有 .venv 的 Python 版本过低，请删除 .venv 后重新运行。" >&2
+  exit 1
+}
+
+echo "[setup] 安装 Python 依赖…"
+"$VENV_PYTHON" -m pip install --upgrade pip
+"$VENV_PYTHON" -m pip install -r "$ROOT/.agents/skills/data-access/scripts/requirements.txt"
+echo "[setup] 安装本机服务依赖…"
+(cd "$ROOT/orchestrator" && npm ci --no-audit --no-fund)
+echo "[setup] 安装浏览器界面依赖…"
+(cd "$ROOT/desktop" && npm ci --no-audit --no-fund)
+node "$ROOT/orchestrator/src/init.ts" --python "$VENV_PYTHON"
+
+if [ "$SKIP_DOCTOR" -eq 0 ]; then
+  set +e
+  node "$ROOT/orchestrator/src/doctor.ts" --python "$VENV_PYTHON"
+  doctor_exit=$?
+  set -e
+  case "$doctor_exit" in
+    0) ;;
+    2) echo "[setup] 产品体检有待处理警告；安装已完成，请按上方提示处理。" >&2 ;;
+    *) echo "[setup] 产品体检失败（退出码 $doctor_exit）。" >&2; exit "$doctor_exit" ;;
+  esac
+fi
+
+echo "[setup] 安装完成。运行 scripts/start 打开 Vibe AStock。"

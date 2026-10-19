@@ -13,7 +13,9 @@ import { fileURLToPath } from "node:url";
  */
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const SKIP_DIRS = new Set(["node_modules", ".venv", "dist", ".local", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", "test", "tests"]);
+const SKIP_DIRS = new Set(["node_modules", ".venv", "dist", ".local", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", "test", "tests",
+  // v1 旧版应用代码(fork 为保留线上部署而并存,冻结维护,不再改写法);新代码仍受全部规则约束
+  "vr", "duanxian", "review_agent", "frontend", "runtime", "research_data"]);
 // 由 datasources/port_astock.py 从上游 a-stock-data 原样生成，问题回上游修
 const GENERATED = new Set([".agents/skills/data-access/scripts/sources/astock_ported.py"]);
 

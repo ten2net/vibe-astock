@@ -1,10 +1,6 @@
-#!/bin/sh
-set -eu
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-for PY in "$ROOT/.venv/bin/python" python3.12 python3.11 python3; do
-  if "$PY" -c 'import sys; sys.exit(sys.version_info < (3,10))' >/dev/null 2>&1; then
-    exec "$PY" "$ROOT/scripts/manage.py" doctor "$@"
-  fi
-done
-printf '%s\n' '请先安装 Python 3.10 或更高版本（推荐 3.12），再重新打开启动器。' >&2
-exit 1
+#!/usr/bin/env sh
+# 体检:本机订阅 Agent / 后台默认 AI 来源 / 宪法 / skills / Python 依赖 / calc / 注册表 / 写权限 / .gitignore / 密钥扫描 / [--net] 数据源连通。实现见 orchestrator/src/doctor.ts
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# 先做 Node 运行时预检:版本不够或构建未启用 TypeScript 支持时给出指引,而不是 ERR_UNKNOWN_FILE_EXTENSION(#38)
+node "$ROOT/scripts/check-node.mjs" || exit 1
+exec node "$ROOT/orchestrator/src/doctor.ts" "$@"

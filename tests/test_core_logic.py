@@ -3220,7 +3220,7 @@ class TestBoardLabel:
         """
         import pathlib
 
-        readme = pathlib.Path("README.md").read_text(encoding="utf-8")
+        readme = pathlib.Path("README-v1.md").read_text(encoding="utf-8")
         for stale in ("收盘后再跑", "要用当天的收盘价"):
             assert stale not in readme, f"README 还留着过时说法「{stale}」"
         assert "历史场次随时能看" in readme and "定稿记录" in readme, \
@@ -7270,7 +7270,7 @@ class TestVersionIsConsistentEverywhere:
         assert 'const APP_VERSION = `v${product.version}`' in layout
         ui = json.loads(self._read("product.json"))["version"]
 
-        readme = self._read("README.md")
+        readme = self._read("README-v1.md")
         b = re.search(r"badge/version-v([\d.]+)-", readme)
         assert b, "README 里找不到版本徽章"
         assert ui == b.group(1), \
@@ -7280,7 +7280,7 @@ class TestVersionIsConsistentEverywhere:
         import re
 
         vs = {f: re.search(r"badge/version-v([\d.]+)-", self._read(f)).group(1)
-              for f in ("README.md", "README_en.md")}
+              for f in ("README-v1.md", "README-v1_en.md")}
         assert len(set(vs.values())) == 1, f"中英文 README 版本号不一致：{vs}"
 
     def test_product_packages_and_release_notes_match(self):

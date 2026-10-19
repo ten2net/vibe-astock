@@ -1,0 +1,309 @@
+<p align="center"><b>简体中文</b> | <a href="README-v1_en.md">English</a></p>
+
+<h1 align="center">Vibe AStock</h1>
+
+<p align="center">
+  <b>基于 OpenAI Codex Harness 的 A 股短线复盘与跟踪工作台</b><br>
+  盘面观察 · 证据复盘 · 多空辩论 · 历史回测 · 本地网页
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/react-19-61DAFB.svg?logo=react&logoColor=white" alt="React">
+  <a href="https://github.com/simonlin1212/vibe-astock/releases/tag/v1.1.3"><img src="https://img.shields.io/badge/version-v1.1.3-orange.svg" alt="v1.1.3"></a>
+</p>
+
+<p align="center">
+  <a href="#产品定位">产品定位</a> · <a href="#七个工作模块">功能</a> ·
+  <a href="#快速开始">快速开始</a> · <a href="#docker-compose-部署">Docker 部署</a> · <a href="#接入-ai">接入 AI</a> ·
+  <a href="#数据与隐私">数据与隐私</a> · <a href="#验证范围">验证范围</a> ·
+  <a href="CHANGELOG.md">更新日志</a>
+</p>
+
+**V1.1.3：修复 v1.1.2 的回归 —— 自托管网关启动时打印的 `http://0.0.0.0:<端口>` 重新可用；端口写错时的提示直接指向端口。**
+
+统一 AI 接入、任务进度与证据核验，保留并完善短线复盘、盯盘、个股研究和历史回测。提供 Codex、Claude、WorkBuddy / CodeBuddy 订阅接入入口，以及 DeepSeek 等 API 配置；具体要求见[接入 AI](#接入-ai)。
+
+---
+
+## 产品定位
+
+Vibe AStock 把 A 股短线研究中反复进行的工作放在一个本地网页里：查看盘面和昨日梯队，整理复盘证据，核对次日变化，再回看自己的记录与历史规则表现。
+
+数据、程序计算、人工记录和 AI 解读分别呈现。行情与统计不依赖 AI 生成；AI 用于解释材料、对照不同观点和整理待验证条件。情绪分档是分析框架，不是客观事实，也不能由某一个指标直接推导交易结论。
+
+通过本地网页启动器运行，在浏览器中查看行情、复盘、异动和任务进度。
+
+### 界面预览
+
+深色为默认主题，也保留浅色主题。侧栏按工作流程分组，二级栏目默认展开，可用小三角单独收起。
+
+![深色网页复盘界面](assets/screenshots/09-web-review-dark-20260909.png)
+
+截图摄于 2026-09-09，展示 2026-09-08 的公开盘面复盘和样本覆盖说明，不代表实时行情或收益案例。
+
+## 七个工作模块
+
+| 一级模块 | 二级栏目与主要内容 |
+|---|---|
+| 首页 | 聊天、分类功能入口、查看最近报告 |
+| 盯盘 | 盘面数据（含自选行情）、实时动态、昨日梯队、盘中核验 |
+| 复盘 | 复盘报告、首板分析、近5天热度、历史统计 |
+| 资讯雷达 | 新闻聚合与事件概率，显示来源、时点和覆盖状态 |
+| 个股研究 | 行情、估值、财报与研报资料；多空辩论 |
+| 回测 | AI 整理历史规则、确认条件、程序计算和报告归档 |
+| 我的股票 | 持仓自选、交易日志、研究记录 |
+
+「接入 AI」位于侧栏底部。持仓自选在同一页上下展示；持仓来自交易日志，不再维护互相冲突的两份账。
+
+### 盯盘：看今天，也看昨天留下的梯队
+
+- **盘面数据**：指数、市场广度、资金与板块读数，以及同一自选池的行情。不同来源的市场范围、日期和单位要分别阅读。
+- **实时动态**：从行情快照归集急拉急跌、封板开板等已发生事件，可按页面提供的范围和阈值筛选。快照轮询并非逐笔成交数据，不能保证捕获所有盘中变化。
+- **昨日梯队**：固定前一交易日的涨停样本，可选全部、二板及以上、三板及以上。今天回落或行情缺失的成员仍保留，便于观察高位梯队的延续、断板和覆盖缺口。
+- **盘中核验**：把复盘中的观察条件与当天有效快照对照。它回答“此前条件是否出现”，实时动态回答“刚才发生了什么”。历史场次随时能看，读取已有定稿记录与已保存快照；错过的历史盘中时点不能靠当前行情补造。
+
+采集依赖本机服务运行和数据源可用。夜间、午休或过期行情不能冒充当场的有效盘中快照。
+
+盘面数据中的限售解禁日历可查看未来或最近十个日历日，自选匹配在浏览器内完成。解禁数量使用本次解禁股数，占比使用总股本口径；接口失败会明确提示，不等同于没有解禁。数据源最多返回 500 条时会标明部分覆盖。
+
+### 复盘：先确认日期、样本和证据
+
+选择目标交易日后生成复盘，可以选择尚未生成报告的日期。页面区分所选日期、当前报告的交易日和生成时间；不会将已有报告的日期冒充新选择。支持进度、取消和刷新后继续查看任务状态；生成失败保留旧稿，同日重新生成保存版本，补做较早日期不会把最新报告倒退。
+
+各路取数显示当前类别，单路等待上限为90秒，并受整场剩余时间约束；超时或取消会清理对应进程。AI生成耗时另计。
+
+复盘围绕情绪、资金、题材、龙虎榜和龙头跟踪整理五个分项，再汇总依据与待验证条件。新报告可展开「查看依据」；数字展示与已支持的比较由程序处理，AI 解释受引用校验约束。旧稿保留原样，不因升级自动获得新的校验结论。
+
+| 观察维度 | 看什么 | 阅读边界 |
+|---|---|---|
+| 市场广度 | 上涨、下跌、平盘及成交情况 | 不同统计范围不能混用分母 |
+| 昨日强势股反馈 | 均值、中位数、翻红率、再次涨停率 | 是固定样本的反馈，不代表全市场收益 |
+| 晋级与梯队 | 昨日不同板位今天的延续、断板和分布 | 缺行情要披露，单个读数不能决定情绪周期 |
+| 亏钱效应与封板结构 | 回落、炸板、回封和封板质量 | 只解释来源实际覆盖的样本 |
+| 题材与跨日比较 | 涨停原因、题材变化、历史观察条件 | 归因是待核对的解释，不是已证实因果 |
+
+首板分析与近5天热度放在复盘内，提供当日结构与跨交易日背景。数据缺失、来源修订或结构变化会保留提示；已有原始归档便于追溯，但不保证外部来源永久可补取。
+
+### 个股研究与多空辩论
+
+个股研究集中展示行情、估值、财报和研报资料。多空辩论针对同一标的组织不同分析视角，分别检查积极解释、风险解释和反证，再汇总尚未解决的分歧；不强制选出赢家，不给参与倾向、买卖点位或仓位建议。
+
+旧记录中的操作倾向与点位字段不再作为操作提示展示；旧正文没有自动重新校验，页面会标明旧记录边界。运行时长受来源、材料量和模型影响，不承诺固定几分钟完成。
+
+### 历史统计与回测的区别
+
+**复盘里的历史统计**按已有涨停样本观察次日表现、封板时间等分组差异。样本是事后整理的名单，存在选择偏差；样本统计不能当成实际可成交收益。
+
+**独立的回测模块**用于检查明确的历史规则：输入条件 → AI 整理可执行范围 → 用户确认 → 确定性引擎计算 → 本地报告。AI 不替用户决定当前如何交易。报告按支持范围披露市场规则、数据区间、费用、成交与未成交原因；零成交也如实显示。没有数据或暂不支持的条件会说明限制，不用模拟结果伪装实测结果。
+
+历史表现不能保证未来结果。港股旧报告若缺少当前市场规则字段，应按原条件重新运行，不能把旧结果当作新版规则已验收。
+
+### 我的股票：保留自己的研究过程
+
+持仓、已实现结果和费用以交易日志为基础；自选是手动维护的观察列表。行情缺失显示为不可用，汇总注明不完整，不能把缺行情算成资产归零。
+
+交易日志支持结合市场环境、模式与执行记录进行分组自查。账户风险按用户填写的条件计算；没有填写风险边界的持仓单列，已知部分不能冒充完整账户风险。研究记录支持保存、查找和导出。记录中的相关性不等于能够判定盈亏的因果。
+
+## 快速开始
+
+从 [v1.1.3 Release](https://github.com/simonlin1212/vibe-astock/releases/tag/v1.1.3) 获取源码并解压，在项目目录中按下面步骤启动。已有用户请先备份本地数据，更新源码后重新准备依赖。
+
+环境要求：Python 3.10+（推荐 3.12）、Node.js 22+（含 npm）。首次准备环境需要联网下载依赖。
+
+macOS 可双击 [启动 Vibe AStock.command](启动%20Vibe%20AStock.command)，按提示准备环境并打开本地浏览器。保留终端窗口，按 Control+C 停止服务。
+
+macOS / Linux 也可在仓库根目录分步运行：
+
+```bash
+python scripts/manage.py setup
+python scripts/manage.py doctor
+python scripts/manage.py start
+```
+
+Windows 10/11 可双击 [启动 Vibe AStock.cmd](启动%20Vibe%20AStock.cmd)，或在 PowerShell / CMD 的仓库根目录运行：
+
+```powershell
+py -3 -X utf8 scripts/manage.py setup
+.venv\Scripts\python.exe -X utf8 scripts/manage.py doctor
+.venv\Scripts\python.exe -X utf8 scripts/manage.py start
+```
+
+Windows 也在本机浏览器中使用；需要安装 Python（含 `py` 启动器）和 Node.js。保留启动窗口，按 Ctrl+C 停止服务；更换端口可在 `start` 后加 `--port 8911`。更新源码后重新运行上述 `setup` 和 `doctor`。
+
+默认地址为 `http://127.0.0.1:8910`，只监听本机回环地址。端口被占用时可运行 `python scripts/manage.py start --port 8911`。开发预览可使用其他端口；截图中的布局不依赖固定开发端口。
+
+从局域网 IP 打开需要配置两处，缺一不可（都可写在 `.env` 中）：
+
+1. `VIBE_HOST=0.0.0.0` —— 让服务绑到非回环地址。默认 `127.0.0.1`，此时用局域网 IP 访问会直接**连接被拒绝**，请求还没进到程序里。
+2. `VIBE_ALLOW_HOSTS=192.168.1.10` —— 把实际访问用的 Host（逗号分隔）加入白名单（示例 IP 换成你自己的）。只配这一项而没配上一项，仍然连不上。
+
+上述第 1 步也可以写成命令行参数 `python scripts/manage.py start --host 0.0.0.0`。
+
+关于 `VIBE_ALLOW_HOSTS` 本身：自行改为监听局域网地址或挂在反向代理后面时，需要把访问用的 Host 写进环境变量 `VIBE_ALLOW_HOSTS`（逗号分隔，可写在 `.env` 中），例如 `VIBE_ALLOW_HOSTS=192.168.1.10,astock.example.com`。未列出的 Host 会被全部接口拒绝并返回 403，页面表现为各处读取失败。`127.0.0.1`、`::1` 与 `localhost` 始终允许，不需要写入；其余回环地址（如 `127.0.0.2`）不在默认名单内。
+
+先到「接入 AI」完成登录或填写自己的 API 配置，测试成功后保存。查看行情与已有记录不要求先生成 AI 报告；启动服务也不会自动生成复盘。连接测试和 AI 任务可能消耗所选服务的额度。
+
+源码更新前停止服务并备份下节列出的数据；保留本地修改，更新后重新运行 `python scripts/manage.py setup` 与 `python scripts/manage.py doctor`。日志位于 `.local/startup.log`，分享日志前检查个人信息。
+
+本地后台提供 macOS、Linux 和 Windows 启动路径。Windows 原生安装、进程清理和网页重启的自动验收结果见[验证范围](#验证范围)；各供应商需使用自己的账户或密钥完成连接测试。
+
+## Docker Compose 部署
+
+也可以不装本机环境，直接用容器跑：
+
+```bash
+docker compose up -d --build   # 首次较慢：装 Python/Node 依赖并构建前端
+docker compose logs -f
+docker compose down            # 停止并移除容器，数据保留在卷里
+```
+
+镜像里同时有 Python 3.12 与 Node 22 两个运行时 —— AI 引擎（固定版本的 Codex CLI）由 Node 拉起，不是构建完就不用了。启动后同样是 `http://127.0.0.1:8910`。
+
+业务数据落在三个命名卷 `astock-agent`、`astock-duanxian`、`astock-market`，容器重建不丢；`docker compose down -v` 会连卷一起删，慎用。
+
+容器内监听地址固定 `0.0.0.0`（只绑回环的话宿主机的端口映射连不进来），Host 白名单仍由 `VIBE_ALLOW_HOSTS` 决定。只想本机访问时，把 `docker-compose.yml` 里的端口改写为 `127.0.0.1:8910:8910`。
+
+### 在容器里登录 CodeBuddy
+
+CodeBuddy 的 OAuth 回调默认绑定 `127.0.0.1`，而容器的回环地址与宿主机不互通 —— 浏览器回调打不进容器，登录会卡住。它也没有 `login` 子命令，登录要在 Web UI 里完成，所以先用 `--host 0.0.0.0` 把服务暴露出来：
+
+```bash
+# 1) 把宿主机已装好的 CodeBuddy 复制进持久化卷（省去容器内重新下载）。
+#    只复制当前版本 —— 整份 ~/.local 常有几个 GB。
+CB_VER=$(ls ~/.local/share/codebuddy/versions | tail -1)
+#    卷名带 compose 项目名前缀，用 docker volume ls 确认；这里是默认的 vibe-astock_
+docker run --rm \
+  -v "$HOME/.local/share/codebuddy/versions/$CB_VER:/srcdir:ro" \
+  -v vibe-astock_astock-codebuddy-cli:/dst \
+  alpine sh -c "mkdir -p /dst/share/codebuddy/versions/$CB_VER /dst/bin \
+    && cp -a /srcdir/. /dst/share/codebuddy/versions/$CB_VER/ \
+    && ln -sf /root/.local/share/codebuddy/versions/$CB_VER/codebuddy /dst/bin/codebuddy"
+
+# 2) 启动一次性登录服务
+docker run -d --name vibe-cb-login -p 8920:8920 \
+  -v vibe-astock_astock-codebuddy:/root/.codebuddy \
+  -v vibe-astock_astock-codebuddy-cli:/root/.local \
+  vibe-astock:local \
+  sh -c "/root/.local/bin/codebuddy --serve --host 0.0.0.0 --port 8920"
+
+# 3) 看它给出的 Web UI 地址与一次性密码
+docker logs vibe-cb-login
+```
+
+在**宿主机浏览器**打开 `http://127.0.0.1:8920`（日志里会带 password），在页面里完成登录。登录态写入 `vibe-astock_astock-codebuddy` 卷。
+
+```bash
+docker rm -f vibe-cb-login     # 登录完成后收掉这个一次性容器
+docker compose up -d           # 正常启动
+```
+
+之后在页面的「接入 AI」里选 WorkBuddy / CodeBuddy 订阅即可。若提示找不到 CLI，在 `.env` 里补一行 `CODEBUDDY_BIN=/root/.local/bin/codebuddy`。
+
+登录态与 CLI 本体都挂在卷上，容器重建不需要重新登录；但换机器或删卷后要重做一次这个流程。
+
+## 接入 AI
+
+网页的 AI 入口共用「接入 AI」中测试保存的来源与模型。页面显示来源不等于当前账户仍能调用，应以连接测试和任务结果为准。
+
+| 接入方式 | 当前实现与验证边界 |
+|---|---|
+| Codex 订阅 | 产品专用 ChatGPT 授权与隔离引擎；已有真实登录、连接及业务运行记录，模型可用性受账户额度限制 |
+| Claude 订阅 | 本机官方 CLI 接入，已有真实复盘与辩论记录；需要自己的安装、登录和有效订阅，历史成功不代表当前账户状态 |
+| WorkBuddy / CodeBuddy | 使用本机 CLI 登录；本次仅实测 macOS WorkBuddy 内置 CodeBuddy CLI 2.137.1 的连接、受控工具、普通对话与单日完整复盘流程 |
+| OpenAI API | 使用用户自己的配置；不以订阅测试代替 API 实测，尚未完成全部兼容验收 |
+| DeepSeek / MiMo | 提供模型与地址预设，支持自行修改；使用自己的密钥测试成功后保存 |
+| CC Switch 本机路由 / 自托管网关 | 预设 `http://127.0.0.1:15721/v1`，密钥通常填 `PROXY_MANAGED`，模型按路由实际配置填写；本机回环、内网（RFC1918）、未指定地址 `0.0.0.0` 与 IPv6 唯一本地地址允许 http 任意端口，公网地址仍强制 HTTPS 标准端口。需路由支持流式 Responses 与工具调用 |
+| 智谱 GLM / Kimi / 通义千问 | 提供阿里云百炼预设，需要填写工作空间地址和百炼密钥；须以实际连接测试为准 |
+| 硅基流动 / MiniMax / OpenRouter / Groq / Together / 自定义 | 提供可编辑的地址与模型配置；预设不代表兼容性已验证，端点必须支持 Responses API 与工具调用 |
+
+Agent 默认关闭：普通聊天不启用工具或联网。开启后，适用入口才会使用其允许的证据或公开数据工具；首页已有复盘证据、页面材料和显式允许的历史日线各有范围，不是开放任意联网与本机文件访问。生成复盘、辩论和回测仍需明确发起，不由开关自动执行。
+
+所有网页 AI 来源均附加研究约束；普通聊天与报告路径对明确交易建议进行检查，证据回答另有引用和数字核对。这些检查能减少越界与错引，**不构成完整语义正确性保证**。产品要求不输出投资决策、买卖建议或仓位指令；历史规则中的买卖描述用于模拟，不是现实操作建议。
+
+旧 `main.py` CLI 与可执行 Python Prompt 包保留供开发维护，参见 [PromptPack](duanxian/prompts.py)；其独立配置不是网页接入步骤，自定义代码也不属于官方网页约束保证。
+
+## 数据与隐私
+
+行情、涨停池、龙虎榜、板块、新闻与事件概率来自公开接口或用户配置的来源。问财密钥是可选补充，未配置不应被解释成整个复盘不可用；公开涨停原因渠道也可能不覆盖所有市场或历史日期。事件概率来自 Kalshi / Polymarket 等来源，显示采集时点、缓存年龄与部分覆盖状态；它不是事件已发生的证明，也不是产品给出的股票涨跌预测。
+
+本地网页仍需要联网取数；使用远程 AI 时，问题、所选材料和必要上下文会发送给用户选择的供应商。不能把“本地保存”理解为“所有计算都离线”。
+
+| 数据 | 默认位置与注意事项 |
+|---|---|
+| Agent 会话、任务、证据账本与产品登录 | `~/.vibe-astock-agent/`；可用 `ASTOCK_AGENT_HOME` 改变该根目录 |
+| 复盘、版本、交易日志与原始归档 | `~/.duanxian-agents/`，包括 `reviews/`、`journal/`、`archive/` 等；可用 `ASTOCK_DATA_HOME` 指定绝对路径 |
+| 市场资料与盯盘缓存 | `~/.vibe-astock-agent/market-data/`；可通过 `VR_DATA_DIR` 指定 |
+| 研报资料 | 默认在上述市场资料目录的 `myreports/`；`VR_REPORTS_DIR` 可单独指定 |
+| 自选、研究记录、界面状态与 API 配置 | 当前浏览器站点的本地存储；更换浏览器、端口或清理站点数据会影响读取 |
+| 开发日志与运行诊断 | 仓库 `.local/`，默认不进入版本控制 |
+
+这些位置不是由一个开关统一迁移的：更改 `ASTOCK_AGENT_HOME` 不会自动搬走交易日志、市场资料或浏览器数据。备份应覆盖实际使用的目录及页面可导出的记录，并妥善保护其中的登录与密钥。不要将私人记录、API key 或登录文件提交到仓库；不要复制开发助手的登录文件来替代产品授权。
+
+### 将业务数据放到其他磁盘
+
+Windows PowerShell 中，在启动前设置（示例路径可自行调整）：
+
+```powershell
+$env:ASTOCK_DATA_HOME = 'D:\VibeAStock\reviews-and-journal'
+$env:ASTOCK_AGENT_HOME = 'D:\VibeAStock\agent'
+$env:VR_DATA_DIR = 'D:\VibeAStock\market-data'
+python scripts/manage.py start
+```
+
+这些变量只影响从该终端启动的进程，需在每次启动前设置，或加入自己的启动脚本。macOS/Linux 可用 `export ASTOCK_DATA_HOME="/完整路径/业务数据"` 等对应变量。默认目录保持兼容；配置目录不会自动搬迁旧文件。迁移已有数据时，先停止服务、备份并将原目录内容复制到对应新目录，再设置变量启动核对；确认前保留原件。单独配置的 `VR_REPORTS_DIR` 也需同步调整。浏览器记录和仓库 `.local/` 运行日志不受这些变量影响。
+
+## 架构与开发
+
+使用官方 OpenAI Codex Harness 作为 Agent 底座，产品固定引擎版本，配套短线研究流程、受控证据工具、任务管理和引用校验。行情与回测计算由程序完成；AI 负责阅读材料、解释和追问。Claude 与 WorkBuddy / CodeBuddy 通过各自的本机 CLI 适配接入。
+
+```text
+公开数据 → 原始归档与口径整理 → 确定性统计 / 历史模拟
+                              ↓
+                     受控 AI 解读与证据工具
+                              ↓
+                     引用校验 → 报告版本与追问
+人工交易日志与研究记录 → 本地台账和自查视图
+```
+
+| 目录 | 职责 |
+|---|---|
+| `frontend/` | React 网页、七模块导航、主题与交互 |
+| `server.py`、`vr/` | 本地 HTTP 服务与市场数据页面接口 |
+| `review_agent/`、`runtime/` | 统一模型接入、隔离引擎、任务、证据工具与研究约束 |
+| `duanxian/` | 短线指标、复盘、核验、归档、交易日志与多空辩论 |
+| `backtest/`、`research_data/` | 历史模拟引擎、配套取数与事件概率 |
+| `scripts/`、`tests/`、`frontend/test/` | 初始化、体检、启动和回归验证 |
+
+事件概率与回测所用代码的来源及许可见 [回测 NOTICE](backtest/NOTICE.md) 和 [取数 NOTICE](research_data/NOTICE.md)。
+
+## 验证范围
+
+v1.1.3 发布检查：macOS 后端三目录 **1287 项通过、4 项 Windows 专项跳过**，前端 **41 项通过**，类型检查与生产构建通过。回归包含 README、网页页脚、包配置和 API 的产品版本一致性检查。
+
+2026-09-10 源码基线 `9d84e0d` 的 Windows Server 2025 原生验收通过 **34 项运行契约和87项业务回归**，以及全新环境准备、体检、捆绑引擎启动、两次真实 HTTP 网页/API 启动和强制退出后的重启。[查看 Windows 验收记录](https://github.com/simonlin1212/vibe-astock/actions/runs/34417311929)。
+
+已有部分真实日期复盘、日期切换、页面问答和 A/H/US 历史回测与独立复算记录。上述结果不代表所有供应商、Windows 10/11 实体用户电脑、Linux 全流程或连续完整交易日均已验收；已使用 macOS WorkBuddy 内置 CodeBuddy CLI 2.137.1 完成一次单日复盘流程验证，并验证连接、受控工具、普通对话及取消/超时；独立安装的 CodeBuddy CLI、其他平台、全部模型及报告推断的正确性不在此次验证范围内。保留既有依赖弃用与构建体积提示。
+
+在完成环境准备的仓库中可运行：
+
+```bash
+.venv/bin/python -m pytest tests backtest/tests research_data/tests -q
+node --test frontend/test/*.test.ts
+npm --prefix frontend run build
+```
+
+## 更新日志
+
+产品更新见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 免责声明
+
+本工具用于数据整理、研究和历史复核，不提供投资决策或交易指令。公开数据、程序计算、人工记录与 AI 解读均可能出错；引用存在不代表推论正确，历史结果不代表未来表现。投资有风险，应独立核实资料并自行判断。
+
+## License
+
+Apache-2.0，详见 [LICENSE](LICENSE)。
+
+**作者：** Simon 林 · X [@linsizhen](https://x.com/linsizhen) · 邮箱：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)

@@ -1,0 +1,310 @@
+<p align="center"><a href="README-v1.md">简体中文</a> | <b>English</b></p>
+
+<h1 align="center">Vibe AStock</h1>
+
+<p align="center">
+  <b>A-share market review and tracking, built on OpenAI Codex Harness</b><br>
+  Market observation · Evidence-based reviews · Bull–bear discussion · Historical backtesting · Local web UI
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/react-19-61DAFB.svg?logo=react&logoColor=white" alt="React">
+  <a href="https://github.com/simonlin1212/vibe-astock/releases/tag/v1.1.3"><img src="https://img.shields.io/badge/version-v1.1.3-orange.svg" alt="v1.1.3"></a>
+</p>
+
+<p align="center">
+  <a href="#purpose">Purpose</a> · <a href="#seven-work-modules">Features</a> ·
+  <a href="#quick-start">Quick start</a> · <a href="#docker-compose-deployment">Docker</a> · <a href="#connect-ai">Connect AI</a> ·
+  <a href="#data-and-privacy">Data and privacy</a> · <a href="#validation-scope">Validation</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+**V1.1.3 fixes a v1.1.2 regression so that `http://0.0.0.0:<port>` — the address self-hosted gateways print at startup — is accepted again, and points the malformed-port message at the port itself.**
+
+Shared AI connections, task progress, and evidence validation support market reviews, market watch, stock research, and historical backtesting. Connection options include Codex, Claude, WorkBuddy / CodeBuddy subscriptions, and API configurations such as DeepSeek. See [Connect AI](#connect-ai) for requirements and verification status.
+
+---
+
+## Purpose
+
+Vibe AStock brings recurring short-term A-share research tasks into one local web workspace: inspect the market and yesterday's limit-up cohorts, organize review evidence, check subsequent changes, and revisit personal records and historical rules.
+
+Source data, program calculations, manual records, and AI interpretation are presented separately. Quotes and statistics do not depend on AI generation. AI explains materials, compares interpretations, and organizes conditions for later verification. Market-sentiment classifications are analytical frameworks, not objective facts; a single indicator cannot establish a trading conclusion.
+
+Run the local web launcher to view quotes, reviews, market events, and task progress in your browser.
+
+### Interface preview
+
+Dark mode is the default; light mode remains available. The sidebar groups pages by workflow. Submenus start expanded and can be collapsed individually using their triangles.
+
+![Dark web market-review interface](assets/screenshots/09-web-review-dark-20260909.png)
+
+Captured on September 9, 2026, this screenshot shows a review of public market data for September 8 and its sample-coverage notes. It is neither a live quote display nor a performance case study.
+
+## Seven work modules
+
+| Primary module | Pages and main content |
+|---|---|
+| Home | Chat, categorized feature shortcuts, and recent reports |
+| Market watch | Market data including watchlist quotes, live events, yesterday's cohorts, and intraday verification |
+| Market review | Review reports, first-limit-up analysis, five-session heat, and historical statistics |
+| News radar | News aggregation and event probabilities, with sources, timestamps, and coverage status |
+| Stock research | Quotes, valuation, financial and research-report materials; bull–bear discussion |
+| Backtesting | AI-assisted rule clarification, confirmation, program calculation, and report archiving |
+| My stocks | Holdings and watchlist, trading journal, and research notes |
+
+Connect AI is at the bottom of the sidebar. Holdings and the watchlist appear in two vertically stacked sections on one page. Holdings are derived from the trading journal rather than maintained in a second, potentially conflicting ledger.
+
+### Market watch: today's events and yesterday's cohorts
+
+- **Market data:** indices, breadth, fund-flow and sector readings, and quotes for the shared watchlist. Read each source's market universe, date, and units separately.
+- **Live events:** observed changes such as sharp moves and limit-up breaks or reseals, grouped from quote snapshots. Page controls filter scope and thresholds. Snapshot polling is not tick-by-tick transaction data and cannot guarantee capture of every intraday change.
+- **Yesterday's cohorts:** a fixed sample of the preceding trading session's limit-up stocks, with filters for all, two or more consecutive limit-up sessions, or three or more. Stocks that decline today or lack current quotes remain visible, preserving continuity and coverage gaps.
+- **Intraday verification:** compares conditions recorded in a review with valid snapshots from the current session. It asks whether earlier conditions occurred; live events show what just happened. Historical sessions remain viewable through saved snapshots and finalized records. Current quotes cannot reconstruct missed historical intraday observations.
+
+Collection requires the local service to be running and data sources to be available. Overnight, lunch-break, or stale quotes cannot stand in for valid snapshots of an active session.
+
+The market-data page includes an unlock calendar for the next or most recent ten calendar days, with watchlist matching performed in the browser. Share counts describe the current unlock batch; percentages use total equity. Source failures are reported rather than treated as no unlocks. Results reaching the 500-record limit are marked as partial coverage.
+
+### Market review: establish the date, sample, and evidence first
+
+Data retrieval shows the current source category and has a 90-second limit per call, bounded by the remaining task deadline. Timeout or cancellation cleans up the corresponding process. AI generation takes additional time.
+
+Choose a target trading date before generating a review, including dates without an existing report. The page distinguishes the selected date, the displayed report's trading date, and its generation time. It does not substitute an existing report's date for a new selection. Tasks support progress, cancellation, and status recovery after a refresh. Failed generation preserves the old report; regeneration saves versions, and filling in an earlier date does not move the latest-report pointer backwards.
+
+Five review sections cover sentiment, funds, themes, exchange trading disclosures, and leading-stock developments, followed by a synthesis of evidence and conditions to verify. New reports expose their supporting materials. Numerical presentation and supported comparisons are handled by the program; AI explanations are subject to citation checks. Existing reports are retained and do not automatically acquire new validation results after an upgrade.
+
+| Observation | What it covers | Reading boundary |
+|---|---|---|
+| Market breadth | Advancers, decliners, unchanged stocks, and turnover | Do not mix denominators across market universes |
+| Yesterday's strong-stock feedback | Mean, median, positive-return share, and repeat limit-up share | Describes a fixed cohort, not whole-market returns |
+| Continuation and cohort structure | Continuation, breaks, and distributions by yesterday's streak length | Disclose missing quotes; one reading cannot establish a sentiment cycle |
+| Loss distribution and limit-up structure | Pullbacks, breaks, reseals, and sealing quality | Interpret only the samples actually covered by the source |
+| Themes and cross-session comparison | Reported catalysts, theme changes, and earlier observation conditions | Attribution is an interpretation to check, not established causality |
+
+First-limit-up analysis and five-session heat sit within Market review, providing daily structure and context across trading sessions. Missing data, source revisions, and structural changes retain explicit notices. Available raw archives support tracing, but external sources are not guaranteed to remain retrievable indefinitely.
+
+### Stock research and bull–bear discussion
+
+Stock research brings quotes, valuation, financial information, and research-report materials together. Bull–bear discussion organizes different analytical perspectives on the same stock, checks positive interpretations, risk interpretations, and counterevidence, then summarizes unresolved differences. It does not force a winner or provide participation ratings, entry or exit levels, or position-sizing recommendations.
+
+Action-oriented stance and price-level fields in older records are no longer displayed as operating guidance. Old report bodies have not been automatically revalidated; the page identifies that boundary. Duration depends on sources, material volume, and the selected model, with no fixed completion-time promise.
+
+### Historical statistics versus backtesting
+
+**Historical statistics within Market review** describe subsequent-session outcomes and grouping differences, such as sealing time, using available limit-up samples. The lists were assembled after the event and carry selection bias. Their statistics cannot be treated as achievable trading returns.
+
+**The separate Backtesting module** evaluates explicit historical rules: enter conditions → AI clarifies supported execution details → user confirms → deterministic engine calculates → local report. AI does not decide what the user should trade now. Within its supported scope, the report discloses market rules, the data period, costs, trades, and reasons for unfilled orders. Zero-trade results are shown honestly. Missing data and unsupported conditions are explained rather than replaced with invented test results.
+
+Historical performance does not guarantee future outcomes. Older Hong Kong reports missing current market-rule fields should be rerun with their original conditions; their old results do not establish validation under the updated rules.
+
+### My stocks: preserve the research process
+
+Holdings, realized results, and costs are based on the trading journal; the watchlist is a manually maintained observation list. Missing quotes are marked unavailable and aggregates indicate incomplete coverage, rather than treating absent prices as worthless assets.
+
+The journal supports grouped self-review using market context, recorded methods, and execution records. Account-risk calculations use conditions entered by the user. Holdings without a specified risk boundary are listed separately, so the known portion is not presented as complete account risk. Research notes can be saved, searched, and exported. Associations in these records do not establish the causes of profits or losses.
+
+## Quick start
+
+Get and extract the source from the [v1.1.3 Release](https://github.com/simonlin1212/vibe-astock/releases/tag/v1.1.3), then follow these steps in the project directory. Existing users should back up local data before updating the source and preparing dependencies again.
+
+Requirements: Python 3.10+ (3.12 recommended), Node.js 22+ including npm. Initial setup requires internet access to download dependencies.
+
+On macOS, double-click [启动 Vibe AStock.command](启动%20Vibe%20AStock.command), follow the setup prompts, and open the local browser UI. Keep the terminal window open; press Control+C to stop the service.
+
+On macOS or Linux, run these steps from the repository root:
+
+```bash
+python scripts/manage.py setup
+python scripts/manage.py doctor
+python scripts/manage.py start
+```
+
+On Windows 10/11, double-click [启动 Vibe AStock.cmd](启动%20Vibe%20AStock.cmd), or run these commands from the repository root in PowerShell or CMD:
+
+```powershell
+py -3 -X utf8 scripts/manage.py setup
+.venv\Scripts\python.exe -X utf8 scripts/manage.py doctor
+.venv\Scripts\python.exe -X utf8 scripts/manage.py start
+```
+
+Windows uses the same local browser interface. Install Python (including the `py` launcher) and Node.js first. Keep the launch window open and press Ctrl+C to stop. Add `--port 8911` after `start` to change ports. Rerun `setup` and `doctor` after updating the source.
+
+The default address is `http://127.0.0.1:8910`, bound to the local loopback interface. If the port is occupied, use `python scripts/manage.py start --port 8911`. Development previews may use other ports; the interface does not depend on a particular development port.
+
+Opening the interface from a LAN IP requires both settings; either alone is not enough (both may live in `.env`):
+
+1. `VIBE_HOST=0.0.0.0` — binds the service beyond loopback. The default is `127.0.0.1`, where a request to the LAN IP is **connection refused** before it ever reaches the application.
+2. `VIBE_ALLOW_HOSTS=192.168.1.10` — adds the Host actually used for access to the allowlist (replace the sample IP with your own). Setting this without the one above still leaves the service unreachable.
+
+Step 1 can also be passed as `python scripts/manage.py start --host 0.0.0.0`.
+
+The allowlist itself: if you change the binding to a LAN address or place the service behind a reverse proxy, list the Host values used for access in the `VIBE_ALLOW_HOSTS` environment variable (comma separated, may be placed in `.env`), for example `VIBE_ALLOW_HOSTS=192.168.1.10,astock.example.com`. Any Host not listed is rejected by every endpoint with 403, which appears in the interface as widespread read failures. `127.0.0.1`, `::1` and `localhost` are always allowed and need not be listed; other loopback addresses such as `127.0.0.2` are not in the default set.
+
+Open Connect AI to sign in or enter your own API configuration, test it, and save it. Viewing quotes and existing records does not require generating an AI report first. Starting the service does not automatically generate a review. Connection tests and AI tasks may consume the selected service's quota.
+
+Before updating source code, stop the service and back up the data listed below. Preserve local modifications; after updating, rerun `python scripts/manage.py setup` and `python scripts/manage.py doctor`. Startup logs are in `.local/startup.log`; check for personal information before sharing logs.
+
+The local backend has startup paths for macOS, Linux, and Windows. See [Validation scope](#validation-scope) for native Windows installation, cleanup, and web-restart tests. Test each provider with your own account or key.
+
+## Docker Compose deployment
+
+You can also run it in a container without installing the local environment:
+
+```bash
+docker compose up -d --build   # slower the first time: installs deps and builds the frontend
+docker compose logs -f
+docker compose down            # stops and removes the container; data stays in the volumes
+```
+
+The image carries two runtimes: Python 3.12 and Node 22. The AI engine (a pinned Codex CLI) is launched by Node at run time, so Node is still needed after the build. Once started, the address is again `http://127.0.0.1:8910`.
+
+Business data lives in three named volumes — `astock-agent`, `astock-duanxian`, `astock-market` — and survives container rebuilds. `docker compose down -v` also deletes the volumes; use with care.
+
+The container always listens on `0.0.0.0` (binding only to loopback would make the host port mapping unreachable). The Host allowlist is still governed by `VIBE_ALLOW_HOSTS`. For local-only access, change the port in `docker-compose.yml` to `127.0.0.1:8910:8910`.
+
+### Signing in to CodeBuddy inside the container
+
+CodeBuddy's OAuth callback binds to `127.0.0.1` by default, and the container's loopback is not the host's — the browser cannot complete the callback and sign-in stalls. It also has no `login` subcommand; sign-in happens in the web UI. So expose the service first with `--host 0.0.0.0`:
+
+```bash
+# 1) Copy the host's existing CodeBuddy into the persistent volume (avoids re-downloading).
+#    Only the current version — a full ~/.local is often several GB.
+CB_VER=$(ls ~/.local/share/codebuddy/versions | tail -1)
+#    Volume names carry the compose project prefix; confirm with docker volume ls.
+#    The default project name gives vibe-astock_ here.
+docker run --rm \
+  -v "$HOME/.local/share/codebuddy/versions/$CB_VER:/srcdir:ro" \
+  -v vibe-astock_astock-codebuddy-cli:/dst \
+  alpine sh -c "mkdir -p /dst/share/codebuddy/versions/$CB_VER /dst/bin \
+    && cp -a /srcdir/. /dst/share/codebuddy/versions/$CB_VER/ \
+    && ln -sf /root/.local/share/codebuddy/versions/$CB_VER/codebuddy /dst/bin/codebuddy"
+
+# 2) Start a one-off sign-in server
+docker run -d --name vibe-cb-login -p 8920:8920 \
+  -v vibe-astock_astock-codebuddy:/root/.codebuddy \
+  -v vibe-astock_astock-codebuddy-cli:/root/.local \
+  vibe-astock:local \
+  sh -c "/root/.local/bin/codebuddy --serve --host 0.0.0.0 --port 8920"
+
+# 3) Read the Web UI URL and one-time password it prints
+docker logs vibe-cb-login
+```
+
+Open `http://127.0.0.1:8920` in the **host browser** (the log includes the password) and complete sign-in in the page. The session is written to the `vibe-astock_astock-codebuddy` volume.
+
+```bash
+docker rm -f vibe-cb-login     # remove the one-off container once signed in
+docker compose up -d           # start normally
+```
+
+Then select the WorkBuddy / CodeBuddy subscription under Connect AI. If the CLI cannot be found, add `CODEBUDDY_BIN=/root/.local/bin/codebuddy` to `.env`.
+
+Both the session and the CLI itself live on volumes, so rebuilding the container does not require signing in again — but you must repeat this flow on another machine or after deleting the volumes.
+
+## Connect AI
+
+Web AI entry points share the source and model tested and saved in Connect AI. A displayed source label does not establish that the account can still make requests; use connection-test and task results to check that.
+
+| Connection | Implementation and verification boundary |
+|---|---|
+| Codex subscription | Product-specific ChatGPT authorization and isolated engine; real login, connection, and business runs have been recorded. Model availability depends on account quota |
+| Claude subscription | Official local CLI integration, with real review and discussion runs recorded. Requires the user's installation, login, and valid subscription; past success does not establish current account status |
+| WorkBuddy / CodeBuddy | Uses local CLI login. This test covered only CodeBuddy CLI 2.137.1 bundled with WorkBuddy on macOS: connection, bounded tools, ordinary chat, and a complete single-day review workflow. |
+| OpenAI API | Uses the user's own configuration. Subscription tests do not substitute for API validation; the full compatibility assessment is incomplete |
+| DeepSeek / MiMo | Editable model and endpoint presets; use your own key and pass the connection test before saving |
+| CC Switch local route / self-hosted gateway | Preset `http://127.0.0.1:15721/v1`; the key is usually `PROXY_MANAGED` and the model follows your route's actual configuration. Loopback, private (RFC1918), the unspecified address `0.0.0.0`, and IPv6 unique local addresses may use http on any port; public addresses still require HTTPS on the standard port. The route must support streaming Responses and tool calling |
+| GLM / Kimi / Qwen | Alibaba Cloud Bailian presets require the workspace endpoint and a Bailian key; availability must be tested with your account |
+| SiliconFlow / MiniMax / OpenRouter / Groq / Together / custom | Editable endpoint and model settings; presets do not establish verified compatibility. Endpoints must support the Responses API and tool calling |
+
+Agent mode defaults to off: ordinary chat does not enable tools or network access. When enabled, applicable entry points use only their permitted evidence or public-data tools. Existing review evidence on Home, page materials, and explicitly allowed historical daily prices have distinct scopes; this is not unrestricted access to the internet or local files. Reviews, discussions, and backtests still require explicit initiation rather than being triggered by the switch.
+
+Every web AI source receives the research constraints. Ordinary chat and report paths check for explicit trading recommendations; evidence answers also undergo citation and numerical checks. These checks reduce violations and citation errors but **do not guarantee complete semantic correctness**. Product instructions prohibit investment decisions, trading recommendations, and position-sizing directives. Buy and sell descriptions in historical rules are for simulation, not present-day operating advice.
+
+The legacy `main.py` CLI and executable Python prompt packs remain for development maintenance; see [PromptPack](duanxian/prompts.py). Their separate configuration is not the web setup procedure, and custom code is outside the official web constraints guarantee.
+
+## Data and privacy
+
+Quotes, limit-up pools, exchange disclosures, sectors, news, and event probabilities come from public interfaces or user-configured sources. An iWencai key is an optional supplement: its absence should not imply that the entire review is unavailable. Public catalyst sources may also omit markets or historical dates. Event probabilities from sources including Kalshi and Polymarket carry retrieval times, cache ages, and partial-coverage status. They neither establish that an event has occurred nor represent a stock-price forecast by the product.
+
+The local web app still uses network connections to retrieve data. When remote AI is used, questions, selected materials, and necessary context are sent to the chosen supplier. Local storage does not mean all processing happens offline.
+
+| Data | Default location and considerations |
+|---|---|
+| Agent conversations, tasks, evidence ledger, and product login | `~/.vibe-astock-agent/`; `ASTOCK_AGENT_HOME` changes this root |
+| Reviews, versions, trading journal, and raw archives | `~/.duanxian-agents/`, including `reviews/`, `journal/`, `archive/`, and related directories; set `ASTOCK_DATA_HOME` to an absolute path to override |
+| Market materials and watch caches | `~/.vibe-astock-agent/market-data/`; configurable through `VR_DATA_DIR` |
+| Research-report materials | The market-data directory's `myreports/` by default; independently configurable through `VR_REPORTS_DIR` |
+| Watchlist, research notes, UI state, and API configuration | Local storage for the current browser origin; changing browser or port, or clearing site data, affects access |
+| Development logs and runtime diagnostics | Repository `.local/`, excluded from version control by default |
+
+These locations are not migrated by one setting: changing `ASTOCK_AGENT_HOME` does not automatically move the journal, market materials, or browser data. Backups should cover the actual directories in use and records exportable from the UI. Protect any login data and keys they contain. Do not commit private records, API keys, or login files, or copy a development assistant's login file as a substitute for product authorization.
+
+### Store business data on another drive
+
+Set these variables in Windows PowerShell before starting the service:
+
+```powershell
+$env:ASTOCK_DATA_HOME = 'D:\VibeAStock\reviews-and-journal'
+$env:ASTOCK_AGENT_HOME = 'D:\VibeAStock\agent'
+$env:VR_DATA_DIR = 'D:\VibeAStock\market-data'
+python scripts/manage.py start
+```
+
+These settings apply only to processes launched from this terminal. Set them before each launch or in your own launcher script. On macOS/Linux, use equivalent exports, such as `export ASTOCK_DATA_HOME="/absolute/path/business-data"`. Existing defaults remain compatible; settings never move existing files automatically. To migrate, stop the service, back up and copy each old directory's contents to its corresponding destination, then start with the new settings and verify. Keep the originals until verified. Update any separately configured `VR_REPORTS_DIR` too. Browser records and repository `.local/` runtime logs are unaffected.
+
+## Architecture and development
+
+The Agent foundation uses an official, pinned OpenAI Codex Harness engine with short-term research workflows, bounded evidence tools, task management, and citation validation. Programs calculate market metrics and backtests; AI reads, explains, and answers follow-up questions. Claude and WorkBuddy / CodeBuddy connect through adapters for their local CLIs.
+
+```text
+Public data → Raw archives and normalized definitions → Deterministic statistics / simulation
+                                      ↓
+                         Constrained AI interpretation and evidence tools
+                                      ↓
+                         Citation validation → Report versions and follow-up
+Manual journal and research notes → Local records and self-review views
+```
+
+| Directory | Responsibility |
+|---|---|
+| `frontend/` | React web UI, seven-module navigation, themes, and interactions |
+| `server.py`, `vr/` | Local HTTP service and market-page data interfaces |
+| `review_agent/`, `runtime/` | Shared model access, isolated engine, tasks, evidence tools, and research constraints |
+| `duanxian/` | Short-term indicators, reviews, verification, archives, journal, and bull–bear discussion |
+| `backtest/`, `research_data/` | Historical simulation engine, supporting data retrieval, and event probabilities |
+| `scripts/`, `tests/`, `frontend/test/` | Setup, diagnostics, startup, and regression validation |
+
+Provenance and licensing for the event-probability and backtesting code are recorded in the [backtesting NOTICE](backtest/NOTICE.md) and [data NOTICE](research_data/NOTICE.md).
+
+## Validation scope
+
+v1.1.3 release checks: **1,287 backend tests passed on macOS, with four Windows-specific tests skipped**; **41 frontend tests**, type checking, and a production build passed. Regression checks cover product-version consistency across the READMEs, web footer, package manifests, and APIs.
+
+For source baseline `9d84e0d` on September 10, 2026, native Windows Server 2025 acceptance passed **34 runtime contracts and 87 business regression tests**, plus fresh setup, diagnostics, bundled-engine startup, two real HTTP web/API launches, and restart after forced termination. [Windows acceptance record](https://github.com/simonlin1212/vibe-astock/actions/runs/34417311929).
+
+Evidence also includes selected real-date reviews, date switching, page questions, and A-share, Hong Kong, and US backtests with independent recalculation. These results do not establish acceptance for every provider, physical Windows 10/11 user machine, complete Linux workflow, or continuous full trading day. CodeBuddy CLI 2.137.1 bundled with WorkBuddy on macOS completed one single-day review workflow; connection, bounded tools, ordinary chat, cancellation, and timeout handling were also tested. Independently installed CodeBuddy CLI, other platforms, every model, and the correctness of report interpretations are outside this verification scope. Existing dependency-deprecation and build-size warnings remain.
+
+With the repository environment prepared, run:
+
+```bash
+.venv/bin/python -m pytest tests backtest/tests research_data/tests -q
+node --test frontend/test/*.test.ts
+npm --prefix frontend run build
+```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for product updates.
+
+## Disclaimer
+
+This tool is for organizing data, research, and historical review, not investment decisions or trading instructions. Public data, calculations, manual records, and AI interpretations may contain errors. A citation does not establish a conclusion, and historical results do not establish future performance. Investing carries risk; verify materials independently and exercise your own judgment.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
+
+**Author:** Simon Lin · X [@linsizhen](https://x.com/linsizhen) · Email: [simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)

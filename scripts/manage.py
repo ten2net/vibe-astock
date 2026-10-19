@@ -132,7 +132,7 @@ print('ASTOCK_IMPORTS='+json.dumps(failures))
     except subprocess.TimeoutExpired:
         return False, "依赖加载超过一分钟；请检查机器负载后重试体检"
     except OSError:
-        return False, "Python 环境无法启动；运行 scripts/setup"
+        return False, "Python 环境无法启动；运行 scripts/manage.py setup"
     if p.returncode != 0:
         return False, f"依赖检查进程未完成（退出码 {p.returncode}）；请重试体检"
     for line in reversed(p.stdout.splitlines()):
@@ -140,7 +140,7 @@ print('ASTOCK_IMPORTS='+json.dumps(failures))
             try:
                 failures = json.loads(line.removeprefix("ASTOCK_IMPORTS="))
                 if isinstance(failures, list) and all(isinstance(v, str) for v in failures):
-                    return not failures, "运行 scripts/setup；依赖加载失败：" + ", ".join(failures)
+                    return not failures, "运行 scripts/manage.py setup；依赖加载失败：" + ", ".join(failures)
             except ValueError:
                 break
     return False, f"依赖检查进程未完成（退出码 {p.returncode}）；请重试体检"
@@ -152,20 +152,20 @@ def doctor(root: Path) -> list[dict]:
         checks.append({"name": name, "ok": bool(ok), "action": "通过" if ok else action})
     add("平台", PLATFORM in ("posix", "nt"), "请使用 macOS、Linux 或 Windows 10/11")
     py = python_at(root)
-    add("Python 环境", probe([py, "-c", "import sys;sys.exit(sys.version_info < (3,10))"], root), "运行 scripts/setup")
+    add("Python 环境", probe([py, "-c", "import sys;sys.exit(sys.version_info < (3,10))"], root), "运行 scripts/manage.py setup")
     add("Node.js / npm", bool(shutil.which("npm")) and probe(["node", "-e", "process.exit(Number(process.versions.node.split('.')[0])>=22?0:1)"], root), "安装 Node.js 22+（包含 npm）")
     dependencies_ok, dependency_action = dependency_status(root)
     add("Python 依赖", dependencies_ok, dependency_action)
-    add("依赖安装工具", probe([py, "-m", "pip", "--version"], root), "运行 scripts/setup 自动补齐 pip")
-    # add("依赖兼容性", probe([py, "-m", "pip", "check"], root), "运行 scripts/setup；如仍失败，检查 Python 依赖冲突")
-    add("官方 Agent 引擎", probe(["node", root / "runtime/node_modules/@openai/codex/bin/codex.js", "--version"], root), "运行 scripts/setup 安装本机引擎")
-    add("浏览器界面", (root / "frontend/dist/index.html").is_file(), "运行 scripts/setup 构建界面")
+    add("依赖安装工具", probe([py, "-m", "pip", "--version"], root), "运行 scripts/manage.py setup 自动补齐 pip")
+    # add("依赖兼容性", probe([py, "-m", "pip", "check"], root), "运行 scripts/manage.py setup；如仍失败，检查 Python 依赖冲突")
+    add("官方 Agent 引擎", probe(["node", root / "runtime/node_modules/@openai/codex/bin/codex.js", "--version"], root), "运行 scripts/manage.py setup 安装本机引擎")
+    add("浏览器界面", (root / "frontend/dist/index.html").is_file(), "运行 scripts/manage.py setup 构建界面")
     try:
         stamp = json.loads((root / ".local/setup.json").read_text())
         current = isinstance(stamp, dict) and stamp.get("fingerprint") == fingerprint(root)
     except (OSError, ValueError):
         current = False
-    add("安装与源码一致", current, "首次使用或源码更新后运行 scripts/setup")
+    add("安装与源码一致", current, "首次使用或源码更新后运行 scripts/manage.py setup")
     return checks
 
 
@@ -244,7 +244,7 @@ def start(root: Path, port: int, browser: bool, timeout=60, host="127.0.0.1"):
     checks = doctor(root)
     print_checks(checks)
     if not all(c["ok"] for c in checks):
-        raise SetupError("尚未就绪。请运行 scripts/setup，或双击启动文件自动准备环境。")
+        raise SetupError("尚未就绪。请运行 scripts/manage.py setup，或双击启动文件自动准备环境。")
     # 探活要连得上：通配地址就用回环去连，绑到具体网卡时只能用那个地址。
     probe_host = host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1"
     try:
@@ -252,7 +252,7 @@ def start(root: Path, port: int, browser: bool, timeout=60, host="127.0.0.1"):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind((host, port))   # 与 uvicorn 同一地址，占用检查才准
     except OSError:
-        raise SetupError(f"端口 {port} 已被占用。请关闭原服务，或使用 scripts/start --port 8911。") from None
+        raise SetupError(f"端口 {port} 已被占用。请关闭原服务，或使用 scripts/manage.py start --port 8911。") from None
     launch_id = uuid.uuid4().hex
     env = {**os.environ, "ASTOCK_LAUNCH_ID": launch_id, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     log = root / ".local/startup.log"
