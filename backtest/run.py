@@ -24,11 +24,14 @@ import pandas as pd
 from backtest.engines.china_a import ChinaAEngine
 from backtest.engines.global_equity import GlobalEquityEngine
 from backtest.gate import Plan, Refusal
-from backtest.loader import SymbolProvenance, VibeLoader
+from backtest.loader import SymbolProvenance, VibeLoader, index_spec
 
 logger = logging.getLogger(__name__)
 
 ENGINES = {"ChinaAEngine": ChinaAEngine, "GlobalEquityEngine": GlobalEquityEngine}
+# 港股和美股共用一个引擎，靠 market 参数切规则；不传就是美股规则（碎股、零费用、滑点 0.05%）。
+# 🔴 之前漏传，港股一直按美股规则在跑，而闸口披露写的是 100 股一手、印花税双边 ⇒ 报告和实际算法对不上。
+SUBMARKET = {"hk_equity": "hk", "us_equity": "us"}
 BARS_PER_YEAR = 252     # 日线
 
 
@@ -46,6 +49,10 @@ class Result:
     notes: List[str]
     run_dir: Path
     missing: Dict[str, str] = field(default_factory=dict)
+    #: 对照指数的来源（取到时）；与标的来源分开放
+    benchmark: Optional[SymbolProvenance] = None
+    #: 月度 / 年度表、最深几段回撤、画图序列 —— 全部读自引擎写出的 equity.csv
+    report: Optional[Dict[str, Any]] = None
 
     def summary(self) -> str:
         m = self.metrics
@@ -68,8 +75,12 @@ class Result:
         bench = self.metrics.get("benchmark_return")
         if isinstance(bench, (int, float)):
             ticker = self.metrics.get("benchmark_ticker")
-            what = f"指数 {ticker}" if ticker else "初始等权持有这几只标的本身（不是指数；无再平衡、不计费用；缺报价沿用前值，首笔报价前留现金）"
+            label = self.metrics.get("benchmark_label") or ticker
+            what = f"指数 {label}（价格序列，不含分红再投资）" if ticker else "初始等权持有这几只标的本身（不是指数；无再平衡、不计费用；缺报价沿用前值，首笔报价前留现金）"
             lines.append(f"  对照 {bench * 100:.2f}%    ← {what}")
+            hold = self.metrics.get("hold_return")
+            if ticker and isinstance(hold, (int, float)):
+                lines.append(f"  标的本身买入持有 {hold * 100:.2f}%    ← 初始等权、不再平衡、不计费用")
         if self.missing:
             lines += ["", "取不到数据（未参与回测）："] + [f"  · {c}：{why}" for c, why in self.missing.items()]
         lines += ["", "这次回测的限制（读结果前先看）："] + [f"  · {x}" for x in self.limits]
@@ -110,6 +121,17 @@ class _Guarded:
             raise BacktestNotValid("一只标的的数据都没取到")
         longest = max(bars.values())
         need = self.plan.style.min_bars
+        # 带预热的策略（如 RSRS 前 600 多根只算指标）：能持有的只有「实际根数 − 预热」那么多。
+        # 不算进来的话，5 年数据里真正参与的可能只有几个月，报告却照写「长线」。
+        # 先查这一条：连口径本身的根数都不够时，也要一次说清合计要多少，不然挪了起点还会再被拒一次。
+        warm = int(getattr(self.inner, "warmup_bars", 0) or 0)
+        if warm and longest - warm < need:
+            short = need + warm - longest
+            raise BacktestNotValid(
+                f"{self.name}前 {warm} 根日线只用来算指标、不持有；{self.plan.style.label}要 {need} 根能持有的日线，"
+                f"一共至少 {need + warm} 根，实际只有 {longest} 根，还差 {short} 根（约 {max(1, round(short / 21))} 个月）。"
+                f"把起点往前挪，或{getattr(self.inner, 'warmup_remedy', '调短策略的预热窗口')}"
+            )
         if longest < need:
             raise BacktestNotValid(
                 f"{self.plan.style.label}至少要 {need} 根日线，实际只有 {longest} 根"
@@ -121,11 +143,12 @@ class _Guarded:
         #    长线要 480 根，A 有 600 根、B 有 400 根 —— 整体过关，B 也够不上「一半」线，
         #    于是 B 带着不足的历史参与回测，而**报告里一个字都不说**。
         #    ⇒ 判据只用一个：低于这个口径的最低要求就说出来。不致命(组合整体够)，但必须看得见。
-        thin = {c: n for c, n in bars.items() if n < need}
+        thin = {c: n for c, n in bars.items() if n < need + warm}
         if thin:
             self.note = (
-                f"以下标的自身历史不足{self.plan.style.label}所需的 {need} 根，"
-                "它们仍参与了回测，但各自的胜率 / 盈亏比只是少数几笔的偶然：" +
+                f"以下标的自身历史不足{self.plan.style.label}所需的 {need} 根"
+                + (f"（另有前 {warm} 根只算指标、不持有，合计要 {need + warm} 根）" if warm else "") +
+                "，它们仍参与了回测，但各自的胜率 / 盈亏比只是少数几笔的偶然：" +
                 "、".join(f"{c} 仅 {n} 根" for c, n in sorted(thin.items()))
             )
 
@@ -154,8 +177,17 @@ class _Guarded:
         return sig
 
 
+def make_engine(plan: Plan, config: Dict[str, Any]):
+    """按计划的市场建引擎：A 股引擎只有一套规则，港美股引擎要告诉它是哪个市场。"""
+    cls = ENGINES[plan.market.engine]
+    if cls is GlobalEquityEngine:
+        return cls(config, market=SUBMARKET[plan.market.key])
+    return cls(config)
+
+
 def run(plan: Plan | Refusal, strategy: Strategy, run_dir: Optional[Path] = None,
-        python: Optional[str] = None) -> Result:
+        python: Optional[str] = None, loader: Optional[VibeLoader] = None,
+        config_overrides: Optional[Dict[str, Any]] = None) -> Result:
     """按闸口给的计划跑一次回测。
 
     传进来的若是 :class:`Refusal`，直接抛 —— 调用方本该先看闸口的结论。
@@ -166,20 +198,10 @@ def run(plan: Plan | Refusal, strategy: Strategy, run_dir: Optional[Path] = None
     run_dir = Path(run_dir) if run_dir else Path(tempfile.mkdtemp(prefix="backtest-"))
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    loader = VibeLoader(out_dir=run_dir / "data", python=python)
-    engine_cls = ENGINES[plan.market.engine]
-    from dataclasses import replace
-    from backtest.strategies import BuyAndHold
-    if isinstance(strategy, BuyAndHold):
-        note = "买入持有策略按不调仓执行；所选风格仅决定样本要求，不执行等权再平衡。"
-        plan = replace(plan, position_adjustment="hold", notes=[*plan.notes, note])
-    config = plan.to_config()
-
-    if plan.market.engine == "GlobalEquityEngine":
-        engine = engine_cls(config, market={"hk_equity": "hk", "us_equity": "us"}[plan.market.key])
-        plan = replace(plan, notes=[*plan.notes, "市场执行规则 v2：按所选市场应用费用、滑点与交易单位。"])
-    else:
-        engine = engine_cls(config)
+    # 传进来的 loader 会被复用（参数敏感度重跑时同一份数据只取一次）
+    loader = loader if loader is not None else VibeLoader(out_dir=run_dir / "data", python=python)
+    config = {**plan.to_config(), **(config_overrides or {})}
+    engine = make_engine(plan, config)
 
     guarded = _Guarded(strategy, plan)
     try:
@@ -206,37 +228,47 @@ def run(plan: Plan | Refusal, strategy: Strategy, run_dir: Optional[Path] = None
     if missing:
         logger.warning("以下标的没有参与回测：%s", ", ".join(missing))
 
-    # Keep existing gross metrics stable; disclose fee-adjusted closed-trade
-    # statistics separately from the account equity return.
-    from dataclasses import replace
-    from backtest.metrics import win_rate_and_stats
-    net_trades = [replace(t, pnl=t.pnl - t.commission) for t in engine.trades]
-    net_stats = win_rate_and_stats(net_trades)
-    for key in ("win_rate", "profit_loss_ratio", "profit_factor", "max_consecutive_loss"):
-        metrics["net_" + key] = net_stats[key]
     notes = list(plan.notes)
-    if metrics.get("unclosed_positions", 0):
-        notes.append("期末存在因停牌、涨跌停或T+1无法平仓的持仓，按末次有效价格估值留存；未虚构成交，平仓统计不含这些持仓。")
-    if metrics.get("sharpe") is None:
-        notes.append("收益波动为零或样本不足，夏普比率无法计算。")
     if guarded.note:
         notes.append(guarded.note)
+    # 策略自己的口径（如 RSRS 的方法出处、预热期、平仓记录太少）：要拿到成交结果才写得出来
+    strategy_notes = getattr(strategy, "result_notes", None)
+    if callable(strategy_notes):
+        notes.extend(x for x in strategy_notes(metrics) if x)
     # 指定了指数基准却没取到时，报告只是**少一行**，看起来仍是一份完整的报告。
     # 日志在服务端 / Notebook / 界面里对用户不可见 ⇒ 这件事必须进结果本身。
-    # （当前 to_config() 不设 benchmark，这条是给将来接指数基准时兜底的。）
+    # （闸口按市场填 INDEX_BENCHMARKS 里的指数，见 gate.py。）
     wanted = config.get("benchmark")
+    spec = index_spec(wanted) if isinstance(wanted, str) else None
+    if metrics.get("benchmark_ticker"):
+        hit = index_spec(metrics["benchmark_ticker"])
+        if hit:
+            metrics["benchmark_label"] = hit.label
     if wanted and wanted != "auto" and not metrics.get("benchmark_ticker"):
         # ⚠️ 声称「下面的对照是…」之前得确认对照那一行真的会出现 ——
         #    否则就是**注释替代码许愿**：摘要里没有对照行，说明却说有。
         fallback = metrics.get("benchmark_return")
+        why = (getattr(loader, "benchmark_failures", None) or {}).get(wanted) or metrics.get("benchmark_gap")
+        name = f"{spec.label}（{wanted}）" if spec else wanted
+        reason = f"（{why}）" if why else ""
         notes.append(
-            f"指定的基准 {wanted} 没有取到，下面的对照是等权买入持有这几只标的本身，不是该指数"
+            f"指定的基准 {name} 没有取到{reason}，下面的对照是等权买入持有这几只标的本身，不是该指数"
             if isinstance(fallback, (int, float)) and fallback == fallback
-            else f"指定的基准 {wanted} 没有取到，本次**没有任何对照**"
+            else f"指定的基准 {name} 没有取到{reason}，本次**没有任何对照**"
         )
+    report = None
+    equity_csv = run_dir / "artifacts" / "equity.csv"
+    if equity_csv.exists():
+        from backtest.report_data import report_tables
+        try:
+            report = report_tables(equity_csv, plan.initial_cash)
+        except (ValueError, KeyError) as exc:
+            notes.append(f"月度 / 年度表没有生成（{exc}），只给出汇总指标")
     return Result(
         metrics=metrics, plan=plan, strategy=guarded.name,
         provenance={c: p for c, p in loader.provenance.items() if c in asked},
         limits=list(plan.limits), notes=notes,
         run_dir=run_dir, missing=missing,
+        benchmark=(getattr(loader, "benchmark_provenance", None) or {}).get(metrics.get("benchmark_ticker") or ""),
+        report=report,
     )

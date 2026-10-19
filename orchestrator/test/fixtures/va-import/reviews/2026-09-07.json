@@ -1,0 +1,154 @@
+{
+ "schema_version": 3,
+ "run_type": "daily_review",
+ "review_id": "daily_2026-09-07",
+ "trade_date": "2026-09-07",
+ "data_as_of": "2026-09-07 收盘（各项缺口见 warnings）",
+ "generated_at": "2026-09-08 21:50 CST",
+ "warnings": [
+  "[全市场跌停家数没取到]"
+ ],
+ "focus": {
+  "emotion_phase": "发酵",
+  "market_oneliner": "涨停家数扩大",
+  "focus_directions": [
+   {
+    "direction": "元件",
+    "logic": "涨停家数靠前",
+    "risk": "都停在首板"
+   }
+  ],
+  "risk_alerts": [
+   "宽度没取到"
+  ],
+  "verification_items": [
+   {
+    "metric": "limit_up_count",
+    "direction": "持平",
+    "reason": "AI 说持平"
+   },
+   {
+    "metric": "broken_rate",
+    "direction": "下降",
+    "reason": "AI 说降"
+   },
+   {
+    "metric": "highest_board",
+    "direction": "上升",
+    "reason": "高度打开"
+   },
+   {
+    "metric": "foo_metric",
+    "direction": "上升",
+    "reason": "新版没有这个读数"
+   }
+  ]
+ },
+ "analysts": [
+  {
+   "key": "sentiment",
+   "title": "情绪面",
+   "html": "<p>情绪面旧文</p>"
+  },
+  {
+   "key": "capital",
+   "title": "资金面",
+   "html": "<p>资金面旧文</p>"
+  },
+  {
+   "key": "theme",
+   "title": "题材面",
+   "html": "<p>题材面旧文</p>"
+  },
+  {
+   "key": "dragon_tiger",
+   "title": "龙虎榜",
+   "html": "<p>龙虎榜旧文</p>"
+  },
+  {
+   "key": "leader",
+   "title": "龙头",
+   "html": "<p>龙头旧文</p>"
+  }
+ ],
+ "ai_source": {
+  "provider": "claude",
+  "model": "default"
+ },
+ "report_grounding": {
+  "version": 1,
+  "status": "references_validated",
+  "records": [
+   {
+    "id": "ev-0a1b2c3d4e5f60718293",
+    "label": "盘口统计",
+    "text": "[真实数据 2026-09-07] 涨停 93 家",
+    "kind": "input_excerpt"
+   },
+   {
+    "id": "ev-1b2c3d4e5f6071829304",
+    "label": "晋级",
+    "metric": "1进2",
+    "value": 0.3,
+    "unit": "",
+    "kind": "metric"
+   }
+  ],
+  "sections": [
+   {
+    "key": "sentiment",
+    "title": "情绪面",
+    "findings": [
+     {
+      "text": "涨停家数扩大",
+      "citations": [
+       "ev-0a1b2c3d4e5f60718293"
+      ]
+     },
+     {
+      "text": "1进2 回暖",
+      "citations": [
+       "ev-1b2c3d4e5f6071829304",
+       "ev-ffff00001111222233334"
+      ]
+     }
+    ]
+   },
+   {
+    "key": "capital",
+    "title": "资金面",
+    "findings": []
+   }
+  ],
+  "summary": {
+   "emotion_phase": "发酵",
+   "market_oneliner": {
+    "text": "涨停家数扩大(核对过)",
+    "citations": [
+     "ev-0a1b2c3d4e5f60718293"
+    ]
+   },
+   "focus_directions": [
+    {
+     "direction": "元件",
+     "logic": {
+      "text": "涨停家数靠前",
+      "citations": [
+       "ev-0a1b2c3d4e5f60718293"
+      ]
+     },
+     "risk": {
+      "text": "都停在首板",
+      "citations": []
+     }
+    }
+   ],
+   "risk_alerts": [
+    {
+     "text": "宽度没取到",
+     "citations": []
+    }
+   ]
+  }
+ }
+}

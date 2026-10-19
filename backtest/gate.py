@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Sequence
 
-from backtest.loader import LoaderError, assert_a_share_stock, canonical_code, market_of, price_basis
+from backtest.loader import INDEX_BENCHMARKS, LoaderError, assert_a_share_stock, canonical_code, market_of, price_basis
 
 # ── 市场规则表：这是「限制是什么」的事实来源 ──
 
@@ -128,7 +128,6 @@ class Plan:
     #: 只靠调用方声明是不够的：忘了声明而策略发出负权重时，引擎会静默拒单，
     #: 报告描述的就变成「删掉所有做空信号后的策略」，而不是用户写的那个。
     allow_short: bool = False
-    position_adjustment: Optional[str] = None  # 策略约束确定后的实际调仓方式
 
     def __bool__(self) -> bool:
         return True
@@ -141,9 +140,13 @@ class Plan:
             "end_date": self.end,
             "interval": self.interval,
             "initial_cash": self.initial_cash,
-            "position_adjustment": self.position_adjustment or self.style.position_adjustment,
-            "style": self.style.label,
+            "position_adjustment": self.style.position_adjustment,
             "source": "vibe",
+            # 对照用本市场的指数；取不到时结果里如实写明，不悄悄当成指数
+            "benchmark": INDEX_BENCHMARKS[self.market.key].ticker,
+            # 稳健性检验默认打开：夏普的重抽样置信区间 + 把净值切成 5 段分别看
+            "validation": {"bootstrap": {"n_bootstrap": 1000, "confidence": 0.95, "seed": 42},
+                           "walk_forward": {"n_windows": 5}},
         }
 
 
@@ -278,7 +281,7 @@ def plan_backtest(
         f"计价币种：{rules.currency}",
     ]
     if rules.price_limit:
-        limits.append(f"涨跌停：{rules.price_limit}；创业板 2020-08-24 前按 ±10%。按输入前收与次日开盘近似判定，ST、上市初期/退市例外未建模，不等于真实撮合。")
+        limits.append(f"涨跌停：{rules.price_limit}；创业板 2020-08-24 前按 ±10%。用不复权前收按交易所规则四舍五入到分算涨跌停价，开盘就在涨跌停价视为封板、不成交；取不到不复权价时按复权价近似。ST、上市初期/退市例外未建模，不等于真实撮合。")
 
     notes = [
         f"口径：{st.label}（{st.holding}）",
@@ -287,7 +290,7 @@ def plan_backtest(
         price_basis(rules.key),
     ]
     if len(canon) == 1:
-        notes.append("单只标的：没有跨标的分散；策略的持仓与现金比例会改变账户回撤，不能等同于标的自身回撤")
+        notes.append("单只标的：没有分散，最大回撤基本等于这只票自己的回撤")
 
     return Plan(
         codes=canon, market=rules, style=st, start=str(d0), end=str(d1),

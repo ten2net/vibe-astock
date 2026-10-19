@@ -17,8 +17,6 @@ BACKTEST_SUMMARY_KEYS = (
     "end_date",
     "interval",
     "engine",
-    "style",
-    "position_adjustment",
     "initial_cash",
     "source",
 )

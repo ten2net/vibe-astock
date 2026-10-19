@@ -1,35 +1,32 @@
-# ---- Python ----
-# 不带斜杠：`.venv` 可能是符号链接，而 `.venv/` 带斜杠只匹配目录，
-# 会让符号链接漏网、被当 gitlink 提交成一条断链。
-.venv
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
+# 用户私有层:配置 / 运行产物 / 知识层私有档案,永不入库
+.local/
 
-# ---- 前端 ----
-node_modules
+# Python
+# 不带斜杠：`.venv` 可能是符号链接，带斜杠只匹配目录会让符号链接漏网被当成 gitlink。
+.venv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
 dist/
 .vite/
 
-# ---- 凭据 / 本机配置 ----
-# LLM 的 key 放在仓库外（见 README「快速开始」）。这里兜底：任何 .env 都不进 git。
+# 旧版用户数据兜底：复盘数据落在 ~/.duanxian-agents/，万一有人把数据目录软链进来
+.duanxian-agents/
+
+# 环境与密钥
 .env
 .env.*
 !.env.example
+*.key
+*.pem
 
-# ---- 用户数据 ----
-# 复盘结果落在 ~/.duanxian-agents/，不在仓库里。兜底：万一有人把数据目录软链进来。
-.duanxian-agents/
-
-# ---- vr/ 的运行时缓存 ----
-# 资讯雷达抓来的第三方新闻正文，可再生、且是别人的内容。
-# 上游 vr/ 把它写在仓库内（HERE/.cache），只能在这里挡。
-vr/.cache/
-
-# ---- macOS ----
+# 系统与日志
 .DS_Store
-dist-astock/
-.local/
-# Local build artifacts
-packaging/macos/
+*.log

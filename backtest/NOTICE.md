@@ -5,7 +5,7 @@ MIT 协议，`Copyright (c) 2026 Vibe-Trading Contributors`。协议全文见 `L
 
 移植基线：上游 `main @ 002373ef32800d4f7d70b418eb4e3bf9d030a5bc`（2026-08-26）的 `agent/backtest/`。
 
-## 上游来源文件（下表是归属清单，不代表当前逻辑原样未改）
+## 从上游搬来的
 
 | 文件 | 内容 |
 |---|---|
@@ -15,15 +15,26 @@ MIT 协议，`Copyright (c) 2026 Vibe-Trading Contributors`。协议全文见 `L
 | `validation.py` `rebalance_notes.py` `risk_xray.py` `run_card.py` | 校验、调仓说明、风险 X 光、run card |
 | `engines/base.py` | 逐 bar 撮合内核 |
 | `engines/china_a.py` | A股规则：T+1 / 涨跌停 / 100 股整手 / 印花税 |
-| `engines/global_equity.py` | 美股与港股规则；加拿大分支保留，产品闸口未开放 |
+| `engines/global_equity.py` | 美股 · 港股 · 加拿大规则 |
 | `engines/_market_hooks.py` | 代码 → 市场分类、币种 |
 
-## 初次迁入的依赖调整（历史记录）
+## 相对上游的改动
+
+移植时只改了两处，均为**移除依赖**，不动算法：
 
 1. **`engines/base.py`** — 事件（RSSHub）与基本面（Tushare）两路增强改成**惰性 import**。
    这两路没有随本产品发行（前者要自建服务、后者要付费 key，而本产品的数据一律走自己的取数层）。
    `config` 没点名就永远不 import；点名了就报清楚的错，**不静默跳过**。
 2. **`benchmark.py`** — 删掉 yfinance 兜底（同上），并让原本静默的取数失败出声。
+
+v2.1 起又改了下面这些上游文件（本产品自己的改动，与上游无关）：
+
+- **`metrics.py` `validation.py`** — 没有平仓交易时的胜率、净值没有波动时的夏普和信息比率改为 `None`（无定义），不再写成 0；
+  分段检验和重抽样里算不出的段同样是 `None`，不参与均值。
+- **`engines/base.py`** — 对照指数按收盘价对齐到策略日期（原来拿收益率序列补 0，停牌日的指数涨跌会丢掉）；
+  补充指标改由 `report_data.py` 计算；回撤曲线的高水位从初始资金起算，与最大回撤同口径。
+- **`benchmark.py`** — 带回原始收盘价，新增 `align_benchmark_close`（对照在回测首日前没有报价、或尾部断掉太久就不出对照并说明）。
+- **`risk_xray.py`** — 新增风险贡献、单只年化波动和相关矩阵。
 
 ## 本产品新写的（不属于上游）
 
@@ -32,24 +43,15 @@ MIT 协议，`Copyright (c) 2026 Vibe-Trading Contributors`。协议全文见 `L
 | `loader.py` | 把本产品的取数端点接到引擎上 —— 整个移植里唯一的新数据代码 |
 | `gate.py` | 回测闸口：判要回测什么 → 需要什么 → 限制是什么 |
 | `run.py` | 接线 + 运行期守卫 + 结果呈现 |
-| `strategies.py` | 内置策略（也是"策略长什么样"的模板） |
-| `tests/` | 回归测试；数量以各阶段实际测试记录为准 |
+| `strategies.py` | 内置策略（也是"策略长什么样"的模板）；RSRS 按光大证券 2017 年公开研报的公式自写，没有搬任何仓库的代码 |
+| `cli.py` `stdio_utf8.py` | 回测的 JSON 入口（界面与命令行共用）；把进程输入输出固定为 UTF-8 |
+| `report_data.py` `cost_compare.py` `sensitivity.py` | 回测报告的补充指标与图表数据、扣费前后对照、参数敏感度 |
+| `kline.py` `event_study.py` `symbol_search.py` | 个股 K 线、事件回看、按代码 / 名称 / 拼音找标的 |
+| `portfolio_perf.py` `portfolio_xray.py` `scenario_replay.py` `gics.py` | 持仓收益率、持仓体检、历史情景回放、港美股 GICS 行业 |
+| `tests/` | 上面这些文件的测试 |
 
 ## 没有搬的
 
 `loaders/`（25+ 数据源）· `optimizers/`（组合优化）· 期货 / 外汇 / 加密 / 印度 / 韩国 / 越南 /
 期权 / composite 引擎 · `regime.py` `correlation.py` `factor_costs.py` 等。
 数据一律走本产品自己的取数层；其余引擎等对应市场接进来时再说。
-
-## Vibe AStock 迁入适配（2026-09-08）
-
-本目录从 Vibe-Research 的已验证版本迁入 AStock。撮合、指标及市场规则沿用原实现。
-AStock 将 loader 的 FETCH_SCRIPT 指向本仓库 research_data/fetch_backtest.py，保留原始日线落盘、标的核对及复权口径。
-交互和报告归档由 review_agent/backtesting.py 与 page-chats 的既有持久任务处理。
-Research 专用 datasources.health 的测试不在本产品范围，未带入；其余引擎回归保留。
-
-## 2026-09-09 本地维护边界
-
-后继已修改上游来源文件的算法与边界处理：约束优化失败拒绝、日期索引对齐、期末成交限制、零波动指标、成交费用与持仓统计、买入持有调仓方式，以及港股执行规则选择。不能继续称“仅改依赖、不动算法”。变化说明见本仓库 CHANGELOG.md，回归测试位于本目录 tests/；原 MIT 归属和许可证保留。
-
-网页只开放三种日线规则及 A/H/US 市场。benchmark、validation、其它市场钩子保留供上游对照，当前网页不开放指数基准、Monte Carlo 验证、组合优化或加拿大等其它市场，不把存在的源码等同已接通功能。旧港股报告保留原计算结果，界面提示按原条件重跑；不得用旧费用模型的结果为新规则背书。

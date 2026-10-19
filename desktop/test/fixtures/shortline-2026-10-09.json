@@ -1,0 +1,2346 @@
+{
+ "_note": "2026-10-09 收盘后真实取数(cn_shortline_* 的 extra.result),长列表截短到前几条(天梯首板只留 4 只、2 板没接上的留前 6 和最后 2);计数字段保留原值",
+ "date": "2026-10-09",
+ "emotion": {
+  "date": "2026-10-09",
+  "prev_date": "2026-10-08",
+  "settled": true,
+  "money_effect": {
+   "available": true,
+   "sample": 43,
+   "coverage": 43,
+   "coverage_rate": 1.0,
+   "partial": false,
+   "avg": 3.11,
+   "median": 1.95,
+   "positive_rate": 0.628,
+   "limit_up_again_rate": 0.279,
+   "source": "settled",
+   "prev_date": "2026-10-08"
+  },
+  "promotion": {
+   "available": true,
+   "prev_date": "2026-10-08",
+   "tiers": {
+    "1进2": {
+     "base": 33,
+     "promoted": 8,
+     "rate": 0.242
+    },
+    "2进3": {
+     "base": 3,
+     "promoted": 0,
+     "rate": 0.0
+    },
+    "3板以上晋级": {
+     "base": 7,
+     "promoted": 4,
+     "rate": 0.571
+    }
+   },
+   "overall": {
+    "base": 43,
+    "promoted": 12,
+    "rate": 0.279
+   },
+   "limit_up_count": 69,
+   "prev_limit_up_count": 43
+  },
+  "consec_premium": {
+   "available": true,
+   "prev_date": "2026-10-08",
+   "source": "settled",
+   "sample": 10,
+   "coverage": 10,
+   "coverage_rate": 1.0,
+   "partial": false,
+   "avg": 3.89,
+   "median": 5.86,
+   "positive_rate": 0.7
+  },
+  "ladder_gap": {
+   "available": true,
+   "highest": 9,
+   "tiers": {
+    "9": 1,
+    "5": 2,
+    "4": 1,
+    "2": 8
+   },
+   "gaps": [
+    3,
+    6,
+    7,
+    8
+   ],
+   "continuous": false,
+   "note": "板位缺档 3板、6板、7板、8板 → 最高标下方断层，是否有同题材承接需另查，板位缺档本身不能判定"
+  }
+ },
+ "facts": {
+  "date": "2026-10-09",
+  "prev_date": "2026-10-08",
+  "settled": true,
+  "seal_quality": {
+   "available": true,
+   "total": 69,
+   "never_broken": 43,
+   "never_broken_rate": 0.623,
+   "opening_seconds": 11,
+   "late_seal": 7,
+   "reopened": 26,
+   "avg_broken_times": 0.81,
+   "broken_pool": 14,
+   "broken_rate": 0.169,
+   "ever_opened_rate": 0.377
+  },
+  "loss_effect": {
+   "available": true,
+   "prev_date": "2026-10-08",
+   "source": "settled",
+   "sample": 43,
+   "coverage": 43,
+   "coverage_rate": 1.0,
+   "partial": false,
+   "deep_loss_5_count": 3,
+   "deep_loss_5_rate": 0.07,
+   "deep_loss_7_count": 2,
+   "limit_down_count": 1,
+   "worst": -10.01,
+   "market_limit_down": 8,
+   "prev_broken_recovery": null,
+   "note": "昨日强势股由定稿记录算；全市场跌停另取所选日东财池。昨日炸板股修复未覆盖。"
+  },
+  "feedback": {
+   "available": true,
+   "prev_date": "2026-10-08",
+   "source": "settled",
+   "sample": 43,
+   "coverage": 43,
+   "coverage_rate": 1.0,
+   "partial": false,
+   "result_order": [
+    "晋级涨停",
+    "收红",
+    "小跌",
+    "跌超5%",
+    "跌停"
+   ],
+   "matrix": {
+    "首板": {
+     "晋级涨停": 8,
+     "收红": 12,
+     "小跌": 11,
+     "跌超5%": 1,
+     "跌停": 1,
+     "合计": 33,
+     "晋级率": 0.242
+    },
+    "3板": {
+     "晋级涨停": 1,
+     "收红": 2,
+     "小跌": 1,
+     "跌超5%": 0,
+     "跌停": 0,
+     "合计": 4,
+     "晋级率": 0.25
+    },
+    "4板": {
+     "晋级涨停": 2,
+     "收红": 0,
+     "小跌": 0,
+     "跌超5%": 0,
+     "跌停": 0,
+     "合计": 2,
+     "晋级率": 1.0
+    },
+    "2板": {
+     "晋级涨停": 0,
+     "收红": 1,
+     "小跌": 1,
+     "跌超5%": 1,
+     "跌停": 0,
+     "合计": 3,
+     "晋级率": 0.0
+    },
+    "8板": {
+     "晋级涨停": 1,
+     "收红": 0,
+     "小跌": 0,
+     "跌超5%": 0,
+     "跌停": 0,
+     "合计": 1,
+     "晋级率": 1.0
+    }
+   },
+   "details": [
+    {
+     "code": "603073",
+     "name": "彩蝶实业",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -10.01,
+     "result": "跌停",
+     "sector": "化学纤维"
+    },
+    {
+     "code": "600663",
+     "name": "陆家嘴",
+     "board": 2,
+     "prev_tier": "2板",
+     "ret": -8.72,
+     "result": "跌超5%",
+     "sector": "房地产开"
+    },
+    {
+     "code": "603788",
+     "name": "宁波高发",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -5.6,
+     "result": "跌超5%",
+     "sector": "汽车零部"
+    },
+    {
+     "code": "605298",
+     "name": "必得科技",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -4.83,
+     "result": "小跌",
+     "sector": "轨交设备"
+    },
+    {
+     "code": "603928",
+     "name": "兴业股份",
+     "board": 2,
+     "prev_tier": "2板",
+     "ret": -4.8,
+     "result": "小跌",
+     "sector": "塑料"
+    },
+    {
+     "code": "603137",
+     "name": "恒尚节能",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -4.65,
+     "result": "小跌",
+     "sector": "装修装饰"
+    },
+    {
+     "code": "301697",
+     "name": "贝特利",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -4.47,
+     "result": "小跌",
+     "sector": "光伏设备"
+    },
+    {
+     "code": "601975",
+     "name": "招商南油",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -3.82,
+     "result": "小跌",
+     "sector": "航运港口"
+    },
+    {
+     "code": "601956",
+     "name": "东贝集团",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -3.62,
+     "result": "小跌",
+     "sector": "家电零部"
+    },
+    {
+     "code": "002951",
+     "name": "金时科技",
+     "board": 1,
+     "prev_tier": "首板",
+     "ret": -3.03,
+     "result": "小跌",
+     "sector": "其他电源"
+    }
+   ],
+   "note": "涨跌幅取昨日强势股当日记录；晋级以本次东财涨停池成员为准。记录不含昨日炸板股，故缺「昨日炸板」这一档。"
+  },
+  "themes": {
+   "available": true,
+   "themes": [
+    {
+     "sector": "电池",
+     "limit_up": 6,
+     "first_boards": 1,
+     "consec_boards": 5,
+     "highest": 5,
+     "broken": 3,
+     "names": [
+      {
+       "code": "600241",
+       "name": "时代万恒",
+       "boards": 5,
+       "first_seal": "092500",
+       "broken_times": 0
+      },
+      {
+       "code": "002058",
+       "name": "紫竹高科",
+       "boards": 4,
+       "first_seal": "092500",
+       "broken_times": 0
+      },
+      {
+       "code": "002733",
+       "name": "雄韬股份",
+       "boards": 2,
+       "first_seal": "093103",
+       "broken_times": 0
+      },
+      {
+       "code": "002805",
+       "name": "丰元股份",
+       "boards": 2,
+       "first_seal": "093621",
+       "broken_times": 1
+      },
+      {
+       "code": "300530",
+       "name": "领湃科技",
+       "boards": 2,
+       "first_seal": "095427",
+       "broken_times": 3
+      },
+      {
+       "code": "600478",
+       "name": "科力远",
+       "boards": 1,
+       "first_seal": "093749",
+       "broken_times": 1
+      }
+     ],
+     "first_seal": "092500",
+     "last_seal": "095427",
+     "broken_rate": 0.333
+    },
+    {
+     "sector": "出版",
+     "limit_up": 5,
+     "first_boards": 4,
+     "consec_boards": 1,
+     "highest": 9,
+     "broken": 0,
+     "names": [
+      {
+       "code": "600825",
+       "name": "新华传媒",
+       "boards": 9,
+       "first_seal": "092500",
+       "broken_times": 0
+      },
+      {
+       "code": "601811",
+       "name": "新华文轩",
+       "boards": 1,
+       "first_seal": "093159",
+       "broken_times": 3
+      },
+      {
+       "code": "605577",
+       "name": "龙版传媒",
+       "boards": 1,
+       "first_seal": "134440",
+       "broken_times": 0
+      },
+      {
+       "code": "603096",
+       "name": "新经典",
+       "boards": 1,
+       "first_seal": "140035",
+       "broken_times": 0
+      },
+      {
+       "code": "002181",
+       "name": "粤 传 媒",
+       "boards": 1,
+       "first_seal": "141103",
+       "broken_times": 5
+      }
+     ],
+     "first_seal": "092500",
+     "last_seal": "141103",
+     "broken_rate": 0.0
+    },
+    {
+     "sector": "软件开发",
+     "limit_up": 5,
+     "first_boards": 5,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "names": [
+      {
+       "code": "300369",
+       "name": "绿盟科技",
+       "boards": 1,
+       "first_seal": "130509",
+       "broken_times": 0
+      },
+      {
+       "code": "002212",
+       "name": "天融信",
+       "boards": 1,
+       "first_seal": "130806",
+       "broken_times": 0
+      },
+      {
+       "code": "601519",
+       "name": "大智慧",
+       "boards": 1,
+       "first_seal": "132015",
+       "broken_times": 1
+      },
+      {
+       "code": "603232",
+       "name": "格尔软件",
+       "boards": 1,
+       "first_seal": "140456",
+       "broken_times": 0
+      },
+      {
+       "code": "688152",
+       "name": "麒麟信安",
+       "boards": 1,
+       "first_seal": "141550",
+       "broken_times": 0
+      }
+     ],
+     "first_seal": "130509",
+     "last_seal": "141550",
+     "broken_rate": 0.0
+    },
+    {
+     "sector": "一般零售",
+     "limit_up": 4,
+     "first_boards": 4,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 1,
+     "names": [
+      {
+       "code": "601086",
+       "name": "国芳集团",
+       "boards": 1,
+       "first_seal": "101607",
+       "broken_times": 0
+      },
+      {
+       "code": "603101",
+       "name": "汇嘉时代",
+       "boards": 1,
+       "first_seal": "103634",
+       "broken_times": 2
+      },
+      {
+       "code": "600865",
+       "name": "百大集团",
+       "boards": 1,
+       "first_seal": "130527",
+       "broken_times": 0
+      },
+      {
+       "code": "605188",
+       "name": "国光连锁",
+       "boards": 1,
+       "first_seal": "131016",
+       "broken_times": 0
+      }
+     ],
+     "first_seal": "101607",
+     "last_seal": "131016",
+     "broken_rate": 0.2
+    },
+    {
+     "sector": "影视院线",
+     "limit_up": 4,
+     "first_boards": 4,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "names": [
+      {
+       "code": "601595",
+       "name": "上海电影",
+       "boards": 1,
+       "first_seal": "135226",
+       "broken_times": 0
+      },
+      {
+       "code": "000892",
+       "name": "欢瑞世纪",
+       "boards": 1,
+       "first_seal": "140318",
+       "broken_times": 0
+      },
+      {
+       "code": "001330",
+       "name": "博纳影业",
+       "boards": 1,
+       "first_seal": "141615",
+       "broken_times": 1
+      },
+      {
+       "code": "002343",
+       "name": "慈文传媒",
+       "boards": 1,
+       "first_seal": "141754",
+       "broken_times": 1
+      }
+     ],
+     "first_seal": "135226",
+     "last_seal": "141754",
+     "broken_rate": 0.0
+    }
+   ],
+   "theme_count": 40,
+   "concentration": 0.087,
+   "timeline": [
+    {
+     "slot": "09:25-09:35",
+     "count": 11
+    },
+    {
+     "slot": "09:35-10:00",
+     "count": 9
+    },
+    {
+     "slot": "10:00-11:30",
+     "count": 9
+    },
+    {
+     "slot": "11:30-14:00",
+     "count": 19
+    },
+    {
+     "slot": "14:00-15:00",
+     "count": 21
+    }
+   ]
+  },
+  "events": {
+   "available": true,
+   "events": [
+    {
+     "tag": "最高标",
+     "code": "600825",
+     "name": "新华传媒",
+     "board": "10cm",
+     "boards": 9,
+     "sector": "出版",
+     "ret": 10.01,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 4.778412342071533,
+     "note": "今日最高 9 板",
+     "prev_boards": 8
+    },
+    {
+     "tag": "反复开板",
+     "code": "002242",
+     "name": "九阳股份",
+     "board": "10cm",
+     "boards": 5,
+     "sector": "小家电",
+     "ret": 10.04,
+     "first_seal": "093027",
+     "last_seal": "132851",
+     "broken_times": 6,
+     "turnover": 18.27719497680664,
+     "note": "炸板 6 次后回封",
+     "prev_boards": 4
+    },
+    {
+     "tag": "反复开板",
+     "code": "605168",
+     "name": "三人行",
+     "board": "10cm",
+     "boards": 1,
+     "sector": "广告营销",
+     "ret": 10.01,
+     "first_seal": "142701",
+     "last_seal": "145449",
+     "broken_times": 6,
+     "turnover": 4.097489356994629,
+     "note": "炸板 6 次后回封",
+     "prev_boards": null
+    },
+    {
+     "tag": "反复开板",
+     "code": "002480",
+     "name": "新筑股份",
+     "board": "10cm",
+     "boards": 1,
+     "sector": "电力",
+     "ret": 10.09,
+     "first_seal": "111745",
+     "last_seal": "142557",
+     "broken_times": 5,
+     "turnover": 6.39810037612915,
+     "note": "炸板 5 次后回封",
+     "prev_boards": null
+    },
+    {
+     "tag": "题材首封",
+     "code": "002058",
+     "name": "紫竹高科",
+     "board": "10cm",
+     "boards": 4,
+     "sector": "电池",
+     "ret": 9.99,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 2.8765933513641357,
+     "note": "电池 当日最早封板",
+     "prev_boards": 3
+    },
+    {
+     "tag": "题材首封",
+     "code": "600825",
+     "name": "新华传媒",
+     "board": "10cm",
+     "boards": 9,
+     "sector": "出版",
+     "ret": 10.01,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 4.778412342071533,
+     "note": "出版 当日最早封板",
+     "prev_boards": 8
+    }
+   ],
+   "count": 19,
+   "loss_events": [
+    {
+     "tag": "高位断板",
+     "code": "605303",
+     "name": "园林股份",
+     "board": "10cm",
+     "boards": 0,
+     "sector": "基础建设",
+     "ret": 2.16,
+     "first_seal": "092502",
+     "last_seal": null,
+     "broken_times": 1,
+     "turnover": 16.301061630249023,
+     "note": "昨日 3 板，今日炸板未回封（炸 1 次）",
+     "prev_boards": 3
+    },
+    {
+     "tag": "炸板",
+     "code": "920627",
+     "name": "力王股份",
+     "board": "北交所",
+     "boards": 0,
+     "sector": "电池",
+     "ret": 24.12,
+     "first_seal": "105812",
+     "last_seal": null,
+     "broken_times": 2,
+     "turnover": 35.784812927246094,
+     "note": "炸板 2 次未回封，昨日 1 板",
+     "prev_boards": 1
+    },
+    {
+     "tag": "炸板",
+     "code": "002702",
+     "name": "海欣食品",
+     "board": "10cm",
+     "boards": 0,
+     "sector": "食品加工",
+     "ret": 4.05,
+     "first_seal": "102636",
+     "last_seal": null,
+     "broken_times": 1,
+     "turnover": 36.76154708862305,
+     "note": "炸板 1 次未回封，昨日 1 板",
+     "prev_boards": 1
+    },
+    {
+     "tag": "炸板",
+     "code": "002105",
+     "name": "信隆健康",
+     "board": "10cm",
+     "boards": 0,
+     "sector": "摩托车及",
+     "ret": 5.51,
+     "first_seal": "132545",
+     "last_seal": null,
+     "broken_times": 4,
+     "turnover": 8.86279296875,
+     "note": "炸板 4 次未回封（昨日未涨停）",
+     "prev_boards": null
+    }
+   ],
+   "gain_events": [
+    {
+     "tag": "最高标",
+     "code": "600825",
+     "name": "新华传媒",
+     "board": "10cm",
+     "boards": 9,
+     "sector": "出版",
+     "ret": 10.01,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 4.778412342071533,
+     "note": "今日最高 9 板",
+     "prev_boards": 8
+    },
+    {
+     "tag": "题材首封",
+     "code": "002058",
+     "name": "紫竹高科",
+     "board": "10cm",
+     "boards": 4,
+     "sector": "电池",
+     "ret": 9.99,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 2.8765933513641357,
+     "note": "电池 当日最早封板",
+     "prev_boards": 3
+    },
+    {
+     "tag": "题材首封",
+     "code": "600825",
+     "name": "新华传媒",
+     "board": "10cm",
+     "boards": 9,
+     "sector": "出版",
+     "ret": 10.01,
+     "first_seal": "092500",
+     "last_seal": "092500",
+     "broken_times": 0,
+     "turnover": 4.778412342071533,
+     "note": "出版 当日最早封板",
+     "prev_boards": 8
+    }
+   ],
+   "split_events": [
+    {
+     "tag": "反复开板",
+     "code": "002242",
+     "name": "九阳股份",
+     "board": "10cm",
+     "boards": 5,
+     "sector": "小家电",
+     "ret": 10.04,
+     "first_seal": "093027",
+     "last_seal": "132851",
+     "broken_times": 6,
+     "turnover": 18.27719497680664,
+     "note": "炸板 6 次后回封",
+     "prev_boards": 4
+    },
+    {
+     "tag": "反复开板",
+     "code": "605168",
+     "name": "三人行",
+     "board": "10cm",
+     "boards": 1,
+     "sector": "广告营销",
+     "ret": 10.01,
+     "first_seal": "142701",
+     "last_seal": "145449",
+     "broken_times": 6,
+     "turnover": 4.097489356994629,
+     "note": "炸板 6 次后回封",
+     "prev_boards": null
+    },
+    {
+     "tag": "反复开板",
+     "code": "002480",
+     "name": "新筑股份",
+     "board": "10cm",
+     "boards": 1,
+     "sector": "电力",
+     "ret": 10.09,
+     "first_seal": "111745",
+     "last_seal": "142557",
+     "broken_times": 5,
+     "turnover": 6.39810037612915,
+     "note": "炸板 5 次后回封",
+     "prev_boards": null
+    }
+   ]
+  },
+  "by_board": {
+   "available": true,
+   "prev_date": "2026-10-08",
+   "prev_available": true,
+   "boards": {
+    "10cm": {
+     "limit_up": 62,
+     "highest": 9,
+     "prev_base": 38,
+     "promoted": 11,
+     "broken": 11,
+     "limit_down": 8,
+     "promotion_rate": 0.289
+    },
+    "20cm": {
+     "limit_up": 7,
+     "highest": 2,
+     "prev_base": 4,
+     "promoted": 1,
+     "broken": 2,
+     "limit_down": 0,
+     "promotion_rate": 0.25
+    },
+    "北交所": {
+     "limit_up": 0,
+     "highest": 0,
+     "prev_base": 1,
+     "promoted": 0,
+     "broken": 1,
+     "limit_down": 0,
+     "promotion_rate": 0.0
+    }
+   },
+   "note": "按 2026-07-06 起施行的交易规则：主板 ST 涨跌幅 10%"
+  }
+ },
+ "themes": {
+  "date": "2026-10-09",
+  "prev_date": "2026-10-08",
+  "settled": true,
+  "top": 10,
+  "tree": {
+   "available": true,
+   "source_note": "昨日有效题材覆盖 42/43 只，只对已覆盖的样本算延续。列出当天前 10 个题材，另补最多 6 个昨日有、今天没再涨停的题材。来源：同花顺涨停揭秘 2026-10-09；原因覆盖 69/69 只；封板时间逐行核对；沪深主板 / 创业板 / 科创板，不含北交所；源站编辑归因非公司确认。",
+   "tag_count": 266,
+   "prev_covered": 42,
+   "prev_total": 43,
+   "has_prev": true,
+   "themes": [
+    {
+     "tag": "固态电池",
+     "limit_up": 4,
+     "first_boards": 1,
+     "consec_boards": 3,
+     "highest": 4,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "002058",
+       "name": "紫竹高科",
+       "boards": 4,
+       "zt_stat": "4天4板",
+       "label": "4板",
+       "first_seal": "092500",
+       "broken_times": 0
+      },
+      {
+       "code": "002805",
+       "name": "丰元股份",
+       "boards": 2,
+       "zt_stat": "2天2板",
+       "label": "2板",
+       "first_seal": "093621",
+       "broken_times": 1
+      },
+      {
+       "code": "002733",
+       "name": "雄韬股份",
+       "boards": 2,
+       "zt_stat": "2天2板",
+       "label": "2板",
+       "first_seal": "093103",
+       "broken_times": 0
+      }
+     ],
+     "prev_members": 5,
+     "prev_still_up": 3,
+     "prev_broken_or_down": 0,
+     "first_seal": "092500",
+     "last_seal": "093749",
+     "broken_rate": 0.0,
+     "continuation_rate": 0.6,
+     "state": "延续"
+    },
+    {
+     "tag": "AI漫剧",
+     "limit_up": 4,
+     "first_boards": 4,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "605577",
+       "name": "龙版传媒",
+       "boards": 1,
+       "zt_stat": "3天2板",
+       "label": "3天2板",
+       "first_seal": "134440",
+       "broken_times": 0
+      },
+      {
+       "code": "605287",
+       "name": "德才股份",
+       "boards": 1,
+       "zt_stat": "3天2板",
+       "label": "3天2板",
+       "first_seal": "133925",
+       "broken_times": 0
+      },
+      {
+       "code": "600715",
+       "name": "文投控股",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "142940",
+       "broken_times": 3
+      }
+     ],
+     "prev_members": 0,
+     "prev_still_up": 0,
+     "prev_broken_or_down": 0,
+     "first_seal": "133925",
+     "last_seal": "142940",
+     "broken_rate": 0.0,
+     "continuation_rate": null,
+     "state": "昨日覆盖样本未见"
+    },
+    {
+     "tag": "创新药",
+     "limit_up": 3,
+     "first_boards": 2,
+     "consec_boards": 1,
+     "highest": 2,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "600812",
+       "name": "华北制药",
+       "boards": 2,
+       "zt_stat": "2天2板",
+       "label": "2板",
+       "first_seal": "093058",
+       "broken_times": 0
+      },
+      {
+       "code": "002317",
+       "name": "众生药业",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "140815",
+       "broken_times": 0
+      },
+      {
+       "code": "002675",
+       "name": "东诚药业",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "103645",
+       "broken_times": 2
+      }
+     ],
+     "prev_members": 2,
+     "prev_still_up": 1,
+     "prev_broken_or_down": 0,
+     "first_seal": "093058",
+     "last_seal": "140815",
+     "broken_rate": 0.0,
+     "continuation_rate": 0.5,
+     "state": "延续"
+    },
+    {
+     "tag": "微短剧",
+     "limit_up": 3,
+     "first_boards": 3,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "002181",
+       "name": "粤 传 媒",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "141103",
+       "broken_times": 5
+      },
+      {
+       "code": "300413",
+       "name": "芒果超媒",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "141733",
+       "broken_times": 1
+      },
+      {
+       "code": "002343",
+       "name": "慈文传媒",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "141754",
+       "broken_times": 1
+      }
+     ],
+     "prev_members": 0,
+     "prev_still_up": 0,
+     "prev_broken_or_down": 0,
+     "first_seal": "141103",
+     "last_seal": "141754",
+     "broken_rate": 0.0,
+     "continuation_rate": null,
+     "state": "昨日覆盖样本未见"
+    },
+    {
+     "tag": "AI短剧",
+     "limit_up": 3,
+     "first_boards": 3,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "603533",
+       "name": "掌阅科技",
+       "boards": 1,
+       "zt_stat": "4天2板",
+       "label": "4天2板",
+       "first_seal": "140903",
+       "broken_times": 0
+      },
+      {
+       "code": "001330",
+       "name": "博纳影业",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "141615",
+       "broken_times": 1
+      },
+      {
+       "code": "300364",
+       "name": "中文在线",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "140851",
+       "broken_times": 0
+      }
+     ],
+     "prev_members": 0,
+     "prev_still_up": 0,
+     "prev_broken_or_down": 0,
+     "first_seal": "140851",
+     "last_seal": "141615",
+     "broken_rate": 0.0,
+     "continuation_rate": null,
+     "state": "昨日覆盖样本未见"
+    },
+    {
+     "tag": "网络安全",
+     "limit_up": 3,
+     "first_boards": 3,
+     "consec_boards": 0,
+     "highest": 1,
+     "broken": 0,
+     "limit_down": 0,
+     "members": [
+      {
+       "code": "002912",
+       "name": "中新赛克",
+       "boards": 1,
+       "zt_stat": "16天8板",
+       "label": "16天8板",
+       "first_seal": "132548",
+       "broken_times": 0
+      },
+      {
+       "code": "002212",
+       "name": "天融信",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "130806",
+       "broken_times": 0
+      },
+      {
+       "code": "300369",
+       "name": "绿盟科技",
+       "boards": 1,
+       "zt_stat": "1天1板",
+       "label": "1板",
+       "first_seal": "130509",
+       "broken_times": 0
+      }
+     ],
+     "prev_members": 0,
+     "prev_still_up": 0,
+     "prev_broken_or_down": 0,
+     "first_seal": "130509",
+     "last_seal": "132548",
+     "broken_rate": 0.0,
+     "continuation_rate": null,
+     "state": "昨日覆盖样本未见"
+    }
+   ],
+   "concentration": 0.058,
+   "covered": 69,
+   "total_limit_up": 69,
+   "coverage_rate": 1.0
+  }
+ },
+ "firstboard": {
+  "date": "2026-10-09",
+  "settled": true,
+  "available": true,
+  "total_limit_up": 69,
+  "first_count": 57,
+  "rebound_count": 9,
+  "reason_available": true,
+  "reason_covered": 57,
+  "reason_note": "来源：同花顺涨停揭秘 2026-10-09；原因覆盖 69/69 只；封板时间逐行核对；沪深主板 / 创业板 / 科创板，不含北交所；源站编辑归因非公司确认。",
+  "stocks": [
+   {
+    "code": "002692",
+    "name": "远程股份",
+    "board": "10cm",
+    "close": 4.76,
+    "ret": 9.930715560913086,
+    "amount": 80596491.0,
+    "float_cap": 3417021573.0,
+    "sector": "电网设备",
+    "first_seal": "093148",
+    "broken_times": 0,
+    "label": "1板",
+    "rebound": false,
+    "reason": "电线电缆+电网应用+数据中心电缆+参股半导体"
+   },
+   {
+    "code": "601811",
+    "name": "新华文轩",
+    "board": "10cm",
+    "close": 20.91,
+    "ret": 9.994739532470703,
+    "amount": 1172870480.0,
+    "float_cap": 16558710549.0,
+    "sector": "出版",
+    "first_seal": "093159",
+    "broken_times": 3,
+    "label": "10天7板",
+    "rebound": true,
+    "reason": "教科书发行+数字教育+收购整合"
+   },
+   {
+    "code": "605136",
+    "name": "丽人丽妆",
+    "board": "10cm",
+    "close": 9.44,
+    "ret": 10.023309707641602,
+    "amount": 158789251.0,
+    "float_cap": 3780328240.0,
+    "sector": "互联网电",
+    "first_seal": "093316",
+    "broken_times": 0,
+    "label": "1板",
+    "rebound": false,
+    "reason": "化妆品电商+海外总代+业绩扭亏"
+   },
+   {
+    "code": "600207",
+    "name": "安彩高科",
+    "board": "10cm",
+    "close": 5.6,
+    "ret": 10.019646644592285,
+    "amount": 271154864.0,
+    "float_cap": 6100150302.4,
+    "sector": "光伏设备",
+    "first_seal": "093500",
+    "broken_times": 1,
+    "label": "1板",
+    "rebound": false,
+    "reason": "光伏玻璃+资产出售+高透产品"
+   },
+   {
+    "code": "605399",
+    "name": "晨光新材",
+    "board": "10cm",
+    "close": 13.06,
+    "ret": 10.025274276733398,
+    "amount": 77810099.0,
+    "float_cap": 4062238610.2400002,
+    "sector": "化学制品",
+    "first_seal": "093522",
+    "broken_times": 0,
+    "label": "1板",
+    "rebound": false,
+    "reason": "功能性硅烷+多基地产能"
+   },
+   {
+    "code": "600478",
+    "name": "科力远",
+    "board": "10cm",
+    "close": 5.1,
+    "ret": 9.913793563842773,
+    "amount": 308873440.0,
+    "float_cap": 8638986471.599998,
+    "sector": "电池",
+    "first_seal": "093749",
+    "broken_times": 1,
+    "label": "1板",
+    "rebound": false,
+    "reason": "固态电池+储能电站+电池材料"
+   }
+  ]
+ },
+ "cycle": {
+  "date": "2026-10-09",
+  "settled": true,
+  "cycle": {
+   "available": true,
+   "window": 10,
+   "requested_window": 10,
+   "trough_date": "2026-09-23",
+   "trough_score": 0.183,
+   "current_score": 0.788,
+   "current_date": "2026-10-09",
+   "day_n": 7,
+   "rising": true,
+   "trend": "今日走强",
+   "pctile": 1.0,
+   "series": [
+    {
+     "date": "2026-09-18",
+     "limit_up": 78,
+     "highest_consec": 4,
+     "broken_rate": 0.24271844660194175,
+     "score": 0.416
+    },
+    {
+     "date": "2026-09-21",
+     "limit_up": 103,
+     "highest_consec": 5,
+     "broken_rate": 0.1953125,
+     "score": 0.654
+    },
+    {
+     "date": "2026-09-22",
+     "limit_up": 63,
+     "highest_consec": 6,
+     "broken_rate": 0.2222222222222222,
+     "score": 0.501
+    },
+    {
+     "date": "2026-09-23",
+     "limit_up": 51,
+     "highest_consec": 4,
+     "broken_rate": 0.33766233766233766,
+     "score": 0.183
+    },
+    {
+     "date": "2026-09-24",
+     "limit_up": 52,
+     "highest_consec": 5,
+     "broken_rate": 0.16129032258064516,
+     "score": 0.449
+    },
+    {
+     "date": "2026-09-28",
+     "limit_up": 33,
+     "highest_consec": 5,
+     "broken_rate": 0.25,
+     "score": 0.261
+    },
+    {
+     "date": "2026-09-29",
+     "limit_up": 57,
+     "highest_consec": 6,
+     "broken_rate": 0.12307692307692308,
+     "score": 0.581
+    },
+    {
+     "date": "2026-09-30",
+     "limit_up": 52,
+     "highest_consec": 7,
+     "broken_rate": 0.1875,
+     "score": 0.553
+    },
+    {
+     "date": "2026-10-08",
+     "limit_up": 43,
+     "highest_consec": 8,
+     "broken_rate": 0.4266666666666667,
+     "score": 0.314
+    },
+    {
+     "date": "2026-10-09",
+     "limit_up": 69,
+     "highest_consec": 9,
+     "broken_rate": 0.1686746987951807,
+     "score": 0.788
+    }
+   ]
+  }
+ },
+ "ladder": {
+  "date": "2026-10-09",
+  "prev_date": "2026-10-08",
+  "settled": true,
+  "ladder": {
+   "available": true,
+   "levels": [
+    {
+     "boards": 9,
+     "stocks": [
+      {
+       "code": "600825",
+       "name": "新华传媒",
+       "board": "10cm",
+       "boards": 9,
+       "label": "9板",
+       "rebound": false,
+       "first_seal": "092500",
+       "last_seal": "092500",
+       "broken_times": 0,
+       "seal_fund": 1421176407.0,
+       "amount": 625610976.0,
+       "float_cap": 13092444760.5,
+       "turnover": 4.778412342071533,
+       "reason": "拟收购财联社+重大资产重组+图书发行",
+       "tags": [
+        "拟收购财联社",
+        "重大资产重组",
+        "图书发行"
+       ]
+      }
+     ],
+     "fell": [],
+     "base": 1,
+     "promoted": 1,
+     "rate": 1.0
+    },
+    {
+     "boards": 5,
+     "stocks": [
+      {
+       "code": "600241",
+       "name": "时代万恒",
+       "board": "10cm",
+       "boards": 5,
+       "label": "5板",
+       "rebound": false,
+       "first_seal": "092500",
+       "last_seal": "092500",
+       "broken_times": 0,
+       "seal_fund": 229379199.0,
+       "amount": 68939072.0,
+       "float_cap": 3460992872.4,
+       "turnover": 1.991887092590332,
+       "reason": "新能源电池+圆柱锂电+辽宁国资",
+       "tags": [
+        "新能源电池",
+        "圆柱锂电"
+       ]
+      },
+      {
+       "code": "002242",
+       "name": "九阳股份",
+       "board": "10cm",
+       "boards": 5,
+       "label": "5板",
+       "rebound": false,
+       "first_seal": "093027",
+       "last_seal": "132851",
+       "broken_times": 6,
+       "seal_fund": 74005656.0,
+       "amount": 2062716608.0,
+       "float_cap": 11525513906.25,
+       "turnover": 18.27719497680664,
+       "reason": "机器人投资+厨房小家电+内容电商",
+       "tags": [
+        "机器人投资",
+        "厨房小家电",
+        "内容电商"
+       ]
+      }
+     ],
+     "fell": [],
+     "base": 2,
+     "promoted": 2,
+     "rate": 1.0
+    },
+    {
+     "boards": 4,
+     "stocks": [
+      {
+       "code": "002058",
+       "name": "紫竹高科",
+       "board": "10cm",
+       "boards": 4,
+       "label": "4板",
+       "rebound": false,
+       "first_seal": "092500",
+       "last_seal": "092500",
+       "broken_times": 0,
+       "seal_fund": 89302489.0,
+       "amount": 100791831.0,
+       "float_cap": 3503860934.0800004,
+       "turnover": 2.8765933513641357,
+       "reason": "固态电池+铝塑膜+电池客户",
+       "tags": [
+        "固态电池",
+        "铝塑膜",
+        "电池客户"
+       ]
+      }
+     ],
+     "fell": [
+      {
+       "code": "603200",
+       "name": "上海洗霸",
+       "prev_boards": 3,
+       "prev_label": "3板",
+       "outcome": "没涨停",
+       "ret": 9.57
+      },
+      {
+       "code": "605303",
+       "name": "园林股份",
+       "prev_boards": 3,
+       "prev_label": "3板",
+       "outcome": "炸板",
+       "ret": 2.16
+      },
+      {
+       "code": "002866",
+       "name": "传艺科技",
+       "prev_boards": 3,
+       "prev_label": "3板",
+       "outcome": "没涨停",
+       "ret": -1.45
+      }
+     ],
+     "base": 4,
+     "promoted": 1,
+     "rate": 0.25
+    },
+    {
+     "boards": 3,
+     "stocks": [],
+     "fell": [
+      {
+       "code": "603906",
+       "name": "龙蟠科技",
+       "prev_boards": 2,
+       "prev_label": "2板",
+       "outcome": "没涨停",
+       "ret": 2.05
+      },
+      {
+       "code": "603928",
+       "name": "兴业股份",
+       "prev_boards": 2,
+       "prev_label": "2板",
+       "outcome": "没涨停",
+       "ret": -4.8
+      },
+      {
+       "code": "600663",
+       "name": "陆家嘴",
+       "prev_boards": 2,
+       "prev_label": "2板",
+       "outcome": "没涨停",
+       "ret": -8.72
+      }
+     ],
+     "base": 3,
+     "promoted": 0,
+     "rate": 0.0
+    },
+    {
+     "boards": 2,
+     "stocks": [
+      {
+       "code": "001300",
+       "name": "三柏硕",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "093018",
+       "last_seal": "093018",
+       "broken_times": 0,
+       "seal_fund": 17108318.0,
+       "amount": 122004198.0,
+       "float_cap": 3622510082.04,
+       "turnover": 3.409442663192749,
+       "reason": "蹦床+健身器材+外销",
+       "tags": [
+        "蹦床",
+        "健身器材",
+        "外销"
+       ]
+      },
+      {
+       "code": "600812",
+       "name": "华北制药",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "093058",
+       "last_seal": "093058",
+       "broken_times": 0,
+       "seal_fund": 119195793.0,
+       "amount": 687660544.0,
+       "float_cap": 10345854131.1,
+       "turnover": 6.753522872924805,
+       "reason": "鼠疫+抗生素+创新药+集采",
+       "tags": [
+        "鼠疫",
+        "抗生素",
+        "创新药",
+        "集采"
+       ]
+      },
+      {
+       "code": "002733",
+       "name": "雄韬股份",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "093103",
+       "last_seal": "093103",
+       "broken_times": 0,
+       "seal_fund": 198013887.0,
+       "amount": 434396752.0,
+       "float_cap": 7664968132.02,
+       "turnover": 5.709695339202881,
+       "reason": "数据中心UPS+固态电池+锂电池",
+       "tags": [
+        "数据中心UPS",
+        "固态电池",
+        "锂电池"
+       ]
+      },
+      {
+       "code": "002805",
+       "name": "丰元股份",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "093621",
+       "last_seal": "093751",
+       "broken_times": 1,
+       "seal_fund": 88444224.0,
+       "amount": 607293920.0,
+       "float_cap": 5420184361.92,
+       "turnover": 11.363971710205078,
+       "reason": "固态电池+磷酸铁锂+比亚迪合作",
+       "tags": [
+        "固态电池",
+        "磷酸铁锂",
+        "比亚迪合作"
+       ]
+      },
+      {
+       "code": "001336",
+       "name": "楚环科技",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "093730",
+       "last_seal": "093815",
+       "broken_times": 1,
+       "seal_fund": 336338541.0,
+       "amount": 347765040.0,
+       "float_cap": 1460865623.36,
+       "turnover": 24.12903594970703,
+       "reason": "废气治理+半导体环保+航空航天投资+股价被操纵",
+       "tags": [
+        "废气治理",
+        "半导体环保",
+        "航空航天投资",
+        "股价被操纵"
+       ]
+      },
+      {
+       "code": "300530",
+       "name": "领湃科技",
+       "board": "20cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "095427",
+       "last_seal": "104436",
+       "broken_times": 3,
+       "seal_fund": 38023007.0,
+       "amount": 722835184.0,
+       "float_cap": 4969394130.599999,
+       "turnover": 15.042340278625488,
+       "reason": "储能电池+新能源综合服务+衡阳国资",
+       "tags": [
+        "储能电池",
+        "新能源综合服务"
+       ]
+      },
+      {
+       "code": "600408",
+       "name": "安泰集团",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "104317",
+       "last_seal": "104317",
+       "broken_times": 0,
+       "seal_fund": 34150406.0,
+       "amount": 750030320.0,
+       "float_cap": 3805704000.0,
+       "turnover": 20.914100646972656,
+       "reason": "焦炭+焦炉煤气制氢+型钢",
+       "tags": [
+        "焦炭",
+        "焦炉煤气制氢",
+        "型钢"
+       ]
+      },
+      {
+       "code": "600400",
+       "name": "红豆股份",
+       "board": "10cm",
+       "boards": 2,
+       "label": "2板",
+       "rebound": false,
+       "first_seal": "144612",
+       "last_seal": "144612",
+       "broken_times": 0,
+       "seal_fund": 32983772.0,
+       "amount": 744163056.0,
+       "float_cap": 9119659970.96,
+       "turnover": 8.50883674621582,
+       "reason": "牛散持股+服装+养老机器人",
+       "tags": [
+        "牛散持股",
+        "服装",
+        "养老机器人"
+       ]
+      }
+     ],
+     "fell": [
+      {
+       "code": "920627",
+       "name": "力王股份",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "炸板",
+       "ret": 24.12
+      },
+      {
+       "code": "605378",
+       "name": "野马电池",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "没涨停",
+       "ret": 4.69
+      },
+      {
+       "code": "600722",
+       "name": "金牛化工",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "没涨停",
+       "ret": 4.26
+      },
+      {
+       "code": "002702",
+       "name": "海欣食品",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "炸板",
+       "ret": 4.05
+      },
+      {
+       "code": "600026",
+       "name": "中远海能",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "没涨停",
+       "ret": 3.85
+      },
+      {
+       "code": "000869",
+       "name": "张  裕Ａ",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "没涨停",
+       "ret": 3.3
+      },
+      {
+       "code": "603788",
+       "name": "宁波高发",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "没涨停",
+       "ret": -5.6
+      },
+      {
+       "code": "603073",
+       "name": "彩蝶实业",
+       "prev_boards": 1,
+       "prev_label": "1板",
+       "outcome": "跌停",
+       "ret": -10.01
+      }
+     ],
+     "base": 33,
+     "promoted": 8,
+     "rate": 0.242
+    },
+    {
+     "boards": 1,
+     "stocks": [
+      {
+       "code": "002692",
+       "name": "远程股份",
+       "board": "10cm",
+       "boards": 1,
+       "label": "1板",
+       "rebound": false,
+       "first_seal": "093148",
+       "last_seal": "093148",
+       "broken_times": 0,
+       "seal_fund": 34613863.0,
+       "amount": 80596491.0,
+       "float_cap": 3417021573.0,
+       "turnover": 2.3858327865600586,
+       "reason": "电线电缆+电网应用+数据中心电缆+参股半导体",
+       "tags": [
+        "电线电缆",
+        "电网应用",
+        "数据中心电缆",
+        "参股半导体"
+       ]
+      },
+      {
+       "code": "601811",
+       "name": "新华文轩",
+       "board": "10cm",
+       "boards": 1,
+       "label": "10天7板",
+       "rebound": true,
+       "first_seal": "093159",
+       "last_seal": "141314",
+       "broken_times": 3,
+       "seal_fund": 45790809.0,
+       "amount": 1172870480.0,
+       "float_cap": 16558710549.0,
+       "turnover": 7.470685005187988,
+       "reason": "教科书发行+数字教育+收购整合",
+       "tags": [
+        "教科书发行",
+        "数字教育",
+        "收购整合"
+       ]
+      },
+      {
+       "code": "605136",
+       "name": "丽人丽妆",
+       "board": "10cm",
+       "boards": 1,
+       "label": "1板",
+       "rebound": false,
+       "first_seal": "093316",
+       "last_seal": "093316",
+       "broken_times": 0,
+       "seal_fund": 29041216.0,
+       "amount": 158789251.0,
+       "float_cap": 3780328240.0,
+       "turnover": 4.260241508483887,
+       "reason": "化妆品电商+海外总代+业绩扭亏",
+       "tags": [
+        "化妆品电商",
+        "海外总代",
+        "业绩扭亏"
+       ]
+      },
+      {
+       "code": "600207",
+       "name": "安彩高科",
+       "board": "10cm",
+       "boards": 1,
+       "label": "1板",
+       "rebound": false,
+       "first_seal": "093500",
+       "last_seal": "101212",
+       "broken_times": 1,
+       "seal_fund": 43910176.0,
+       "amount": 271154864.0,
+       "float_cap": 6100150302.4,
+       "turnover": 4.528526306152344,
+       "reason": "光伏玻璃+资产出售+高透产品",
+       "tags": [
+        "光伏玻璃",
+        "资产出售",
+        "高透产品"
+       ]
+      }
+     ],
+     "fell": [],
+     "base": null,
+     "promoted": null,
+     "rate": null
+    }
+   ],
+   "total_limit_up": 69,
+   "highest": 9,
+   "consec_count": 12,
+   "prev_available": true,
+   "prev_note": "",
+   "reason_available": true,
+   "reason_covered": 69,
+   "reason_note": "来源：同花顺涨停揭秘 2026-10-09；原因覆盖 69/69 只；封板时间逐行核对；沪深主板 / 创业板 / 科创板，不含北交所；源站编辑归因非公司确认。"
+  }
+ },
+ "rotation": {
+  "date": "2026-10-09",
+  "days": 5,
+  "settled": true,
+  "rotation": {
+   "available": true,
+   "dates": [
+    "2026-09-28",
+    "2026-09-29",
+    "2026-09-30",
+    "2026-10-08",
+    "2026-10-09"
+   ],
+   "days": [
+    {
+     "date": "2026-09-28",
+     "available": true,
+     "limit_up": 33,
+     "covered": 33,
+     "top": [
+      "AI安全",
+      "染料",
+      "网络安全"
+     ]
+    },
+    {
+     "date": "2026-09-29",
+     "available": true,
+     "limit_up": 57,
+     "covered": 56,
+     "top": [
+      "固态电池",
+      "业绩增长",
+      "“华”字辈"
+     ]
+    },
+    {
+     "date": "2026-09-30",
+     "available": true,
+     "limit_up": 52,
+     "covered": 52,
+     "top": [
+      "业绩增长",
+      "固态电池",
+      "房地产开发"
+     ]
+    },
+    {
+     "date": "2026-10-08",
+     "available": true,
+     "limit_up": 43,
+     "covered": 42,
+     "top": [
+      "固态电池",
+      "业绩增长",
+      "磷酸铁锂"
+     ]
+    },
+    {
+     "date": "2026-10-09",
+     "available": true,
+     "limit_up": 69,
+     "covered": 69,
+     "top": [
+      "固态电池",
+      "AI漫剧",
+      "创新药"
+     ]
+    }
+   ],
+   "themes": [
+    {
+     "tag": "固态电池",
+     "series": [
+      0,
+      7,
+      4,
+      5,
+      4
+     ],
+     "ranks": [
+      null,
+      1,
+      2,
+      1,
+      1
+     ],
+     "highest": [
+      0,
+      1,
+      2,
+      3,
+      4
+     ],
+     "today": 4,
+     "total": 20,
+     "active_days": 4,
+     "top3_days": 4,
+     "streak": 4,
+     "streak_partial": false,
+     "status": "连续 4 天",
+     "first_day": "2026-09-29",
+     "members": [
+      "紫竹高科",
+      "雄韬股份",
+      "丰元股份"
+     ]
+    },
+    {
+     "tag": "AI漫剧",
+     "series": [
+      0,
+      1,
+      2,
+      0,
+      4
+     ],
+     "ranks": [
+      null,
+      14,
+      3,
+      null,
+      1
+     ],
+     "highest": [
+      0,
+      1,
+      1,
+      0,
+      1
+     ],
+     "today": 4,
+     "total": 7,
+     "active_days": 3,
+     "top3_days": 2,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 1 天回流",
+     "first_day": "2026-09-29",
+     "members": [
+      "德才股份",
+      "龙版传媒",
+      "欢瑞世纪"
+     ]
+    },
+    {
+     "tag": "创新药",
+     "series": [
+      1,
+      0,
+      2,
+      2,
+      3
+     ],
+     "ranks": [
+      4,
+      null,
+      3,
+      3,
+      3
+     ],
+     "highest": [
+      1,
+      0,
+      1,
+      1,
+      2
+     ],
+     "today": 3,
+     "total": 8,
+     "active_days": 4,
+     "top3_days": 3,
+     "streak": 3,
+     "streak_partial": false,
+     "status": "连续 3 天",
+     "first_day": "2026-09-28",
+     "members": [
+      "华北制药",
+      "东诚药业",
+      "众生药业"
+     ]
+    },
+    {
+     "tag": "网络安全",
+     "series": [
+      2,
+      2,
+      0,
+      0,
+      3
+     ],
+     "ranks": [
+      1,
+      8,
+      null,
+      null,
+      3
+     ],
+     "highest": [
+      1,
+      2,
+      0,
+      0,
+      1
+     ],
+     "today": 3,
+     "total": 7,
+     "active_days": 3,
+     "top3_days": 2,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 2 天回流",
+     "first_day": "2026-09-28",
+     "members": [
+      "绿盟科技",
+      "天融信",
+      "中新赛克"
+     ]
+    },
+    {
+     "tag": "AI短剧",
+     "series": [
+      0,
+      3,
+      0,
+      0,
+      3
+     ],
+     "ranks": [
+      null,
+      5,
+      null,
+      null,
+      3
+     ],
+     "highest": [
+      0,
+      1,
+      0,
+      0,
+      1
+     ],
+     "today": 3,
+     "total": 6,
+     "active_days": 2,
+     "top3_days": 1,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 2 天回流",
+     "first_day": "2026-09-29",
+     "members": [
+      "中文在线",
+      "掌阅科技",
+      "博纳影业"
+     ]
+    },
+    {
+     "tag": "微短剧",
+     "series": [
+      0,
+      0,
+      0,
+      0,
+      3
+     ],
+     "ranks": [
+      null,
+      null,
+      null,
+      null,
+      3
+     ],
+     "highest": [
+      0,
+      0,
+      0,
+      0,
+      1
+     ],
+     "today": 3,
+     "total": 3,
+     "active_days": 1,
+     "top3_days": 1,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "窗口内首次出现",
+     "first_day": "2026-10-09",
+     "members": [
+      "粤 传 媒",
+      "芒果超媒",
+      "慈文传媒"
+     ]
+    },
+    {
+     "tag": "业绩增长",
+     "series": [
+      0,
+      6,
+      7,
+      3,
+      2
+     ],
+     "ranks": [
+      null,
+      2,
+      1,
+      2,
+      7
+     ],
+     "highest": [
+      0,
+      2,
+      3,
+      2,
+      1
+     ],
+     "today": 2,
+     "total": 18,
+     "active_days": 4,
+     "top3_days": 3,
+     "streak": 4,
+     "streak_partial": false,
+     "status": "连续 4 天",
+     "first_day": "2026-09-29",
+     "members": [
+      "妙可蓝多",
+      "西部黄金"
+     ]
+    },
+    {
+     "tag": "AI安全",
+     "series": [
+      2,
+      1,
+      0,
+      0,
+      2
+     ],
+     "ranks": [
+      1,
+      14,
+      null,
+      null,
+      7
+     ],
+     "highest": [
+      1,
+      2,
+      0,
+      0,
+      1
+     ],
+     "today": 2,
+     "total": 5,
+     "active_days": 3,
+     "top3_days": 1,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 2 天回流",
+     "first_day": "2026-09-28",
+     "members": [
+      "中新赛克",
+      "格尔软件"
+     ]
+    },
+    {
+     "tag": "半年报增长",
+     "series": [
+      1,
+      0,
+      0,
+      0,
+      2
+     ],
+     "ranks": [
+      4,
+      null,
+      null,
+      null,
+      7
+     ],
+     "highest": [
+      2,
+      0,
+      0,
+      0,
+      1
+     ],
+     "today": 2,
+     "total": 3,
+     "active_days": 2,
+     "top3_days": 0,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 3 天回流",
+     "first_day": "2026-09-28",
+     "members": [
+      "国光连锁",
+      "雷赛智能"
+     ]
+    },
+    {
+     "tag": "抗生素",
+     "series": [
+      0,
+      0,
+      0,
+      1,
+      2
+     ],
+     "ranks": [
+      null,
+      null,
+      null,
+      7,
+      7
+     ],
+     "highest": [
+      0,
+      0,
+      0,
+      1,
+      2
+     ],
+     "today": 2,
+     "total": 3,
+     "active_days": 2,
+     "top3_days": 0,
+     "streak": 2,
+     "streak_partial": false,
+     "status": "连续 2 天",
+     "first_day": "2026-10-08",
+     "members": [
+      "华北制药",
+      "东亚药业"
+     ]
+    },
+    {
+     "tag": "AI应用",
+     "series": [
+      0,
+      0,
+      1,
+      0,
+      2
+     ],
+     "ranks": [
+      null,
+      null,
+      9,
+      null,
+      7
+     ],
+     "highest": [
+      0,
+      0,
+      1,
+      0,
+      1
+     ],
+     "today": 2,
+     "total": 3,
+     "active_days": 2,
+     "top3_days": 0,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 1 天回流",
+     "first_day": "2026-09-30",
+     "members": [
+      "吉视传媒",
+      "新经典"
+     ]
+    },
+    {
+     "tag": "全产业链",
+     "series": [
+      0,
+      0,
+      1,
+      0,
+      2
+     ],
+     "ranks": [
+      null,
+      null,
+      9,
+      null,
+      7
+     ],
+     "highest": [
+      0,
+      0,
+      1,
+      0,
+      1
+     ],
+     "today": 2,
+     "total": 3,
+     "active_days": 2,
+     "top3_days": 0,
+     "streak": 1,
+     "streak_partial": false,
+     "status": "隔 1 天回流",
+     "first_day": "2026-09-30",
+     "members": [
+      "东岳硅材",
+      "海南橡胶"
+     ]
+    }
+   ],
+   "tag_count": 502,
+   "missing_days": [],
+   "prev_available": true
+  }
+ }
+}

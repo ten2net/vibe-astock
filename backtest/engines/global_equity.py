@@ -17,8 +17,8 @@ Market rules:
     - Broker commission and slippage are config-driven
     - Official TSX/TSXV price-increment grid is applied to fills
 
-本产品入口仅开放美股与港股；加拿大分支保留作上游参考，未对外开放。
-印度及其专属引擎未迁入本仓库，不构成本产品能力。
+India (NSE/BSE) is handled by the dedicated ``backtest.engines.india_equity``
+``IndiaEquityEngine`` (T+1 delivery, circuit bands, STT/stamp/GST stack).
 """
 
 from __future__ import annotations

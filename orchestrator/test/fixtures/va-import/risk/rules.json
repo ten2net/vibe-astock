@@ -1,0 +1,1 @@
+{"schema": 1, "rules": {"max_loss_per_trade_pct": 4.0, "max_loss_per_day_pct": 8.0, "max_positions": 2, "max_trades_per_day": 5, "pause_after_losses": 3, "max_unplanned_ratio": 0.2}}

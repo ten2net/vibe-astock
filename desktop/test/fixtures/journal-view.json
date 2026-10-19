@@ -1,0 +1,1020 @@
+{
+ "available": true,
+ "settings": {
+  "record_id": "journal_settings-39919a8b-87f1-4b23-9c88-e97b89f6193b",
+  "extra_records": 0,
+  "labels": {
+   "fees": {
+    "commission_rate": "佣金费率(双向)",
+    "commission_min": "单笔佣金最低(元)",
+    "stamp_tax_rate": "印花税(仅卖出)",
+    "transfer_fee_rate": "过户费(双向)"
+   },
+   "rules": {
+    "max_loss_per_trade_pct": "单笔最大亏损",
+    "max_loss_per_day_pct": "单日最大亏损",
+    "max_positions": "最多同时持仓",
+    "max_trades_per_day": "单日最多开仓",
+    "pause_after_losses": "连亏几笔后停手",
+    "max_unplanned_ratio": "计划外交易占比上限"
+   }
+  },
+  "defaults": {
+   "fees": {
+    "commission_rate": 0.00025,
+    "commission_min": 5,
+    "stamp_tax_rate": 0.0005,
+    "transfer_fee_rate": 0.00001
+   },
+   "rules": {
+    "max_loss_per_trade_pct": 5,
+    "max_loss_per_day_pct": 8,
+    "max_positions": 3,
+    "max_trades_per_day": 5,
+    "pause_after_losses": 3,
+    "max_unplanned_ratio": 0.2
+   }
+  },
+  "raw": {
+   "equity_base": 200000
+  },
+  "problem": null,
+  "fees": {
+   "commission_rate": 0.00025,
+   "commission_min": 5,
+   "stamp_tax_rate": 0.0005,
+   "transfer_fee_rate": 0.00001
+  },
+  "fees_default": true,
+  "rules": {
+   "max_loss_per_trade_pct": 5,
+   "max_loss_per_day_pct": 8,
+   "max_positions": 3,
+   "max_trades_per_day": 5,
+   "pause_after_losses": 3,
+   "max_unplanned_ratio": 0.2
+  },
+  "rules_default": true,
+  "equity_base": 200000
+ },
+ "playbooks": [
+  "打板",
+  "低吸",
+  "接力",
+  "半路",
+  "套利",
+  "其它"
+ ],
+ "today": "2026-10-10",
+ "episodes": [
+  {
+   "id": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+   "symbol": "600004",
+   "name": "示例丁",
+   "trade_ids": [
+    "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9"
+   ],
+   "fills": [
+    {
+     "trade_id": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+     "type": "buy",
+     "date": "2026-10-09",
+     "price": 15,
+     "shares": 300,
+     "fee": 5.045,
+     "fee_estimated": true
+    }
+   ],
+   "from_opening": false,
+   "has_split": false,
+   "dividends": 0,
+   "created_at": "2026-10-10T21:39:47.536+08:00",
+   "first_buy": "2026-10-09",
+   "last_sell": null,
+   "closed": false,
+   "buy_shares": 300,
+   "sell_shares": 0,
+   "open_shares": 300,
+   "avg_cost": 15,
+   "amount": 4500,
+   "avg_sell": null,
+   "gross_pnl": null,
+   "fees": null,
+   "fees_are_estimated": null,
+   "realized_pnl": null,
+   "realized_by_date": null,
+   "realized_pct": null,
+   "hold_days": null,
+   "settlement_warning": null
+  },
+  {
+   "id": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+   "symbol": "300003",
+   "name": "示例丙",
+   "trade_ids": [
+    "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328"
+   ],
+   "fills": [
+    {
+     "trade_id": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+     "type": "buy",
+     "date": "2026-10-08",
+     "price": 30,
+     "shares": 500,
+     "fee": 5.15,
+     "fee_estimated": true
+    }
+   ],
+   "from_opening": false,
+   "has_split": false,
+   "dividends": 0,
+   "created_at": "2026-10-10T21:39:47.505+08:00",
+   "first_buy": "2026-10-08",
+   "last_sell": null,
+   "closed": false,
+   "buy_shares": 500,
+   "sell_shares": 0,
+   "open_shares": 500,
+   "avg_cost": 30,
+   "amount": 15000,
+   "avg_sell": null,
+   "gross_pnl": null,
+   "fees": null,
+   "fees_are_estimated": null,
+   "realized_pnl": null,
+   "realized_by_date": null,
+   "realized_pct": null,
+   "hold_days": null,
+   "settlement_warning": null
+  },
+  {
+   "id": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+   "symbol": "002002",
+   "name": "示例乙",
+   "trade_ids": [
+    "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+    "trade-adc96808-3379-4640-9e8c-c77845b6d761"
+   ],
+   "fills": [
+    {
+     "trade_id": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+     "type": "buy",
+     "date": "2026-09-10",
+     "price": 20,
+     "shares": 2000,
+     "fee": 10,
+     "fee_estimated": false
+    },
+    {
+     "trade_id": "trade-adc96808-3379-4640-9e8c-c77845b6d761",
+     "type": "sell",
+     "date": "2026-09-11",
+     "price": 18.5,
+     "shares": 2000,
+     "fee": 30,
+     "fee_estimated": false
+    }
+   ],
+   "from_opening": false,
+   "has_split": false,
+   "dividends": 0,
+   "created_at": "2026-10-10T21:39:47.471+08:00",
+   "first_buy": "2026-09-10",
+   "last_sell": "2026-09-11",
+   "closed": true,
+   "buy_shares": 2000,
+   "sell_shares": 2000,
+   "open_shares": 0,
+   "avg_cost": 20,
+   "amount": 40000,
+   "avg_sell": 18.5,
+   "gross_pnl": -3000,
+   "fees": 40,
+   "fees_are_estimated": false,
+   "realized_pnl": -3040,
+   "realized_by_date": {
+    "2026-09-11": -3040
+   },
+   "realized_pct": -7.6,
+   "hold_days": 1,
+   "settlement_warning": null
+  },
+  {
+   "id": "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+   "symbol": "600001",
+   "name": "示例甲",
+   "trade_ids": [
+    "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+    "trade-4010f12c-fa6d-4931-854c-a6624427259a"
+   ],
+   "fills": [
+    {
+     "trade_id": "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+     "type": "buy",
+     "date": "2026-09-01",
+     "price": 10,
+     "shares": 1000,
+     "fee": 5.1,
+     "fee_estimated": true
+    },
+    {
+     "trade_id": "trade-4010f12c-fa6d-4931-854c-a6624427259a",
+     "type": "sell",
+     "date": "2026-09-03",
+     "price": 11,
+     "shares": 1000,
+     "fee": 10.61,
+     "fee_estimated": true
+    }
+   ],
+   "from_opening": false,
+   "has_split": false,
+   "dividends": 0,
+   "created_at": "2026-10-10T21:39:47.434+08:00",
+   "first_buy": "2026-09-01",
+   "last_sell": "2026-09-03",
+   "closed": true,
+   "buy_shares": 1000,
+   "sell_shares": 1000,
+   "open_shares": 0,
+   "avg_cost": 10,
+   "amount": 10000,
+   "avg_sell": 11,
+   "gross_pnl": 1000,
+   "fees": 15.71,
+   "fees_are_estimated": true,
+   "realized_pnl": 984.29,
+   "realized_by_date": {
+    "2026-09-03": 984.29
+   },
+   "realized_pct": 9.84,
+   "hold_days": 2,
+   "settlement_warning": null
+  }
+ ],
+ "rows": [
+  {
+   "key": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+   "kind": "episode",
+   "symbol": "600004",
+   "name": "示例丁",
+   "date": "2026-10-09",
+   "created_at": "2026-10-10T21:39:47.536+08:00",
+   "episode": {
+    "id": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+    "symbol": "600004",
+    "name": "示例丁",
+    "trade_ids": [
+     "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9"
+    ],
+    "fills": [
+     {
+      "trade_id": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+      "type": "buy",
+      "date": "2026-10-09",
+      "price": 15,
+      "shares": 300,
+      "fee": 5.045,
+      "fee_estimated": true
+     }
+    ],
+    "from_opening": false,
+    "has_split": false,
+    "dividends": 0,
+    "created_at": "2026-10-10T21:39:47.536+08:00",
+    "first_buy": "2026-10-09",
+    "last_sell": null,
+    "closed": false,
+    "buy_shares": 300,
+    "sell_shares": 0,
+    "open_shares": 300,
+    "avg_cost": 15,
+    "amount": 4500,
+    "avg_sell": null,
+    "gross_pnl": null,
+    "fees": null,
+    "fees_are_estimated": null,
+    "realized_pnl": null,
+    "realized_by_date": null,
+    "realized_pct": null,
+    "hold_days": null,
+    "settlement_warning": null
+   },
+   "tag_id": null,
+   "playbook": null,
+   "as_planned": null,
+   "planned_stop": null,
+   "planned_target": null,
+   "plan_late": false,
+   "note": "",
+   "pnl_pct": null,
+   "realized_pnl": null,
+   "hold_days": null
+  },
+  {
+   "key": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+   "kind": "episode",
+   "symbol": "300003",
+   "name": "示例丙",
+   "date": "2026-10-08",
+   "created_at": "2026-10-10T21:39:47.505+08:00",
+   "episode": {
+    "id": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+    "symbol": "300003",
+    "name": "示例丙",
+    "trade_ids": [
+     "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328"
+    ],
+    "fills": [
+     {
+      "trade_id": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+      "type": "buy",
+      "date": "2026-10-08",
+      "price": 30,
+      "shares": 500,
+      "fee": 5.15,
+      "fee_estimated": true
+     }
+    ],
+    "from_opening": false,
+    "has_split": false,
+    "dividends": 0,
+    "created_at": "2026-10-10T21:39:47.505+08:00",
+    "first_buy": "2026-10-08",
+    "last_sell": null,
+    "closed": false,
+    "buy_shares": 500,
+    "sell_shares": 0,
+    "open_shares": 500,
+    "avg_cost": 30,
+    "amount": 15000,
+    "avg_sell": null,
+    "gross_pnl": null,
+    "fees": null,
+    "fees_are_estimated": null,
+    "realized_pnl": null,
+    "realized_by_date": null,
+    "realized_pct": null,
+    "hold_days": null,
+    "settlement_warning": null
+   },
+   "tag_id": "journal_tag-7282b2ce-4633-40d4-9faf-418ce291c41e",
+   "playbook": "接力",
+   "as_planned": null,
+   "planned_stop": 28,
+   "planned_target": null,
+   "plan_late": false,
+   "note": "",
+   "pnl_pct": null,
+   "realized_pnl": null,
+   "hold_days": null
+  },
+  {
+   "key": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+   "kind": "episode",
+   "symbol": "002002",
+   "name": "示例乙",
+   "date": "2026-09-10",
+   "created_at": "2026-10-10T21:39:47.471+08:00",
+   "episode": {
+    "id": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+    "symbol": "002002",
+    "name": "示例乙",
+    "trade_ids": [
+     "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+     "trade-adc96808-3379-4640-9e8c-c77845b6d761"
+    ],
+    "fills": [
+     {
+      "trade_id": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+      "type": "buy",
+      "date": "2026-09-10",
+      "price": 20,
+      "shares": 2000,
+      "fee": 10,
+      "fee_estimated": false
+     },
+     {
+      "trade_id": "trade-adc96808-3379-4640-9e8c-c77845b6d761",
+      "type": "sell",
+      "date": "2026-09-11",
+      "price": 18.5,
+      "shares": 2000,
+      "fee": 30,
+      "fee_estimated": false
+     }
+    ],
+    "from_opening": false,
+    "has_split": false,
+    "dividends": 0,
+    "created_at": "2026-10-10T21:39:47.471+08:00",
+    "first_buy": "2026-09-10",
+    "last_sell": "2026-09-11",
+    "closed": true,
+    "buy_shares": 2000,
+    "sell_shares": 2000,
+    "open_shares": 0,
+    "avg_cost": 20,
+    "amount": 40000,
+    "avg_sell": 18.5,
+    "gross_pnl": -3000,
+    "fees": 40,
+    "fees_are_estimated": false,
+    "realized_pnl": -3040,
+    "realized_by_date": {
+     "2026-09-11": -3040
+    },
+    "realized_pct": -7.6,
+    "hold_days": 1,
+    "settlement_warning": null
+   },
+   "tag_id": "journal_tag-ab8a089d-dc82-4cfb-a7a7-3c1d760c2956",
+   "playbook": "低吸",
+   "as_planned": false,
+   "planned_stop": null,
+   "planned_target": null,
+   "plan_late": false,
+   "note": "",
+   "pnl_pct": -7.6,
+   "realized_pnl": -3040,
+   "hold_days": 1
+  },
+  {
+   "key": "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+   "kind": "episode",
+   "symbol": "600001",
+   "name": "示例甲",
+   "date": "2026-09-01",
+   "created_at": "2026-10-10T21:39:47.434+08:00",
+   "episode": {
+    "id": "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+    "symbol": "600001",
+    "name": "示例甲",
+    "trade_ids": [
+     "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+     "trade-4010f12c-fa6d-4931-854c-a6624427259a"
+    ],
+    "fills": [
+     {
+      "trade_id": "trade-c0ad4c66-2422-4121-9010-01fa74d0bd90",
+      "type": "buy",
+      "date": "2026-09-01",
+      "price": 10,
+      "shares": 1000,
+      "fee": 5.1,
+      "fee_estimated": true
+     },
+     {
+      "trade_id": "trade-4010f12c-fa6d-4931-854c-a6624427259a",
+      "type": "sell",
+      "date": "2026-09-03",
+      "price": 11,
+      "shares": 1000,
+      "fee": 10.61,
+      "fee_estimated": true
+     }
+    ],
+    "from_opening": false,
+    "has_split": false,
+    "dividends": 0,
+    "created_at": "2026-10-10T21:39:47.434+08:00",
+    "first_buy": "2026-09-01",
+    "last_sell": "2026-09-03",
+    "closed": true,
+    "buy_shares": 1000,
+    "sell_shares": 1000,
+    "open_shares": 0,
+    "avg_cost": 10,
+    "amount": 10000,
+    "avg_sell": 11,
+    "gross_pnl": 1000,
+    "fees": 15.71,
+    "fees_are_estimated": true,
+    "realized_pnl": 984.29,
+    "realized_by_date": {
+     "2026-09-03": 984.29
+    },
+    "realized_pct": 9.84,
+    "hold_days": 2,
+    "settlement_warning": null
+   },
+   "tag_id": "journal_tag-d1447530-a126-42fe-9632-466e228f1b17",
+   "playbook": "打板",
+   "as_planned": true,
+   "planned_stop": 9.5,
+   "planned_target": null,
+   "plan_late": false,
+   "note": "首板早封",
+   "pnl_pct": 9.84,
+   "realized_pnl": 984.29,
+   "hold_days": 2
+  },
+  {
+   "key": "journal_tag-d5f2ea9a-e3bc-4326-af28-a6af1d414e3d",
+   "kind": "manual",
+   "symbol": "000001",
+   "name": "示例银行",
+   "date": "2026-08-20",
+   "created_at": "2026-10-10T21:39:47.416+08:00",
+   "episode": null,
+   "tag_id": "journal_tag-d5f2ea9a-e3bc-4326-af28-a6af1d414e3d",
+   "playbook": "半路",
+   "as_planned": null,
+   "planned_stop": null,
+   "planned_target": null,
+   "plan_late": false,
+   "note": "补记的一笔",
+   "pnl_pct": 3.2,
+   "realized_pnl": null,
+   "hold_days": null
+  }
+ ],
+ "issues": [],
+ "orphans": [],
+ "conflicts": [],
+ "skipped_non_a": [],
+ "orphan_dividends": 0,
+ "stats": {
+  "overall": {
+   "count": 5,
+   "scored": 3,
+   "money_scored": 2,
+   "net_pnl": -2055.71,
+   "win_rate": 0.667,
+   "avg": 1.81,
+   "best": 9.84,
+   "worst": -7.6
+  },
+  "by_playbook": [
+   {
+    "key": "打板",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": 984.29,
+    "win_rate": 1,
+    "avg": 9.84,
+    "best": 9.84,
+    "worst": 9.84
+   },
+   {
+    "key": "低吸",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": -3040,
+    "win_rate": 0,
+    "avg": -7.6,
+    "best": -7.6,
+    "worst": -7.6
+   },
+   {
+    "key": "接力",
+    "count": 1,
+    "scored": 0,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": null,
+    "avg": null,
+    "best": null,
+    "worst": null
+   },
+   {
+    "key": "半路",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": 1,
+    "avg": 3.2,
+    "best": 3.2,
+    "worst": 3.2
+   },
+   {
+    "key": "未标注",
+    "count": 1,
+    "scored": 0,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": null,
+    "avg": null,
+    "best": null,
+    "worst": null
+   }
+  ],
+  "by_planned": [
+   {
+    "key": "按计划",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": 984.29,
+    "win_rate": 1,
+    "avg": 9.84,
+    "best": 9.84,
+    "worst": 9.84
+   },
+   {
+    "key": "计划外",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": -3040,
+    "win_rate": 0,
+    "avg": -7.6,
+    "best": -7.6,
+    "worst": -7.6
+   },
+   {
+    "key": "未标注",
+    "count": 3,
+    "scored": 1,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": 1,
+    "avg": 3.2,
+    "best": 3.2,
+    "worst": 3.2
+   }
+  ],
+  "by_hold": [
+   {
+    "key": "隔日",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": -3040,
+    "win_rate": 0,
+    "avg": -7.6,
+    "best": -7.6,
+    "worst": -7.6
+   },
+   {
+    "key": "持有2天",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 1,
+    "net_pnl": 984.29,
+    "win_rate": 1,
+    "avg": 9.84,
+    "best": 9.84,
+    "worst": 9.84
+   },
+   {
+    "key": "还没卖",
+    "count": 2,
+    "scored": 0,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": null,
+    "avg": null,
+    "best": null,
+    "worst": null
+   },
+   {
+    "key": "未填明细",
+    "count": 1,
+    "scored": 1,
+    "money_scored": 0,
+    "net_pnl": null,
+    "win_rate": 1,
+    "avg": 3.2,
+    "best": 3.2,
+    "worst": 3.2
+   }
+  ]
+ },
+ "risk": {
+  "equity": {
+   "available": true,
+   "points": [
+    {
+     "date": "2026-09-03",
+     "cum_pnl": 984.29,
+     "pnl": 984.29,
+     "drawdown": 0
+    },
+    {
+     "date": "2026-09-11",
+     "cum_pnl": -2055.71,
+     "pnl": -3040,
+     "drawdown": 3040
+    }
+   ],
+   "date_note": "按平仓日排列",
+   "trades": 2,
+   "net_pnl": -2055.71,
+   "peak": 984.29,
+   "peak_date": "2026-09-03",
+   "current_drawdown": 3040,
+   "max_drawdown": 3040,
+   "max_drawdown_since": "2026-09-11",
+   "trades_since_peak": 1,
+   "longest_underwater": 1,
+   "win_rate": 0.5,
+   "avg_win": 984.29,
+   "avg_loss": -3040,
+   "payoff_ratio": 0.32,
+   "profit_factor": 0.32,
+   "worst_losing_streak": 1,
+   "worst_trade": -3040,
+   "net_without_best1": -3040,
+   "net_without_best3": 0,
+   "best_trade_share": null
+  },
+  "rolling": {
+   "available": true,
+   "windows": {
+    "10": {
+     "trades": 2,
+     "net_pnl": -2055.71,
+     "win_rate": 0.5,
+     "avg_win": 984.29,
+     "avg_loss": -3040,
+     "payoff_ratio": 0.32,
+     "profit_factor": 0.32,
+     "execution_rate": 0.5,
+     "date_note": "按平仓日排列",
+     "date_from": "2026-09-03",
+     "date_to": "2026-09-11",
+     "window": 10,
+     "enough": false
+    },
+    "20": {
+     "trades": 2,
+     "net_pnl": -2055.71,
+     "win_rate": 0.5,
+     "avg_win": 984.29,
+     "avg_loss": -3040,
+     "payoff_ratio": 0.32,
+     "profit_factor": 0.32,
+     "execution_rate": 0.5,
+     "date_note": "按平仓日排列",
+     "date_from": "2026-09-03",
+     "date_to": "2026-09-11",
+     "window": 20,
+     "enough": false
+    },
+    "50": {
+     "trades": 2,
+     "net_pnl": -2055.71,
+     "win_rate": 0.5,
+     "avg_win": 984.29,
+     "avg_loss": -3040,
+     "payoff_ratio": 0.32,
+     "profit_factor": 0.32,
+     "execution_rate": 0.5,
+     "date_note": "按平仓日排列",
+     "date_from": "2026-09-03",
+     "date_to": "2026-09-11",
+     "window": 50,
+     "enough": false
+    }
+   },
+   "lifetime": {
+    "trades": 2,
+    "net_pnl": -2055.71,
+    "win_rate": 0.5,
+    "avg_win": 984.29,
+    "avg_loss": -3040,
+    "payoff_ratio": 0.32,
+    "profit_factor": 0.32,
+    "execution_rate": 0.5,
+    "date_note": "按平仓日排列",
+    "date_from": "2026-09-03",
+    "date_to": "2026-09-11"
+   },
+   "note": "10 笔看状态、20 笔看节奏、50 笔看打法是否还成立。终身统计会把最近的退化藏起来 —— 前面赚够了,最近一直亏,终身数字照样漂亮。"
+  },
+  "discipline": {
+   "available": true,
+   "planned": {
+    "count": 1,
+    "win_rate": 1,
+    "avg_pct": 9.84,
+    "net_pnl": 984.29
+   },
+   "unplanned": {
+    "count": 1,
+    "win_rate": 0,
+    "avg_pct": -7.6,
+    "net_pnl": -3040
+   },
+   "untagged": {
+    "count": 1,
+    "win_rate": 1,
+    "avg_pct": 3.2,
+    "net_pnl": null
+   },
+   "execution_rate": 0.5,
+   "what_if_only_planned": {
+    "actual_net": -2055.71,
+    "planned_only_net": 984.29,
+    "cost_of_indiscipline": -3040
+   },
+   "note": "「计划外」要你自己在记录时标 —— 没标的归到未标注,不猜。这不是市场分析,是你自己的行为统计。"
+  },
+  "violations": {
+   "available": true,
+   "rules": {
+    "max_loss_per_trade_pct": 5,
+    "max_loss_per_day_pct": 8,
+    "max_positions": 3,
+    "max_trades_per_day": 5,
+    "pause_after_losses": 3,
+    "max_unplanned_ratio": 0.2
+   },
+   "is_default_rules": true,
+   "rule_status": {
+    "max_loss_per_day_pct": "checked",
+    "max_positions": "unavailable:有没有成交明细的补记(缺买入、卖出日期),未能完整核对历史持仓上限;已确认的超限仍展示,结果可能漏计",
+    "max_trades_per_day": "checked",
+    "max_loss_per_trade_pct": "checked",
+    "max_unplanned_ratio": "checked",
+    "pause_after_losses": "checked"
+   },
+   "unchecked": [
+    "max_positions"
+   ],
+   "violations": [
+    {
+     "date": "2026-09-10",
+     "rule": "max_loss_per_trade_pct",
+     "label": "单笔最大亏损",
+     "limit": -5,
+     "actual": -7.6,
+     "detail": "示例乙 亏 -7.6%"
+    },
+    {
+     "date": "2026-09-10",
+     "rule": "max_unplanned_ratio",
+     "label": "计划外交易占比上限",
+     "limit": 0.2,
+     "actual": 1,
+     "detail": "2026-09-10 计划外 1/1 笔"
+    }
+   ],
+   "violation_count": 2,
+   "after_loss_streak": {
+    "threshold": 3,
+    "trades": 0,
+    "avg_pct": null,
+    "win_rate": null
+   }
+  }
+ },
+ "at_risk": {
+  "available": true,
+  "positions": [
+   {
+    "key": "trade-6457b11a-7e7b-42e9-8437-dfbebfac9328",
+    "symbol": "300003",
+    "name": "示例丙",
+    "date": "2026-10-08",
+    "playbook": "接力",
+    "shares": 500,
+    "avg_cost": 30,
+    "capital": 15000,
+    "planned_stop": 28,
+    "planned_target": null,
+    "plan_late": false,
+    "at_risk": 1000,
+    "at_risk_pct": 6.67,
+    "bounded": true
+   },
+   {
+    "key": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+    "symbol": "600004",
+    "name": "示例丁",
+    "date": "2026-10-09",
+    "playbook": null,
+    "shares": 300,
+    "avg_cost": 15,
+    "capital": 4500,
+    "planned_stop": null,
+    "planned_target": null,
+    "plan_late": false,
+    "at_risk": null,
+    "at_risk_pct": null,
+    "bounded": false
+   }
+  ],
+  "position_count": 2,
+  "total_capital": 19500,
+  "total_at_risk": 1000,
+  "bounded_count": 1,
+  "unbounded_count": 1,
+  "unbounded_capital": 4500,
+  "equity_base": 200000,
+  "rules": {
+   "max_loss_per_trade_pct": 5,
+   "max_positions": 3,
+   "is_default": true
+  },
+  "at_risk_of_equity_pct": 0.5,
+  "capital_of_equity_pct": 9.75,
+  "over_per_trade_limit": [],
+  "equity_base_hint": null,
+  "over_position_limit": null,
+  "unbounded_note": "另有 1 笔没写计划止损、占用本金 4,500 元,最坏情况无从估计 —— 它们没算进上面的总在险,所以那个数是下限。"
+ },
+ "inbox": {
+  "available": true,
+  "items": [
+   {
+    "key": "trade-79c0d4d6-41c3-4b3d-b930-962ac08aebf9",
+    "date": "2026-10-09",
+    "symbol": "600004",
+    "name": "示例丁",
+    "playbook": null,
+    "pnl_pct": null,
+    "note": "",
+    "closed": false,
+    "flags": [
+     {
+      "key": "no_stop",
+      "text": "还在手上,但没写计划止损 —— 最坏情况无从估计"
+     }
+    ]
+   },
+   {
+    "key": "trade-f6774a49-cdef-499a-bc69-c14a6c5b4d55",
+    "date": "2026-09-10",
+    "symbol": "002002",
+    "name": "示例乙",
+    "playbook": "低吸",
+    "pnl_pct": -7.6,
+    "note": "",
+    "closed": true,
+    "flags": [
+     {
+      "key": "over_loss_limit",
+      "text": "亏 -7.6%,超过你自己写的单笔上限 5%"
+     },
+     {
+      "key": "unplanned",
+      "text": "自己标了「计划外」"
+     }
+    ]
+   }
+  ],
+  "count": 2,
+  "scanned": 5,
+  "by_flag": {
+   "no_stop": 1,
+   "over_loss_limit": 1,
+   "unplanned": 1
+  },
+  "baseline": {
+   "median_capital": null,
+   "median_hold_days": null,
+   "history_enough": false,
+   "min_history": 8
+  },
+  "rules_is_default": true,
+  "excursion_available": false,
+  "excursion_skipped": 2,
+  "excursion_hint": "2 笔的行情还没缓存,扛大幅浮亏 / 没吃到行情这两类判定暂时跳过了 —— 打开「复查」里的最大浮盈浮亏会把行情存下来,之后刷新这里就有了。",
+  "note": "判定基准全部来自你自己:仓位大不大、持有久不久是相对你自己的中位数,亏损上限用的是你写下的规矩。这里只说哪里不寻常,不说该怎么做。"
+ },
+ "modes": {
+  "available": true,
+  "cards": [
+   {
+    "id": "mode_card-854c3673-4817-4d92-aaa9-b997594690a2",
+    "name": "首板早封",
+    "playbook": "打板",
+    "version_count": 1,
+    "by_version": [
+     {
+      "version": 1,
+      "since": "2026-08-25",
+      "changes": "初版",
+      "playbook": "打板",
+      "setup": "情绪回暖的首板",
+      "entry": "十点前封板",
+      "exit": "次日不及预期就走",
+      "sizing": "两成",
+      "phase": "发酵期",
+      "saved_at": "2026-08-25T08:00:00.000Z",
+      "trades": 1,
+      "win_rate": 1,
+      "median_pct": 9.84,
+      "avg_pct": 9.84,
+      "best": 9.84,
+      "worst": 9.84,
+      "enough": false
+     }
+    ],
+    "matched_trades": 1,
+    "before_card": null,
+    "latest_vs_prev": null,
+    "compare_blocked": false
+   }
+  ],
+  "min_per_version": 6,
+  "truncated": false,
+  "note": "交易按打法归到卡片,再按入场日落在哪个版本的生效区间分段。建卡当天算第一版,之后的修改从次日生效;不做日内先后归因。建卡之前的交易单独列出、不进任何版本 —— 否则等于拿现在的规则评价更早的操作。"
+ },
+ "invalid_cards": 0
+}

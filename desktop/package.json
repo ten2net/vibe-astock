@@ -1,0 +1,43 @@
+{
+  "name": "vibe-research-desktop",
+  "version": "2.1.2",
+  "private": true,
+  "description": "投研看板前端(投资垂类):与开源 Vibe-Research 同栈,便于搬运既有模块",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "pretest": "node ../scripts/check-node.mjs",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "echarts": "^6.0.0",
+    "lucide-react": "^0.460.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.0",
+    "react-router-dom": "^7.1.0",
+    "remark-gfm": "^4.0.0",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^2.6.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.4.2"
+  }
+}

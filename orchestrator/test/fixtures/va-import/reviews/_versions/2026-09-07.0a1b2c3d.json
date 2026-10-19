@@ -1,0 +1,22 @@
+{
+ "run_type": "daily_review",
+ "trade_date": "2026-09-07",
+ "data_as_of": "2026-09-07 15:40",
+ "generated_at": "2026-09-07 15:40 CST",
+ "focus": {
+  "emotion_phase": "发酵",
+  "verification_items": [
+   {
+    "metric": "limit_up_count",
+    "direction": "上升",
+    "reason": "早一版"
+   }
+  ]
+ },
+ "analysts": [
+  {
+   "key": "sentiment",
+   "html": "<p><strong>情绪</strong>早一版&amp;草稿</p><ul><li>第一点</li></ul>"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "run_type": "daily_review",
+ "trade_date": "2026-07-22",
+ "data_as_of": "2026-07-22 14:20",
+ "generated_at": "2026-07-22 14:20",
+ "focus": {
+  "emotion_phase": "退潮",
+  "market_oneliner": "情绪退潮初期",
+  "debate_takeaway": "进攻派认为还有局部机会"
+ },
+ "analysts": [
+  {
+   "key": "theme",
+   "html": "<p>题材<br>电力</p>"
+  }
+ ],
+ "debate": {
+  "attack": "<p>局部机会在电力</p>",
+  "ebb": "<p>退潮派认为见顶</p>"
+ }
+}

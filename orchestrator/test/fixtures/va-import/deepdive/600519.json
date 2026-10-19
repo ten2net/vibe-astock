@@ -1,0 +1,21 @@
+{
+ "schema_version": 1,
+ "run_type": "deepdive",
+ "code": "600519",
+ "name": "测试甲",
+ "trade_date": "2026-09-07",
+ "generated_at": "2026-09-07 20:00",
+ "verdict_md": "# 个股深挖结论 🔴 回避\n\n- 题材:弱",
+ "ai_source": {
+  "provider": "claude",
+  "model": "default"
+ },
+ "reports": {
+  "theme": "<p><strong>题材</strong>弱</p>",
+  "capital": "<p>资金分歧</p>"
+ },
+ "debate": {
+  "join": "<p>【参与派论证】有弹性</p>",
+  "avoid": "<p>反方:风险大</p>"
+ }
+}

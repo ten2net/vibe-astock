@@ -1,0 +1,853 @@
+{
+ "_comment": "手算 fixture:每条 = 函数 / 输入 / 期望状态 / 期望值(容差 1e-6) / 期望 details 子集。值由人工按 研究宪法 §3 公式算出,不是由代码生成。",
+ "cases": [
+  {
+   "name": "扣非x4 PE 正常: 1000亿市值 / (10亿单季x4)",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1000,
+    "cap_unit": "亿元",
+    "latest_quarter_deducted_profit": 1000000000,
+    "profit_unit": "元"
+   },
+   "expect_status": "ok",
+   "expect_value": 25.0,
+   "expect_details": {
+    "annualized_profit_yuan": 4000000000.0
+   }
+  },
+  {
+   "name": "扣非x4 PE 单季亏损",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1000,
+    "cap_unit": "亿元",
+    "latest_quarter_deducted_profit": -5,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "扣非x4 PE 单季为零",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1000,
+    "cap_unit": "亿元",
+    "latest_quarter_deducted_profit": 0,
+    "profit_unit": "元"
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "扣非x4 PE 未知单位 → error 不猜",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1000,
+    "cap_unit": "美元",
+    "latest_quarter_deducted_profit": 1,
+    "profit_unit": "元"
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "扣非x4 PE 万元单位换算",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 200000,
+    "cap_unit": "万元",
+    "latest_quarter_deducted_profit": 2500,
+    "profit_unit": "万元"
+   },
+   "expect_status": "ok",
+   "expect_value": 20.0
+  },
+  {
+   "name": "前瞻 PE 正常",
+   "function": "forward_pe",
+   "args": {
+    "price": 100,
+    "eps_forecast": 4
+   },
+   "expect_status": "ok",
+   "expect_value": 25.0
+  },
+  {
+   "name": "前瞻 PE EPS 为 0",
+   "function": "forward_pe",
+   "args": {
+    "price": 100,
+    "eps_forecast": 0
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻 PE EPS 为负",
+   "function": "forward_pe",
+   "args": {
+    "price": 100,
+    "eps_forecast": -2
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻 PE 价格缺失",
+   "function": "forward_pe",
+   "args": {
+    "price": null,
+    "eps_forecast": 2
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "TTM PE 拼装",
+   "function": "pe_ttm_from_parts",
+   "args": {
+    "total_market_cap": 500,
+    "cap_unit": "亿元",
+    "ttm_profit": 25,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "ok",
+   "expect_value": 20.0
+  },
+  {
+   "name": "TTM PE 利润为负",
+   "function": "pe_ttm_from_parts",
+   "args": {
+    "total_market_cap": 500,
+    "cap_unit": "亿元",
+    "ttm_profit": -1,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻 CAGR 两年 10→14.4 = 20%",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 10,
+    "eps_t_plus_n": 14.4
+   },
+   "expect_status": "ok",
+   "expect_value": 0.2
+  },
+  {
+   "name": "前瞻 CAGR 三年 8→27 = 50%",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 8,
+    "eps_t_plus_n": 27,
+    "years": 3
+   },
+   "expect_status": "ok",
+   "expect_value": 0.5
+  },
+  {
+   "name": "前瞻 CAGR 起点亏损(跨零)",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": -1,
+    "eps_t_plus_n": 5
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻 CAGR 终点亏损",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 2,
+    "eps_t_plus_n": -1
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻 CAGR 负增长照实",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 10,
+    "eps_t_plus_n": 8.1
+   },
+   "expect_status": "ok",
+   "expect_value": -0.1
+  },
+  {
+   "name": "前瞻 CAGR years=0",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 10,
+    "eps_t_plus_n": 12,
+    "years": 0
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "通用增速 +20%",
+   "function": "growth_rate",
+   "args": {
+    "current": 120,
+    "base": 100
+   },
+   "expect_status": "ok",
+   "expect_value": 0.2
+  },
+  {
+   "name": "通用增速 负值照实",
+   "function": "growth_rate",
+   "args": {
+    "current": 80,
+    "base": 100
+   },
+   "expect_status": "ok",
+   "expect_value": -0.2
+  },
+  {
+   "name": "通用增速 基期为 0",
+   "function": "growth_rate",
+   "args": {
+    "current": 10,
+    "base": 0
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "通用增速 基期为负(扭亏)",
+   "function": "growth_rate",
+   "args": {
+    "current": 10,
+    "base": -5
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "PEG = 30 / (0.3x100) = 1",
+   "function": "peg",
+   "args": {
+    "pe": 30,
+    "cagr": 0.3
+   },
+   "expect_status": "ok",
+   "expect_value": 1.0
+  },
+  {
+   "name": "PEG CAGR 为 0",
+   "function": "peg",
+   "args": {
+    "pe": 30,
+    "cagr": 0
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "PEG CAGR 为负",
+   "function": "peg",
+   "args": {
+    "pe": 30,
+    "cagr": -0.1
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "PEG 百分数误传 → error",
+   "function": "peg",
+   "args": {
+    "pe": 30,
+    "cagr": 30
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "PEG PE 为负",
+   "function": "peg",
+   "args": {
+    "pe": -5,
+    "cagr": 0.3
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "PE 消化 60→30 @50% = ln2/ln1.5",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": 60,
+    "cagr": 0.5,
+    "anchor": 30
+   },
+   "expect_status": "ok",
+   "expect_value": 1.7095112913514547,
+   "expect_details": {
+    "below_anchor": false
+   }
+  },
+  {
+   "name": "PE 消化 已在锚下 → 0 年",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": 25,
+    "cagr": 0.5,
+    "anchor": 30
+   },
+   "expect_status": "ok",
+   "expect_value": 0.0,
+   "expect_details": {
+    "below_anchor": true
+   }
+  },
+  {
+   "name": "PE 消化 CAGR 为 0 永不消化",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": 60,
+    "cagr": 0,
+    "anchor": 30
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "PE 消化 锚为 0 → error",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": 60,
+    "cagr": 0.5,
+    "anchor": 0
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "PE 消化 PE 为负",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": -10,
+    "cagr": 0.5,
+    "anchor": 30
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "分位 1..100 中 50 → 50%",
+   "function": "percentile_rank",
+   "args": {
+    "history": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39,
+     40,
+     41,
+     42,
+     43,
+     44,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     51,
+     52,
+     53,
+     54,
+     55,
+     56,
+     57,
+     58,
+     59,
+     60,
+     61,
+     62,
+     63,
+     64,
+     65,
+     66,
+     67,
+     68,
+     69,
+     70,
+     71,
+     72,
+     73,
+     74,
+     75,
+     76,
+     77,
+     78,
+     79,
+     80,
+     81,
+     82,
+     83,
+     84,
+     85,
+     86,
+     87,
+     88,
+     89,
+     90,
+     91,
+     92,
+     93,
+     94,
+     95,
+     96,
+     97,
+     98,
+     99,
+     100
+    ],
+    "current": 50
+   },
+   "expect_status": "ok",
+   "expect_value": 50.0,
+   "expect_details": {
+    "n": 100,
+    "min": 1.0,
+    "max": 100.0,
+    "median": 50.5
+   }
+  },
+  {
+   "name": "分位 剔除非正值后样本不足",
+   "function": "percentile_rank",
+   "args": {
+    "history": [
+     -1,
+     -2,
+     0,
+     5,
+     6,
+     7
+    ],
+    "current": 6
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "分位 当前值 ≤ 0",
+   "function": "percentile_rank",
+   "args": {
+    "history": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21
+    ],
+    "current": -3
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "分位 含脏值字符串被跳过",
+   "function": "percentile_rank",
+   "args": {
+    "history": [
+     "1",
+     "2",
+     "x",
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22
+    ],
+    "current": 22
+   },
+   "expect_status": "ok",
+   "expect_value": 100.0,
+   "expect_details": {
+    "n": 21
+   }
+  },
+  {
+   "name": "一致预期分歧 10/15/20",
+   "function": "consensus_dispersion",
+   "args": {
+    "low": 10,
+    "mean": 15,
+    "high": 20
+   },
+   "expect_status": "ok",
+   "expect_value": 2.0,
+   "expect_details": {
+    "range_over_mean": 0.6666666666666666
+   }
+  },
+  {
+   "name": "一致预期分歧 high<low → error",
+   "function": "consensus_dispersion",
+   "args": {
+    "low": 20,
+    "mean": 15,
+    "high": 10
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "一致预期分歧 min ≤ 0",
+   "function": "consensus_dispersion",
+   "args": {
+    "low": -1,
+    "mean": 5,
+    "high": 10
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "前瞻vsTTM 近似(差 2pp)",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.5,
+    "ttm_yoy_value": 0.52
+   },
+   "expect_status": "ok",
+   "expect_value": -2.0,
+   "expect_details": {
+    "category": "approx"
+   }
+  },
+  {
+   "name": "前瞻vsTTM 远高(差 50pp)",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.8,
+    "ttm_yoy_value": 0.3
+   },
+   "expect_status": "ok",
+   "expect_value": 50.0,
+   "expect_details": {
+    "category": "forward_above"
+   }
+  },
+  {
+   "name": "前瞻vsTTM 远低 边界恰等于阈值算近似",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.2,
+    "ttm_yoy_value": 0.3
+   },
+   "expect_status": "ok",
+   "expect_value": -10.0,
+   "expect_details": {
+    "category": "approx"
+   }
+  },
+  {
+   "name": "前瞻vsTTM 阈值为负 → error",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.2,
+    "ttm_yoy_value": 0.3,
+    "tolerance_pp": -1
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "TTM PE 市值为负 → not_meaningful",
+   "function": "pe_ttm_from_parts",
+   "args": {
+    "total_market_cap": -500,
+    "cap_unit": "亿元",
+    "ttm_profit": 25,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "TTM PE 市值缺失 → error",
+   "function": "pe_ttm_from_parts",
+   "args": {
+    "total_market_cap": null,
+    "cap_unit": "亿元",
+    "ttm_profit": 25,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "扣非x4 PE 利润缺失 → error(不抛异常)",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1000,
+    "cap_unit": "亿元",
+    "latest_quarter_deducted_profit": null,
+    "profit_unit": "元"
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "扣非x4 PE 极端溢出 → error 而非 0",
+   "function": "pe_deducted_annualized",
+   "args": {
+    "total_market_cap": 1,
+    "cap_unit": "亿元",
+    "latest_quarter_deducted_profit": 1e+305,
+    "profit_unit": "亿元"
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "前瞻 CAGR years=1.5 → error",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 10,
+    "eps_t_plus_n": 12,
+    "years": 1.5
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "前瞻 CAGR years=True → error",
+   "function": "forward_cagr",
+   "args": {
+    "eps_t": 10,
+    "eps_t_plus_n": 12,
+    "years": true
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "PEG cagr=5 边界(500%)仍合法",
+   "function": "peg",
+   "args": {
+    "pe": 30,
+    "cagr": 5
+   },
+   "expect_status": "ok",
+   "expect_value": 0.06
+  },
+  {
+   "name": "PE 消化 cagr=50 百分数误传 → error",
+   "function": "pe_digestion_years",
+   "args": {
+    "pe": 60,
+    "cagr": 50,
+    "anchor": 30
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "分歧 均值越界 low≤mean≤high 不满足 → error",
+   "function": "consensus_dispersion",
+   "args": {
+    "low": 10,
+    "mean": 30,
+    "high": 20
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "分歧 三者相等 → ok 1.0",
+   "function": "consensus_dispersion",
+   "args": {
+    "low": 10,
+    "mean": 10,
+    "high": 10
+   },
+   "expect_status": "ok",
+   "expect_value": 1.0,
+   "expect_details": {
+    "range_over_mean": 0.0
+   }
+  },
+  {
+   "name": "判读 ttm_yoy=25 疑似百分数 → error",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.5,
+    "ttm_yoy_value": 25
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "判读 ttm_yoy=8(800%,低基数极端)仍合法",
+   "function": "forward_vs_ttm_judgement",
+   "args": {
+    "forward_cagr_value": 0.5,
+    "ttm_yoy_value": 8
+   },
+   "expect_status": "ok",
+   "expect_value": -750.0,
+   "expect_details": {
+    "category": "forward_below"
+   }
+  },
+  {
+   "name": "分位 历史含 NaN 被跳过并计数",
+   "function": "percentile_rank",
+   "args": {
+    "history": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     "nan",
+     "x"
+    ],
+    "current": 21
+   },
+   "expect_status": "ok",
+   "expect_value": 100.0,
+   "expect_details": {
+    "n": 21,
+    "skipped": 2
+   }
+  },
+  {
+   "name": "比率 毛利率 40%",
+   "function": "ratio",
+   "args": {
+    "numerator": 40,
+    "denominator": 100,
+    "label": "gross_margin",
+    "unit_in": "元"
+   },
+   "expect_status": "ok",
+   "expect_value": 0.4
+  },
+  {
+   "name": "比率 分子为负照实",
+   "function": "ratio",
+   "args": {
+    "numerator": -5,
+    "denominator": 100
+   },
+   "expect_status": "ok",
+   "expect_value": -0.05
+  },
+  {
+   "name": "比率 分母为 0",
+   "function": "ratio",
+   "args": {
+    "numerator": 1,
+    "denominator": 0
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "比率 分母为负",
+   "function": "ratio",
+   "args": {
+    "numerator": 1,
+    "denominator": -3
+   },
+   "expect_status": "not_meaningful"
+  },
+  {
+   "name": "比率 分子缺失",
+   "function": "ratio",
+   "args": {
+    "numerator": null,
+    "denominator": 3
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "比率 分母缺失",
+   "function": "ratio",
+   "args": {
+    "numerator": 1,
+    "denominator": null
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "比率 非有限输入",
+   "function": "ratio",
+   "args": {
+    "numerator": "inf",
+    "denominator": 100
+   },
+   "expect_status": "error"
+  },
+  {
+   "name": "比率 布尔输入",
+   "function": "ratio",
+   "args": {
+    "numerator": true,
+    "denominator": 100
+   },
+   "expect_status": "error"
+  }
+ ]
+}

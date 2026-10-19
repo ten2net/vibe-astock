@@ -223,6 +223,55 @@ def test_limit_up_bar_blocks_the_buy():
     assert eng.can_execute("600519.SH", 1, normal) is True
 
 
+def _raw_bar(raw_open, raw_pre, scale=1.0):
+    """前复权价 = 不复权价 × scale；涨跌停只能按不复权价算（交易所四舍五入到分）。"""
+    return pd.Series({"open": raw_open * scale, "close": raw_open * scale, "pre_close": raw_pre * scale,
+                      "raw_open": raw_open, "raw_pre_close": raw_pre})
+
+
+@pytest.mark.parametrize("raw_open,raw_pre,direction,cfg,allowed", [
+    # 前收 10.04 → 涨停 11.044 四舍五入为 11.04；零滑点开在 11.04 以前低于未取整的带上沿，被当成能买
+    (11.04, 10.04, 1, {"slippage": 0}, False),
+    # 前收 3.04 → 涨停 3.34；默认滑点下成交价 3.34334 仍低于 3.344，以前照买
+    (3.34, 3.04, 1, {}, False),
+    # 前收 3.05 → 跌停 2.745 四舍五入为 2.75；一字跌停开在 2.75，以前照卖
+    (2.75, 3.05, 0, {}, False),
+    (9.04, 10.04, 0, {"slippage": 0}, False),
+    # 低一分不算封板；零滑点能成交，默认滑点会越过涨停价 → 不成交（永远不在涨跌停价以外记成交）
+    (11.03, 10.04, 1, {"slippage": 0}, True),
+    (11.03, 10.04, 1, {}, False),
+    (3.33, 3.04, 1, {}, True),
+    # 1.15 × 1.1 用浮点是 1.26499…，交易所四舍五入是 1.27：开在 1.26 不是涨停
+    (1.26, 1.15, 1, {"slippage": 0}, True),
+    (1.27, 1.15, 1, {"slippage": 0}, False),
+])
+def test_limit_price_follows_exchange_cent_rounding(raw_open, raw_pre, direction, cfg, allowed):
+    """第四轮审计 D2：涨跌停价 = 不复权前收 ×(1±限幅) 四舍五入到分，开盘就在涨跌停价视为封板。"""
+    eng = ChinaAEngine(cfg)
+    for scale in (1.0, 0.37):   # 前复权缩放不影响判定
+        assert eng.can_execute("600519.SH", direction, _raw_bar(raw_open, raw_pre, scale)) is allowed, scale
+
+
+def test_missing_unadjusted_prices_fall_back_to_the_adjusted_band():
+    eng = ChinaAEngine({"slippage": 0})
+    bar = pd.Series({"open": 110.0, "close": 110.0, "pre_close": 100.0, "raw_open": float("nan"), "raw_pre_close": 50.0})
+    assert eng.can_execute("600519.SH", 1, bar) is False
+    assert eng.can_execute("600519.SH", 1, bar.drop(["raw_open", "raw_pre_close"]).replace({110.0: 109.0})) is True
+
+
+def test_zero_cost_rerun_blocks_the_same_locked_limit_up():
+    """扣费对照：一字涨停那天，实际那次和不计成本那次都买不进，两次成交笔数一致。"""
+    df = frame([10.04, 11.04, 11.20, 11.30], opens=[10.04, 11.04, 11.10, 11.25], pre=[10.0, 10.04, 11.04, 11.20])
+    df["raw_open"], df["raw_pre_close"] = df["open"], df["pre_close"]
+    sig = {"600000.SH": pd.Series([1.0, 1.0, 1.0, 1.0], index=df.index)}
+    from backtest.cost_compare import ZERO_COST
+    real, _ = run_engine(ChinaAEngine, {"600000.SH": df}, sig)
+    free, _ = run_engine(lambda cfg: ChinaAEngine({**cfg, **ZERO_COST}), {"600000.SH": df}, sig)
+    days = lambda e: [str(f.timestamp)[:10] for f in e.fill_records]
+    assert days(real) == days(free) and days(real), "封板那天两次都不该成交"
+    assert str(df.index[1].date()) not in days(free)
+
+
 def test_a_share_refuses_short():
     assert ChinaAEngine({}).can_execute("600519.SH", -1, pd.Series({"open": 10.0, "close": 10.0})) is False
 
@@ -271,3 +320,187 @@ def test_rsi_rejects_bad_params(kw):
     from backtest.strategies import RsiReversion
     with pytest.raises(ValueError):
         RsiReversion(**kw)
+
+
+# ── 长停牌的估值 ──
+
+def test_long_halt_marks_at_last_close_not_entry_price():
+    """A 买入后涨到 110,随后停牌 8 个共同交易日(B 照常交易):停牌期间按 110 估值,
+    不能在补齐额度(5 天)用完后退回买入价(Codex 审计 2026-10-09 D3)。"""
+    n = 16
+    b = frame([100.0] * n)
+    a = frame([100.0, 100.0] + [104.0, 108.0, 110.0] + [110.0] * (n - 5))
+    halt = a.index[5:13]
+    a = a.drop(halt)
+    sig_a = pd.Series(0.5, index=b.index)
+    sig_b = pd.Series(0.0, index=b.index)
+    eng, met = run_engine(lambda cfg: ChinaAEngine({**cfg, "slippage": 0}), {"600519.SH": a, "000001.SZ": b},
+                          {"600519.SH": sig_a, "000001.SZ": sig_b})
+    eq = {s.timestamp: s.equity for s in eng.equity_snapshots}
+    before = eq[a.index[4]]
+    during = [eq[t] for t in halt]
+    assert all(abs(x - before) < 1e-6 for x in during), (before, during)
+    pos = eng.positions.get("600519.SH")
+    assert pos is None or pos.entry_price < 110, "买入价确实低于停牌前的收盘价,否则测不出退回"
+    assert any(f.symbol == "600519.SH" and f.execution_price < 105 for f in eng.fill_records), "确实是在 110 以下买入的"
+    # 🔴 沿用旧价的日子要披露(审计第二轮,D3 修复引入):8 天停牌、补齐 5 天 ⇒ 后 3 天按最后收盘价估值
+    marks = met["stale_price_marks"]
+    assert marks == {"600519.SH": {"from": str(halt[5].date()), "to": str(halt[7].date()), "bars": 3}}, marks
+    from backtest.cli import _result_view
+    from backtest.run import Result
+    from backtest.tests.test_cost_compare import A
+    view = _result_view(Result(metrics=met, plan=A, strategy="s", provenance={}, limits=[], notes=[], run_dir=Path("/tmp")))
+    assert any("600519.SH" in d and "最后一个收盘价" in d and "3 个交易日" in d for d in view["required_disclosures"])
+
+
+def test_fees_turn_a_tiny_price_gain_into_a_losing_trade(tmp_path):
+    """价差赚一点、手续费更多：这笔交易是亏的。胜率、期望、分股票盈亏、
+    写进 trades.csv 再读回（蒙特卡洛 / 分段检验用）都要按扣费后的盈亏算（审计 D4）。"""
+    from backtest.metrics import net_pnl
+    from backtest.validation import _load_trades
+    df = frame([100.0, 100.0, 100.01, 100.01, 100.01, 100.01])
+    sig = pd.Series([1., 1., 1., 0., 0., 0.], index=df.index)
+    cfg = {"codes": ["600519.SH"], "initial_cash": 1_000_000.0, "start_date": "2024-01-02",
+           "end_date": "2025-12-31", "interval": "1D", "position_adjustment": "rebalance", "slippage": 0}
+    eng = ChinaAEngine({**cfg})
+    with contextlib.redirect_stdout(io.StringIO()):
+        m = eng.run_backtest(config=cfg, loader=FrameLoader({"600519.SH": df}), signal_engine=Signals({"600519.SH": sig}),
+                             run_dir=tmp_path, bars_per_year=252)
+    assert len(eng.trades) == 1
+    t = eng.trades[0]
+    assert 0 < t.pnl < t.commission, "前提：价差赚钱、手续费更多"
+    assert m["win_rate"] == 0.0 and m["max_consecutive_loss"] == 1
+    assert m["expectancy"] == pytest.approx(t.pnl - t.commission) and m["expectancy"] < 0
+    assert m["expectancy_pct"] < 0 and m["largest_win"] is None and m["largest_loss"] < 0
+    assert m["by_symbol"]["600519.SH"]["total_pnl"] < 0 and m["by_symbol"]["600519.SH"]["win_rate"] == 0.0
+    loaded = _load_trades(tmp_path)
+    assert net_pnl(loaded[0]) == pytest.approx(net_pnl(t), abs=1e-3), "trades.csv 读回来也要带上手续费"
+
+
+def test_base_price_lookup_survives_the_end_of_run_cleanup():
+    """一次运行结束时引擎把收盘价表清成 None：之后再查前收价要走兜底，不能因为 None.get 崩掉（类型检查发现）。"""
+    eng = ChinaAEngine({})
+    eng._close_arr = None
+    eng._code_to_col = None
+    assert eng.historical_base_price("600519.SH", pd.Series({"close": 10.0})) is None
+    assert eng.historical_base_price("600519.SH", pd.Series({"close": 11.0, "pct_chg": 10.0})) == pytest.approx(10.0)
+
+
+# ── 期末结算（审计 D2）：卖不出去的不编一笔成交 ──
+
+def _end_fills(eng):
+    return [f for f in eng.fill_records if f.reason == "end_of_backtest"]
+
+
+def _view(met):
+    from backtest.cli import _result_view
+    from backtest.run import Result
+    from backtest.tests.test_cost_compare import A
+    return _result_view(Result(metrics=met, plan=A, strategy="s", provenance={}, limits=[], notes=[], run_dir=Path("/tmp")))
+
+
+def test_bought_on_the_last_day_is_held_at_close_not_sold():
+    """最后一天开盘才买进的（T+1 当天不能卖）：不记卖出、不扣卖出费用，按收盘价留在期末净值里并点名。"""
+    df = frame([100.0] * 5 + [101.0], opens=[100.0] * 6)
+    sig = pd.Series([0, 0, 0, 0, 1, 1], index=df.index, dtype=float)
+    eng, met = run_engine(ChinaAEngine, {"600000.SH": df}, {"600000.SH": sig}, adjustment="hold")
+    pos = eng.positions["600000.SH"]
+    assert pos.entry_time.date() == df.index[-1].date(), "确实是最后一天买的"
+    assert not _end_fills(eng) and not eng.trades
+    assert met["unsettled_positions"] == {"600000.SH": "最后一天才买入，按 T+1 当天不能卖"}
+    last = eng.equity_snapshots[-1]
+    assert last.positions == 1
+    assert last.equity == pytest.approx(eng.capital + pos.size * 101.0)
+    assert eng.actual_position_snapshots[-1][1]["600000.SH"] > 0
+    lines = [d for d in _view(met)["required_disclosures"] if d.startswith("回测最后一天有")]
+    assert len(lines) == 1 and "600000.SH" in lines[0] and "T+1" in lines[0], lines
+
+
+def test_increase_on_the_last_day_only_sells_the_shares_held_before():
+    """调仓模式下最后一天加仓：原有部分照常按收盘价平掉，当天加仓买进的按 T+1 留着、按收盘价计入净值并点名
+    （v2.2.0 审计 Codex 第 3 条：加仓保留首次买入日，原来整笔连新买的一起编成卖出）。"""
+    df = frame([100.0] * 6, opens=[100.0] * 6)
+    sig = pd.Series([0.2, 0.2, 0.2, 0.2, 0.8, 0.8], index=df.index)
+    eng, met = run_engine(ChinaAEngine, {"600000.SH": df}, {"600000.SH": sig}, adjustment="rebalance")
+    (inc,) = [f for f in eng.fill_records if f.action == "increase" and f.timestamp == df.index[-1]]
+    added = abs(inc.signed_quantity)
+    (sold,) = _end_fills(eng)
+    assert sold.action == "reduce"
+    held_before = abs(sold.signed_quantity)
+    assert held_before > 0 and added > 0
+    pos = eng.positions["600000.SH"]
+    assert pos.size == pytest.approx(added), "留下的正好是当天加仓的股数"
+    assert met["unsettled_positions"] == {"600000.SH": "最后一天加仓买进的部分按 T+1 当天不能卖（原有部分已按收盘价平掉）"}
+    (trade,) = [t for t in eng.trades if t.exit_reason == "end_of_backtest"]
+    assert trade.size == pytest.approx(held_before)
+    last = eng.equity_snapshots[-1]
+    assert last.positions == 1 and last.equity == pytest.approx(eng.capital + added * 100.0)
+    lines = [d for d in _view(met)["required_disclosures"] if d.startswith("回测最后一天有")]
+    assert len(lines) == 1 and "600000.SH" in lines[0] and "T+1" in lines[0], lines
+
+
+@pytest.mark.parametrize("last_close, held", [(90.0, True), (90.5, False)])
+def test_limit_down_close_on_the_last_day_is_not_sold(last_close, held):
+    """最后一天收盘封在跌停价（前收 100 × 0.9）：卖不出去；高出跌停价一截则照常按收盘平仓。"""
+    df = frame([100.0] * 5 + [last_close], opens=[100.0] * 5 + [95.0])
+    sig = pd.Series(1.0, index=df.index)
+    eng, met = run_engine(ChinaAEngine, {"600000.SH": df}, {"600000.SH": sig}, adjustment="hold")
+    if held:
+        assert met["unsettled_positions"] == {"600000.SH": "最后一天收盘跌停，卖不出去"}
+        assert not _end_fills(eng) and "600000.SH" in eng.positions
+        assert eng.equity_snapshots[-1].equity == pytest.approx(eng.capital + eng.positions["600000.SH"].size * last_close)
+    else:
+        assert "unsettled_positions" not in met and not eng.positions
+        (fill,) = _end_fills(eng)
+        assert fill.execution_price == pytest.approx(last_close * (1 - 0.001))
+        assert eng.equity_snapshots[-1].equity == pytest.approx(eng.capital)
+        assert eng.equity_snapshots[-1].positions == 0
+
+
+@pytest.mark.parametrize("with_raw, held", [(True, True), (False, False)])
+def test_limit_down_close_uses_the_exchange_cent_band(with_raw, held):
+    """低价股：不复权前收 1.15 × 0.9 = 1.035，交易所四舍五入到 1.04；收盘 1.04 就是跌停。
+    复权尺度的近似带（0.575 × 0.9 = 0.5175）看不出来 —— 有不复权价时必须按分取整比较。"""
+    df = frame([0.575] * 5 + [0.52], opens=[0.575] * 5 + [0.55])
+    if with_raw:
+        df["raw_open"] = [1.15] * 5 + [1.10]
+        df["raw_pre_close"] = [1.15] * 6
+    sig = pd.Series(1.0, index=df.index)
+    eng, met = run_engine(ChinaAEngine, {"600000.SH": df}, {"600000.SH": sig}, adjustment="hold")
+    assert ("600000.SH" in met.get("unsettled_positions", {})) is held
+    assert bool(_end_fills(eng)) is not held
+
+
+def test_no_bar_on_the_last_day_is_held_at_the_last_close():
+    """最后一天停牌 / 来源缺行：不按沿用的旧价编一笔卖出；有行情的那只照常平仓（基类默认规则，美股也适用）。"""
+    a = frame([100.0] * 6)
+    b = frame([50.0] * 5 + [55.0]).iloc[:-1]
+    sig = {"AAPL": pd.Series(0.4, index=a.index), "MSFT": pd.Series(0.4, index=a.index)}
+    eng, met = run_engine(GlobalEquityEngine, {"AAPL": a, "MSFT": b}, sig, adjustment="hold")
+    assert met["unsettled_positions"] == {"MSFT": "最后一天没有行情（停牌或数据源缺行）"}
+    assert [f.symbol for f in _end_fills(eng)] == ["AAPL"]
+    assert list(eng.positions) == ["MSFT"]
+    last = eng.equity_snapshots[-1]
+    assert last.timestamp == a.index[-1] and last.positions == 1
+    assert last.equity == pytest.approx(eng.capital + eng.positions["MSFT"].size * 50.0)
+    weights = eng.actual_position_snapshots[-1][1]
+    assert weights["AAPL"] == 0.0 and weights["MSFT"] > 0
+
+
+def test_unsettled_disclosure_is_one_bounded_line():
+    """很多只卖不出去时并成一条（工具披露最多 12 条、每条 500 字以内）。"""
+    df = frame([100.0] * 5 + [101.0], opens=[100.0] * 6)
+    sig = pd.Series([0, 0, 0, 0, 1, 1], index=df.index, dtype=float)
+    _, met = run_engine(ChinaAEngine, {"600000.SH": df}, {"600000.SH": sig}, adjustment="hold")
+    met["unsettled_positions"] = {
+        **{f"60000{i}.SH": "最后一天才买入，按 T+1 当天不能卖" for i in range(8)},
+        **{f"00000{i}.SZ": "最后一天没有行情（停牌或数据源缺行）" for i in range(1, 4)},
+    }
+    view = _view(met)
+    # 披露只列前 5 只，完整清单原样在 metrics 里（v2.1.0 合并审计 Codex 第 3 条）
+    assert view["metrics"]["unsettled_positions"] == met["unsettled_positions"]
+    disclosures = view["required_disclosures"]
+    lines = [d for d in disclosures if d.startswith("回测最后一天有")]
+    assert len(lines) == 1 and len(lines[0]) <= 500, lines
+    assert "11 只持仓" in lines[0] and "等 8 只" in lines[0] and "000003.SZ" in lines[0]
+    assert len(disclosures) <= 12

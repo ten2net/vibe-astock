@@ -1,0 +1,91 @@
+name: Cross-platform verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    defaults:
+      run:
+        # Explicit bash uses -e -o pipefail on every runner, so an early
+        # npm/pytest failure cannot be hidden by a later successful command.
+        shell: bash
+    env:
+      VRA_PYTHON: python
+      # Python subprocesses emit UTF-8 JSON. Force the Windows test runner to
+      # decode pipes and default text files with the same encoding.
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # 22 = engines 允许的最低大版本（≥22.18 原生类型剥离默认开启），24 = 推荐版本（#38）
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: |
+            orchestrator/package-lock.json
+            desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .agents/skills/data-access/scripts/requirements.txt
+      - name: Install Node dependencies
+        run: |
+          npm ci --prefix orchestrator
+          npm ci --prefix desktop
+      - name: Install Python dependencies
+        run: python -m pip install pytest mypy==2.4.0 -r .agents/skills/data-access/scripts/requirements.txt
+      - name: Orchestrator full suite and typecheck
+        if: runner.os != 'Windows'
+        run: |
+          npm test --prefix orchestrator
+          npm run typecheck --prefix orchestrator
+      - name: Orchestrator Windows contract and typecheck
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node --test --test-concurrency=1 orchestrator/test/windows_support.test.ts orchestrator/test/local_agent_runtime.test.ts orchestrator/test/local_agent_stage_agent.test.ts orchestrator/test/runtime_provider.test.ts orchestrator/test/task_router.test.ts orchestrator/test/task_adapters.test.ts orchestrator/test/run_tools_registry.test.ts orchestrator/test/startup_health.test.ts orchestrator/test/startup_ports.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run typecheck --prefix orchestrator
+      - name: Desktop tests and build
+        run: |
+          npm test --prefix desktop
+          npm run build --prefix desktop
+      - name: Python type check
+        # 配置在仓库根目录 mypy.ini。每个系统各查一次：Windows 那份顺带检查 msvcrt 分支
+        if: matrix.node == 24
+        run: python -m mypy
+      - name: Python tests
+        run: |
+          python -m pytest calc/tests -q
+          python -m pytest backtest/tests -q
+          python -m pytest .agents/skills/data-access/scripts/tests -q
+      - name: Parse Windows PowerShell entrypoints
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $failed = $false
+          Get-ChildItem scripts\*.ps1, scripts\portable\*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              $errors | ForEach-Object { Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber): $($_.Message)" }
+            }
+          }
+          if ($failed) { exit 1 }
