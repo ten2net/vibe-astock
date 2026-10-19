@@ -61,6 +61,28 @@ services:
       retries: 5
       start_period: 60s
 
+  # Cloudflare Tunnel：把内网 http://vibe-astock:8910 发布到 https://a.luckybrother.cc
+  # 走的是 outbound-only 隧道，宿主机不需要开放公网端口，也不需要证书/反代。
+  # 使用本项目**独立**的 tunnel（vibe-astock），不与 a-share-heatmap / quant 共用，
+  # 这样任何一个应用的隧道配置出错都不会连带影响另一个。
+  # 前置条件（一次性，已完成）：
+  #   1) cloudflared tunnel login                          # 生成 ~/.cloudflared/cert.pem
+  #   2) cloudflared tunnel create vibe-astock             # 建独立隧道
+  #   3) cloudflared tunnel route dns vibe-astock a.luckybrother.cc   # 建 CNAME
+  #   4) a.luckybrother.cc 写进 .env 的 VIBE_ALLOW_HOSTS，否则本服务全部 API 返 403
+  # 凭据 JSON 在宿主机 ~/.cloudflared/，勿提交仓库。
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - /root/.cloudflared/3c5b1ac7-34dd-44ce-85e8-8473d54c66c5.json:/etc/cloudflared/creds.json:ro
+    network_mode: service:vibe-astock
+    depends_on:
+      vibe-astock:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   astock-agent:
   astock-duanxian:

@@ -1,0 +1,10 @@
+# Cloudflare Tunnel 配置：a.luckybrother.cc → 本 stack 的 vibe-astock 服务
+# 使用本项目独立创建的 tunnel（vibe-astock），不与 a-share-heatmap / quant 共用。
+# 凭据文件由 ~/.cloudflared/ 挂载进来，勿提交到仓库。
+tunnel: 3c5b1ac7-34dd-44ce-85e8-8473d54c66c5
+credentials-file: /etc/cloudflared/creds.json
+ingress:
+  - hostname: a.luckybrother.cc
+    service: http://127.0.0.1:8910
+  # 兜底：其它 hostname 一律 404，避免误把流量转给本服务
+  - service: http_status:404
