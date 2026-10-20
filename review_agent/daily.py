@@ -21,8 +21,8 @@ from .product_policy import has_trade_recommendation
 # 的 agent_timeout —— 运行桥按这个预算把引擎掐断，不是网络问题）。
 # 两项得一起放宽：只提单次预算会因为多次调用累加，改在整场时限上失败
 # （「复盘超过时限」）——用户看到的错误换了，但照样出不来报告。
-_SINGLE_BUDGET = 900      # 单次 AI 调用预算（秒）
-_TOTAL_BUDGET = 2400      # 整场复盘总时限（秒）
+_SINGLE_BUDGET = 1200      # 单次 AI 调用预算（秒）
+_TOTAL_BUDGET = 7500      # 整场复盘总时限（秒）
 
 
 def atomic_write(path, payload):
