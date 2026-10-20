@@ -1,0 +1,10 @@
+# Cloudflare Tunnel 配置：a2.luckybrother.cc → 本 stack 的 vibe-astock-v2 服务（5940）
+# 与旧版隧道（vibe-astock → a.luckybrother.cc）相互独立，任一重启不影响另一个。
+# 凭据文件由 ~/.cloudflared/ 挂载进来，勿提交到仓库。
+tunnel: 17642bd5-1db7-49b1-aa12-f45d92c5a121
+credentials-file: /etc/cloudflared/creds.json
+ingress:
+  - hostname: a2.luckybrother.cc
+    service: http://127.0.0.1:5940
+  # 兜底：其它 hostname 一律 404，避免误把流量转给本服务
+  - service: http_status:404

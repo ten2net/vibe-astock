@@ -83,7 +83,7 @@ services:
 
     environment:
       # 拼「发给使用者的链接」用的公网根地址（只用于拼链接，不是监听地址）
-      VRA_PUBLIC_URL: https://a.luckybrother.cc
+      VRA_PUBLIC_URL: https://a2.luckybrother.cc
       # 代理：境外数据源与被重置的源走它（fetchEnv 会把代理变量透传给取数子进程）。
       # no_proxy 口径沿用旧容器实测可用的配置；若实测某源容器内直连不通，
       # 把它从 no_proxy 域名列表移除即可改走代理。
@@ -117,6 +117,25 @@ services:
     network_mode: service:vibe-astock
     depends_on:
       vibe-astock:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 第二条 Cloudflare Tunnel：把 v2 研究编排器（5940）发布到 https://a2.luckybrother.cc
+  # 与旧版隧道完全独立（独立 tunnel、独立容器、独立 network namespace），
+  # a.luckybrother.cc（旧版）与 a2.luckybrother.cc（v2）可同时公网访问。
+  # 前置条件（一次性，已完成）：
+  #   1) cloudflared tunnel create vibe-astock-v2
+  #   2) cloudflared tunnel route dns vibe-astock-v2 a2.luckybrother.cc
+  # v2 远程模式有访问口令（卷里的 .local/access.token），公网入口同样受口令保护。
+  cloudflared-v2:
+    image: cloudflare/cloudflared:2026.9.1
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared/config-v2.yml:/etc/cloudflared/config.yml:ro
+      - /root/.cloudflared/17642bd5-1db7-49b1-aa12-f45d92c5a121.json:/etc/cloudflared/creds.json:ro
+    network_mode: service:vibe-astock-v2
+    depends_on:
+      vibe-astock-v2:
         condition: service_healthy
     restart: unless-stopped
 
