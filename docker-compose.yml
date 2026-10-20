@@ -61,6 +61,43 @@ services:
       retries: 5
       start_period: 60s
 
+  # 新版 v2 研究编排器（orchestrator + desktop + data-access 取数层），与旧版并存互不影响。
+  # 页面 5940（远程模式，访问口令在卷里的 .local/access.token），API 8770 只听容器回环。
+  # 公网切换：cloudflared/config.yml 的 ingress 改 http://127.0.0.1:5940，
+  #           cloudflared 的 network_mode 改 service:vibe-astock-v2，回滚反向操作。
+  vibe-astock-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile.v2
+      args:
+        # npm 直连 registry.npmmirror.com 在本网络会 ECONNRESET，构建期走代理
+        https_proxy: http://192.168.200.24:7890
+        http_proxy: http://192.168.200.24:7890
+    image: vibe-astock-v2:local
+    container_name: vibe-astock-v2
+    restart: unless-stopped
+
+    ports:
+      # 与旧服务同款：对局域网开放。只想本机访问时改成 "127.0.0.1:5940:5940"
+      - "5940:5940"
+
+    environment:
+      # 拼「发给使用者的链接」用的公网根地址（只用于拼链接，不是监听地址）
+      VRA_PUBLIC_URL: https://a.luckybrother.cc
+      # 代理：境外数据源与被重置的源走它（fetchEnv 会把代理变量透传给取数子进程）。
+      # no_proxy 口径沿用旧容器实测可用的配置；若实测某源容器内直连不通，
+      # 把它从 no_proxy 域名列表移除即可改走代理。
+      http_proxy: http://192.168.200.24:7890
+      https_proxy: http://192.168.200.24:7890
+      HTTP_PROXY: http://192.168.200.24:7890
+      HTTPS_PROXY: http://192.168.200.24:7890
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+
+    volumes:
+      # 新版私有层：配置、运行产物、对话、台账、知识层档案、访问口令；容器重建不丢
+      - astock-v2-local:/app/.local
+
   # Cloudflare Tunnel：把内网 http://vibe-astock:8910 发布到 https://a.luckybrother.cc
   # 走的是 outbound-only 隧道，宿主机不需要开放公网端口，也不需要证书/反代。
   # 使用本项目**独立**的 tunnel（vibe-astock），不与 a-share-heatmap / quant 共用，
@@ -89,3 +126,4 @@ volumes:
   astock-market:
   astock-codebuddy:      # CodeBuddy 登录态
   astock-codebuddy-cli:  # CodeBuddy CLI 本体（含版本目录）
+  astock-v2-local:       # 新版 v2 私有层（配置 / 运行产物 / 访问口令）

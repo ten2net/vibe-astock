@@ -1,0 +1,34 @@
+# Dockerfile.v2 专用构建上下文（新版 v2 编排器；旧的 Dockerfile 仍用根 .dockerignore）
+# 旧版 v1 应用的目录一律不带进上下文——镜像里只装新版代码
+.git
+.github
+.venv
+.local
+node_modules
+__pycache__
+.pytest_cache
+.mypy_cache
+.vite
+dist
+
+# 旧版 v1 应用（v2 不需要）
+vr
+duanxian
+review_agent
+frontend
+runtime
+tests
+research_data
+evals
+assets
+backtest/tests
+docs/upstream
+Dockerfile
+docker-compose.yml
+.env
+*.log
+
+# 新版自己的构建产物/依赖由构建阶段内生成，不带宿主机副本
+orchestrator/node_modules
+desktop/node_modules
+desktop/dist
