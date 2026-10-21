@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigation } from "react-router-dom";
 import {
-  Activity, Bell, BookOpenCheck, Flame, Gavel, Zap, CalendarDays, CandlestickChart, ChevronsLeft, ChevronsRight, Eye, EyeOff, FileText, FlaskConical, Github, Globe, Home, LayoutGrid, Library, ListFilter, Menu, X, Moon, NotebookPen, Radar, Settings, Star, Sun, Swords, Thermometer, UserRound, Wallet,
+  Activity, Bell, BookOpenCheck, Flame, Gavel, Zap, CalendarDays, CandlestickChart, ChevronsLeft, ChevronsRight, Eye, EyeOff, FileText, FlaskConical, Github, Globe, Home, LayoutGrid, Library, ListFilter, Menu, X, Moon, NotebookPen, Radar, Settings, Sparkle, Star, Sun, Swords, Thermometer, Wallet,
   Atom, BatteryCharging, BatteryFull, Bot, BrainCircuit, Cable, Car, CircuitBoard, Cpu, Database, Dna, Glasses, MemoryStick, Microchip, Pickaxe, Pill, Plane, Rocket, Shield, UtilityPole,
   type LucideIcon,
 } from "lucide-react";
@@ -19,9 +19,6 @@ import { useNotifyUnread } from "@/hooks/useNotifyUnread";
 import { NAV_SECTIONS, isGroup, navPageOf, navTitle, sectionHome, withSectors, type NavIcon, type NavSection } from "@/lib/nav";
 import sectorsData from "@/data/sectors.json";
 import { BRAND_MARK, PRODUCT_NAME, PRODUCT_TAGLINE, REPO_URL } from "@/lib/brand";
-
-// 作者联系方式
-const X_URL = "https://x.com/linsizhen";
 
 const ICONS: Record<NavIcon, LucideIcon> = {
   Home, Swords, Activity, Flame, Zap, Gavel, Radar, Thermometer, LayoutGrid, CandlestickChart, FlaskConical, ListFilter, Star, Wallet, CalendarDays, Bell, Library, FileText, NotebookPen, Settings, BookOpenCheck,
@@ -270,14 +267,19 @@ export function Layout() {
           )}
           <div className={cn("border-t border-border", compact ? "p-1.5" : "px-3 py-2")}>
             <div className={cn("flex items-center text-muted-foreground", compact ? "flex-col gap-3" : "justify-between gap-2")}>
-              <a href="https://phoenixtree.ai/" target="_blank" rel="noopener noreferrer"
-                aria-label="Phoenix Tree AI 官网（新标签页打开）" title="Phoenix Tree AI 官网（新标签页打开）"
+              <a href="https://q.luckybrother.cc/" target="_blank" rel="noopener noreferrer"
+                aria-label="LGBM量化" title="LGBM量化"
                 className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary hover:bg-muted/50">
                 <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {!compact && <span>phoenixtree.ai</span>}
+                {!compact && <span>LGBM量化</span>}
+              </a>
+              <a href="https://www.luckybrother.cc/" target="_blank" rel="noopener noreferrer"
+                aria-label="A股热力图" title="A股热力图"
+                className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary hover:bg-muted/50">
+                <Sparkle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {!compact && <span>热力图</span>}
               </a>
               <div className={cn("flex gap-2", compact && "flex-col")}>
-                <a href={X_URL} target="_blank" rel="noreferrer" aria-label="联系作者" title="联系作者 · X @linsizhen"><UserRound className="h-3.5 w-3.5" /></a>
                 <a href={REPO_URL} target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub"><Github className="h-3.5 w-3.5" /></a>
                 {!mobile && <button onClick={() => setCollapsed(!collapsed)} aria-label={compact ? "展开侧栏" : "收起侧栏"} title={compact ? "展开侧栏" : "收起侧栏"}>
                   {compact ? <ChevronsRight className="h-3.5 w-3.5" /> : <ChevronsLeft className="h-3.5 w-3.5" />}

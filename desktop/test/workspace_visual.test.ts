@@ -44,8 +44,9 @@ test("侧栏两级：一级栏目固定顺序、二级收进组里、接入 AI �
   assert.match(layout, /aria-haspopup="true" aria-expanded=\{flyout\?\.label === s\.label\}/);
   assert.match(layout, /const currentTitle = navTitle\(pathname, SECTIONS\);/);
   assert.doesNotMatch(layout, /FinanceAiConsole|consoleOpen|vr-ai-console|openAgent|打开普通对话/);
-  assert.match(layout, /href="https:\/\/phoenixtree\.ai\/"/);
-  for (const label of ["联系作者", "GitHub", "收起侧栏"]) assert.ok(layout.includes(label));
+  assert.match(layout, /href="https:\/\/q\.luckybrother\.cc\/"/);
+  assert.match(layout, /href="https:\/\/www\.luckybrother\.cc\/"/);
+  for (const label of ["LGBM量化", "热力图", "GitHub", "收起侧栏"]) assert.ok(layout.includes(label));
   assert.match(layout, /const \[collapsed, setCollapsed\] = useState\(\(\) => storageGet\("vr-sidebar"\) === "collapsed"\);/, "没点过收起就是展开的文字栏目");
   assert.match(layout, /compact \? "w-14" : "w-\[216px\]"/);
   assert.match(layout, /workspace-topbar flex h-11/, "顶栏 44px");
