@@ -13,7 +13,7 @@ export function Home() {
     if (!offered.current && state.status === 'missing') { offered.current = true; state.connect(); }
   }, [state.status, state.connect]);
   return <div>
-    <h1 className="sr-only">Vibe AStock 复盘工作台</h1>
+    <h1 className="sr-only">揽宝投研 复盘工作台</h1>
     <WorkspaceChat />
     <section id="home-features" className="mt-5" aria-labelledby="feature-heading">
       <div className="mb-3 flex items-end justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">Workbench</p><h2 id="feature-heading" className="mt-1 text-lg font-bold">复盘工具，一站直达</h2></div><span className="text-xs text-muted-foreground">常用功能</span></div>

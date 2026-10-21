@@ -39,7 +39,7 @@ function Shell() {
   };
   const sidebar = (compact: boolean, mobile = false) => <>
     <div className={cn('border-b border-border', compact ? 'px-2 py-5' : 'px-5 py-4')}>
-      <div className="flex items-center justify-between gap-1"><Link to="/" aria-label="Vibe AStock 首页" className="flex items-center gap-2.5"><PhoenixTreeLogo className="h-8 w-6 shrink-0 text-primary" />{!compact && <span className="workspace-brand text-lg font-semibold tracking-tight">Vibe-<span className="text-primary">AStock</span></span>}</Link>
+      <div className="flex items-center justify-between gap-1"><Link to="/" aria-label="揽宝投研 首页" className="flex items-center gap-2.5"><PhoenixTreeLogo className="h-8 w-6 shrink-0 text-primary" />{!compact && <span className="workspace-brand text-lg font-semibold tracking-tight">揽宝-<span className="text-primary">投研</span></span>}</Link>
         {mobile && <button type="button" onClick={() => setMobileOpen(false)} aria-label="关闭导航" className="p-2"><X className="h-4 w-4" /></button>}</div>
       {!compact && <div data-ai-identity className="mt-2 space-y-1"><p className="text-[10px] leading-4 text-muted-foreground">A 股短线复盘与跟踪工作台</p><button type="button" onClick={state.connect} title={state.label} className="flex min-w-0 items-start gap-1 text-left text-[10px] leading-5 text-muted-foreground hover:text-primary"><span aria-hidden="true" className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{state.previouslyTested && (state.status === 'authenticated' || state.status === 'saved') ? `已接入AI：${state.name}` : state.label}</span></button><AgentToggle /></div>}
       {compact && <div className="mt-3 flex justify-center"><AgentToggle compact /></div>}
