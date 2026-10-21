@@ -411,7 +411,7 @@ HTTP 不加密，API key、研究资料和交易记录可能明文传输；不�
 Windows（PowerShell / CMD）：
 
 ```bat
-git clone https://github.com/simonlin1212/vibe-astock.git vibe-astock
+git clone https://github.com/ten2net/vibe-astock.git vibe-astock
 cd vibe-astock
 scripts\setup-windows.cmd
 scripts\start.cmd
@@ -420,7 +420,7 @@ scripts\start.cmd
 macOS / Linux：
 
 ```bash
-git clone https://github.com/simonlin1212/vibe-astock.git vibe-astock
+git clone https://github.com/ten2net/vibe-astock.git vibe-astock
 cd vibe-astock
 scripts/setup
 scripts/start
@@ -486,7 +486,7 @@ scripts/start --remote --no-open --public-url https://<平台给页面端口（�
 
 ### 在 Claude Code / Codex / Cursor 里调用 Vibe AStock
 
-Vibe AStock 提供 MCP 接口。接上以后，在 Claude Code、Codex、Cursor 等支持 MCP 的工具里可以直接用 Vibe AStock 取数（包括短线端点）、发起研究、读报告和证据；研究结果和页面里看到的是同一份。MCP 不读交易日志和持仓。
+揽宝投研 提供 MCP 接口。接上以后，在 Claude Code、Codex、Cursor 等支持 MCP 的工具里可以直接用揽宝投研取数（包括短线端点）、发起研究、读报告和证据；研究结果和页面里看到的是同一份。MCP 不读交易日志和持仓。
 
 先跑完上面的 setup，然后在仓库目录里运行（Windows PowerShell 把 `"$(pwd)/orchestrator/src/mcp.ts"` 换成 `"$PWD\orchestrator\src\mcp.ts"`）。
 

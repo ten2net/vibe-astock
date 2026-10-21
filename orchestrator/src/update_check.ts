@@ -11,7 +11,7 @@ import path from "node:path";
 import { readJsonIfExists, writeJson } from "./fsutil.ts";
 import { ServiceError } from "./service.ts";
 import { productVersion } from "./version.ts";
-import { PRODUCT_NAME, REPO_SLUG } from "./brand.ts";
+import { PRODUCT_SLUG, REPO_SLUG } from "./brand.ts";
 
 export const RELEASES_API = `https://api.github.com/repos/${REPO_SLUG}/releases/latest`;
 export const RELEASE_PAGE = `https://github.com/${REPO_SLUG}/releases`;
@@ -123,7 +123,8 @@ async function fetchLatest(d: UpdateDeps, current: string): Promise<{ latest: La
   let res: Response;
   try {
     res = await f(RELEASES_API, {
-      headers: { "User-Agent": `${PRODUCT_NAME.replace(/\s+/g, "")}/${current}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+      // User-Agent 只放 ASCII(产品短名):中文产品名会让 fetch 在设置请求头时抛 ByteString 转换错误
+      headers: { "User-Agent": `${PRODUCT_SLUG}/${current}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
       redirect: "follow",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

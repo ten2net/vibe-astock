@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createApiServer } from "../src/api.ts";
+import { PRODUCT_SLUG, REPO_SLUG } from "../src/brand.ts";
 import { CHECK_INTERVAL_MS, FETCH_TIMEOUT_MS, RELEASES_API, RETRY_INTERVAL_MS, isNewer, parseVersion, updateAction, updateStatus, type UpdateDeps } from "../src/update_check.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -48,11 +49,11 @@ test("新版提示:有新版就提示;请求只带版本号;链接按版本号�
   assert.equal(calls[0].url, RELEASES_API);
   const h = calls[0].init.headers as Record<string, string>;
   assert.deepEqual(Object.keys(h).sort(), ["Accept", "User-Agent", "X-GitHub-Api-Version"]);
-  assert.equal(h["User-Agent"], "VibeAStock/2.0.0");
+  assert.equal(h["User-Agent"], `${PRODUCT_SLUG}/2.0.0`);
   assert.ok(calls[0].init.signal instanceof AbortSignal, "要有超时");
   assert.equal(calls[0].init.body, undefined);
   assert.equal(v.update_available, true);
-  assert.deepEqual(v.latest, { version: "2.1.0", tag: "v2.1.0", url: "https://github.com/simonlin1212/vibe-astock/releases/tag/v2.1.0", published_at: "2026-10-08T00:00:00Z" });
+  assert.deepEqual(v.latest, { version: "2.1.0", tag: "v2.1.0", url: `https://github.com/${REPO_SLUG}/releases/tag/v2.1.0`, published_at: "2026-10-08T00:00:00Z" });
   assert.equal(v.current, "2.0.0");
   assert.equal(v.install, "source");
   assert.equal(v.error, null);
@@ -181,8 +182,8 @@ test("新版提示:查的时候用户刚关掉,以磁盘上的开关为准;状�
   // 地址以本仓库发布页开头但用 ../ 跳到别处:存的地址一律不用,按标签重拼
   const at = new Date(d.clock.t).toISOString();
   const put = (latest: unknown) => fs.writeFileSync(path.join(d.dataRoot, "update.json"), JSON.stringify({ enabled: true, checked_at: at, latest }));
-  put({ version: "9.0.0", tag: "v9.0.0", url: "https://github.com/simonlin1212/vibe-astock/releases/../../../evil/repo/releases" });
-  assert.equal((await updateStatus(d)).latest?.url, "https://github.com/simonlin1212/vibe-astock/releases/tag/v9.0.0");
+  put({ version: "9.0.0", tag: "v9.0.0", url: `https://github.com/${REPO_SLUG}/releases/../../../evil/repo/releases` });
+  assert.equal((await updateStatus(d)).latest?.url, `https://github.com/${REPO_SLUG}/releases/tag/v9.0.0`);
   for (const bad of [
     { version: "9.0.0", tag: "v9.0.0/../../../evil" },
     { version: "9.0.0", tag: " v9.0.0" },
@@ -201,7 +202,7 @@ test("新版提示:接口给的标签带路径或怪字符就不用", async () =
     assert.match(v.error ?? "", /版本号看不懂/);
   }
   const padded = await updateStatus(deps({ fetchImpl: fakeFetch(() => release("  v2.1.0 ")).f }));
-  assert.equal(padded.latest?.url, "https://github.com/simonlin1212/vibe-astock/releases/tag/v2.1.0", "前后空白去掉后再拼");
+  assert.equal(padded.latest?.url, `https://github.com/${REPO_SLUG}/releases/tag/v2.1.0`, "前后空白去掉后再拼");
 });
 
 test("新版提示:免安装包按 package-info.json 识别;写不了盘也照样返回", async () => {

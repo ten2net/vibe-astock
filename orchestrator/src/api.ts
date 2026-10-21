@@ -294,9 +294,28 @@ export function createApiServer(ctx: ServiceContext, opts: { token: string; cook
       if (req.method === "POST" && url.pathname === "/chat") {
         // body 里可带 `llm`(界面上选的模型 + 用户自己的 key)。
         // 🔴 key 只在这一次请求的内存里流转 —— 不写配置、不进日志、不入账本。
+        // 🔴 一轮 agent 对话可能要跑几分钟,而常见反向代理(Cloudflare 等)对首字节有约 100s 超时:
+        //    先 flush 200 头并周期性写空白维持连接,成功与失败都以 JSON 正文收尾 —— 失败正文同样带
+        //    error 码(状态码此时已只能是 200),前端对 /chat 在 200 下也认 body.error。
         return await withRequestAbort(req, res, async (signal) => {
           const b = await readBody(req);
-          return send(res, 200, await chatSend(ctx, b as never, signal));
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", ...SECURITY_HEADERS });
+          res.on("error", () => { /* 客户端中途断开:写入失败交给 signal 取消,不在此处再抛 */ });
+          // writeHead 要等首次 body 写入才会真正把头发出去 —— 立即写一个空白字节 flush
+          try { res.write(" "); } catch { /* 连接已断 */ }
+          const heartbeat = setInterval(() => { try { res.write(" "); } catch { /* 连接已断 */ } }, 20_000);
+          try {
+            const result = await chatSend(ctx, b as never, signal);
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            if (!(e instanceof ServiceError)) console.error(`[api] internal error: ${redact(e instanceof Error ? e.stack ?? e.message : String(e), 600)}`);
+            const body = e instanceof ServiceError
+              ? { error: e.code, message: redact(e.message, 200) }
+              : { error: "internal", message: "internal" };
+            try { res.end(JSON.stringify(body)); } catch { /* 连接已断 */ }
+          } finally {
+            clearInterval(heartbeat);
+          }
         });
       }
       // 外部 RSS 标题翻译：与自由对话分开，后端固定 developer 指令、schema 与一次性线程。

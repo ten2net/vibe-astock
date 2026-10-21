@@ -243,7 +243,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(`返回不是 JSON:${text.slice(0, 120)}`, res.status, "bad_response");
   }
-  if (!res.ok) {
+  // /chat 后端会先 flush 200 再边算边回(代理首字节超时保护),失败也是 200 + 带 error 码的 JSON 正文
+  const chatErrorBody = res.ok && path === "/chat" && body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string";
+  if (!res.ok || chatErrorBody) {
     const b = body as { error?: string; message?: string } | null;
     const code = b?.error ?? String(res.status);
     const raw = b?.message ?? b?.error ?? `HTTP ${res.status}`;

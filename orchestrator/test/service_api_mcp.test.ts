@@ -1441,3 +1441,46 @@ setInterval(()=>{},1000);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("/chat 先回 200 头再边算边回(代理首字节超时),失败也以 200 + error 正文收尾", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vra-api-heartbeat-"));
+  // 假 CLI:睡 2.5 秒后非零退出 —— 足以断言响应头在计算完成前已经发出
+  const bin = fakeNodeExecutable(root, "claude", `
+setTimeout(() => { console.error("boom"); process.exit(1); }, 2500);
+`);
+  const ctx: ServiceContext = {
+    repoRoot: REPO, dataRoot: path.join(root, "data"), python: "python3",
+    node: process.execPath,
+  };
+  fs.mkdirSync(ctx.dataRoot, { recursive: true });
+  const oldBin = process.env.CLAUDE_BIN;
+  process.env.CLAUDE_BIN = bin;
+  const server = createApiServer(ctx, { token: TOKEN });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const port = (server.address() as { port: number }).port;
+    const t0 = Date.now();
+    const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+      const request = http.request({
+        host: "127.0.0.1", port, path: "/chat", method: "POST",
+        headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+      }, resolve);
+      request.on("error", reject);
+      request.end(JSON.stringify({ session: "hb", message: "等", executionMode: "agent", llm: { provider: "cli-claude" } }));
+    });
+    const headersMs = Date.now() - t0;
+    assert.equal(response.statusCode, 200, "响应头应立即以 200 返回,不能等计算结束");
+    assert.ok(headersMs < 2000, `响应头应在假 CLI 结束前到达(实际 ${headersMs}ms)`);
+    const body = await new Promise<string>((resolve) => {
+      let data = "";
+      response.on("data", (c: Buffer) => { data += c.toString("utf8"); });
+      response.on("end", () => resolve(data));
+    });
+    const parsed = JSON.parse(body) as { error?: string; message?: string };
+    assert.equal(typeof parsed.error, "string", "失败也要以带 error 码的 JSON 正文收尾(200 下前端靠它识别)");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (oldBin === undefined) delete process.env.CLAUDE_BIN; else process.env.CLAUDE_BIN = oldBin;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

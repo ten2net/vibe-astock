@@ -412,7 +412,7 @@ See [model access and LAN boundaries](docs/model-access.md#5-自托管模型局�
 Windows (PowerShell or Command Prompt):
 
 ```bat
-git clone https://github.com/simonlin1212/vibe-astock.git vibe-astock
+git clone https://github.com/ten2net/vibe-astock.git vibe-astock
 cd vibe-astock
 scripts\setup-windows.cmd
 scripts\start.cmd
@@ -421,7 +421,7 @@ scripts\start.cmd
 macOS / Linux:
 
 ```bash
-git clone https://github.com/simonlin1212/vibe-astock.git vibe-astock
+git clone https://github.com/ten2net/vibe-astock.git vibe-astock
 cd vibe-astock
 scripts/setup
 scripts/start
@@ -487,7 +487,7 @@ The old v1.x was a Python app (data in `~/.duanxian-agents`, page on port 8910);
 
 ### Use Vibe AStock from Claude Code / Codex / Cursor
 
-Vibe AStock provides an MCP interface. Once connected, Claude Code, Codex, Cursor, and other MCP-capable tools can fetch data through Vibe AStock (short-term endpoints included), start research runs, and read reports and evidence. Runs started this way are the same ones you see in the web pages. MCP does not read your trade journal or holdings.
+揽宝投研 provides an MCP interface. Once connected, Claude Code, Codex, Cursor, and other MCP-capable tools can fetch data through 揽宝投研 (short-term endpoints included), start research runs, and read reports and evidence. Runs started this way are the same ones you see in the web pages. MCP does not read your trade journal or holdings.
 
 Finish setup first, then run these from the repository folder (in Windows PowerShell, replace `"$(pwd)/orchestrator/src/mcp.ts"` with `"$PWD\orchestrator\src\mcp.ts"`).
 

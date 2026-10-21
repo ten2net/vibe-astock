@@ -100,16 +100,14 @@ test("导航与路由双向对得上 —— 有导航没路由=点了白屏,有�
     "参数路由的静态父路径要有页面");
 });
 
-test("侧栏展示用户指定的品牌官网，并安全打开新标签", () => {
+test("侧栏底部展示外部工具链接与 GitHub，并安全打开新标签", () => {
   const layoutSrc = fs.readFileSync(path.join(FINANCE, "components", "layout", "Layout.tsx"), "utf8");
-  assert.match(layoutSrc, /href="https:\/\/phoenixtree\.ai\/" target="_blank" rel="noopener noreferrer"/);
-  assert.match(layoutSrc, /aria-label="Phoenix Tree AI 官网（新标签页打开）"/);
-  assert.match(layoutSrc, /!compact && <span>phoenixtree\.ai<\/span>/);
-  const brandLink = layoutSrc.match(/<a href="https:\/\/phoenixtree\.ai\/"[\s\S]*?<\/a>/)?.[0] ?? "";
-  assert.match(brandLink, /text-primary/);
-  assert.doesNotMatch(brandLink, /text-muted-foreground|hover:text-foreground/);
-  assert.doesNotMatch(layoutSrc, /APP_VERSION|· 本地工作台/);
-  assert.equal((layoutSrc.match(/href="https:\/\/phoenixtree\.ai\/"/g) ?? []).length, 1);
+  assert.match(layoutSrc, /href="https:\/\/q\.luckybrother\.cc\/" target="_blank" rel="noopener noreferrer"/);
+  assert.match(layoutSrc, /href="https:\/\/www\.luckybrother\.cc\/" target="_blank" rel="noopener noreferrer"/);
+  assert.match(layoutSrc, /\{REPO_URL\} target="_blank" rel="noreferrer"/);
+  assert.match(layoutSrc, /aria-label="LGBM量化"/);
+  assert.match(layoutSrc, /aria-label="A股热力图"/);
+  assert.doesNotMatch(layoutSrc, /phoenixtree\.ai|x\.com\/linsizhen/, "上游官网与作者联系方式已由本仓库链接替代");
   // 实际可见性由浏览器验收；源码断言不假设容器必须是 footer 标签。
   assert.match(layoutSrc, /<Globe[^>]*aria-hidden="true"/);
   assert.match(layoutSrc, /to="\/" aria-label=\{`\$\{PRODUCT_NAME\} 首页`\}/);
