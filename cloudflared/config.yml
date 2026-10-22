@@ -3,6 +3,8 @@
 # 凭据文件由 ~/.cloudflared/ 挂载进来，勿提交到仓库。
 tunnel: 3c5b1ac7-34dd-44ce-85e8-8473d54c66c5
 credentials-file: /etc/cloudflared/creds.json
+# 与 config-v2.yml 同理:UDP/QUIC 链路抖动会中途取消长请求流,改用 HTTP/2(TCP 443)。
+protocol: http2
 ingress:
   - hostname: a.luckybrother.cc
     service: http://127.0.0.1:8910

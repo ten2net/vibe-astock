@@ -3,6 +3,9 @@
 # 凭据文件由 ~/.cloudflared/ 挂载进来，勿提交到仓库。
 tunnel: 17642bd5-1db7-49b1-aa12-f45d92c5a121
 credentials-file: /etc/cloudflared/creds.json
+# 本机到 Cloudflare 边缘的 UDP/QUIC 链路抖动严重(日志大量 "no recent network activity"，
+# 长请求中途流被取消、浏览器报 "Load failed"):改用 HTTP/2(TCP 443)传输，明显更稳。
+protocol: http2
 ingress:
   - hostname: a2.luckybrother.cc
     service: http://127.0.0.1:5940
