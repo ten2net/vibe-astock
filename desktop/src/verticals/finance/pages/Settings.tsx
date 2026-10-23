@@ -9,6 +9,7 @@ import { API_MODELS, PROVIDER_BASE, SUBSCRIPTION_MODELS, apiPresetForSaved, isCl
 import { clearLlm, loadUserLlm, saveLlm } from "@/lib/llm";
 import { LLM_KEY } from "@/lib/llmStore";
 import { testAndSaveAi } from "@/lib/aiConnection";
+import { clearMirroredAiConnection, mirrorAiConnection } from "@/lib/aiConnectionMirror";
 import { useAiRuntime } from "@/hooks/useAiRuntime";
 import { UpdateSettingsCard } from "@/components/UpdateSettingsCard";
 import { SecContactCard } from "@/components/SecContactCard";
@@ -227,6 +228,7 @@ export function Settings() {
     try {
       await testAndSaveAi(cfg, { read: () => localStorage.getItem(LLM_KEY), probe: backend.llmProbe, save: saveLlm });
       setConfigured(true); say("连接成功。AI 会按问题需要联网搜索、取数和计算。");
+      void mirrorAiConnection(cfg);
     } catch (e) {
       oops(friendlyAgentError(e));
     } finally { setTesting(false); }
@@ -241,6 +243,8 @@ export function Settings() {
     try {
       await testAndSaveAi(cfg, { read: () => localStorage.getItem(LLM_KEY), probe: backend.llmProbe, save: saveLlm });
       setConfigured(true); say(`「${m.name}」连接成功。AI 会按问题需要联网搜索、取数和计算。`);
+      // 订阅档无密钥:落一份服务端镜像,浏览器存储被清/换入口地址后启动自动恢复
+      void mirrorAiConnection(cfg);
     } catch (e) { oops(friendlyAgentError(e)); }
     finally { setTesting(false); }
   };
@@ -256,6 +260,7 @@ export function Settings() {
     try {
       clearLlm();
       setApiKey(""); setConfigured(false); say("已清除。再次使用 AI 功能前需要重新连接。");
+      void clearMirroredAiConnection();
     } catch (e) { oops(e instanceof Error ? e.message : String(e)); }
   };
 

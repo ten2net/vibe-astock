@@ -530,6 +530,18 @@ export const backend = {
     });
   },
 
+  /**
+   * 「接入 AI」订阅档连接的服务端镜像(无密钥)。页面加载时本地没有可用配置就从这里恢复 —
+   * 浏览器存储被隐私模式/内嵌 WebView 清掉、或换了入口地址(localStorage 按源隔离)时,
+   * 「测试并保存」的成果不再随浏览器丢失。🔴 镜像只收 cli-* 订阅档;API key 永不落服务端。
+   */
+  aiConnection: () => call<{ connection: { provider: string; model: string } | null }>("/ai-connection"),
+  saveAiConnection: (provider: string, model: string) =>
+    call<{ connection: { provider: string; model: string } }>("/ai-connection", {
+      method: "POST", body: JSON.stringify({ provider, model }),
+    }),
+  clearAiConnection: () => call<{ ok: true }>("/ai-connection", { method: "DELETE" }),
+
   /** RSS 标题走专用受限转换入口，不借用会记上下文的自由对话。 */
   translateHeadlines: async (items: { id: string; title: string }[], signal?: AbortSignal, llm?: unknown) => {
     const runtime = requestRuntime(llm);

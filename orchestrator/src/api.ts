@@ -16,7 +16,7 @@ import path from "node:path";
 
 import crypto from "node:crypto";
 
-import { IMPORT_MAX_TOTAL_BYTES, ServiceError, auditCheckHead, auditRegister, auditVerify, chatSend, compareRuns, llmProbe, translateHeadlines, evidenceAlerts, guidedToolTurn, listTools, runToolRequest, fetchEndpoint, ingestFiles, debateAdvance, debateStart, ledgerKinds, ledgerLabels, ledgerList, localAgents, productInfo, ledgerRemove, ledgerSnapshot, ledgerUpsert, assertGenericLedgerWrite, pageQuery, getEvidence, credentialStatus, setCodeBuddyLocation, setCredential, getReport, knowledgeRecall, listEndpoints, listRuns, readRunFile, redact, reportDelete, reportDownload, reportPreview, reportUpload, reportsList, researchStatus, safePath, serviceContext, deleteRun, startResearch, thermoSeries, type ServiceContext } from "./service.ts";
+import { IMPORT_MAX_TOTAL_BYTES, ServiceError, auditCheckHead, auditRegister, auditVerify, chatSend, compareRuns, llmProbe, translateHeadlines, evidenceAlerts, guidedToolTurn, listTools, runToolRequest, fetchEndpoint, ingestFiles, debateAdvance, debateStart, ledgerKinds, ledgerLabels, ledgerList, localAgents, productInfo, ledgerRemove, ledgerSnapshot, ledgerUpsert, assertGenericLedgerWrite, pageQuery, getEvidence, credentialStatus, setCodeBuddyLocation, setCredential, getReport, knowledgeRecall, listEndpoints, listRuns, readRunFile, redact, reportDelete, reportDownload, reportPreview, reportUpload, reportsList, researchStatus, safePath, serviceContext, deleteRun, startResearch, thermoSeries, readAiConnection, saveAiConnection, clearAiConnection, type ServiceContext } from "./service.ts";
 import { REPORT_MAX_BYTES } from "./report_library.ts";
 import { savedCredential } from "./saved_credentials.ts";
 import { NOFOLLOW_FLAG, restrictPrivateFile } from "./fsutil.ts";
@@ -332,6 +332,11 @@ export function createApiServer(ctx: ServiceContext, opts: { token: string; cook
           return send(res, 200, await llmProbe(ctx, b as never, signal));
         });
       }
+      // 「接入 AI」订阅档连接的服务端镜像(无密钥;浏览器 key 永不落服务端,见 service.ts)。
+      // 页面加载时本地没有可用配置就从这里恢复 —— 治「保存成功、刷新又变未接入」(浏览器存储被清/换入口地址)。
+      if (req.method === "GET" && url.pathname === "/ai-connection") return send(res, 200, { connection: readAiConnection(ctx) });
+      if (req.method === "POST" && url.pathname === "/ai-connection") return send(res, 200, { connection: saveAiConnection(ctx, await readBody(req)) });
+      if (req.method === "DELETE" && url.pathname === "/ai-connection") { clearAiConnection(ctx); return send(res, 200, { ok: true }); }
       // 资料导入:上传截图 / 文本 → agent 转写成台账**草稿**(不直接落库,见 ingest.ts)。
       // base64 会把体积放大约 1/3,再留些余量给 JSON 外壳
       if (req.method === "POST" && url.pathname === "/import") {

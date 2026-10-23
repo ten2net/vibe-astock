@@ -4,6 +4,7 @@ import { ArrowRight, LoaderCircle, Sparkles, Terminal, X } from "lucide-react";
 import { ApiError, backend, friendlyAgentError } from "@/lib/backend";
 import { LLM_KEY, saveUserLlm } from "@/lib/llmStore";
 import { subscriptionConfig, testAndSaveAi } from "@/lib/aiConnection";
+import { mirrorAiConnection } from "@/lib/aiConnectionMirror";
 
 const OPTIONS = [
   { provider: "cli-codex", label: "Codex订阅版", detail: "使用本机 Codex CLI 的 ChatGPT 登录" },
@@ -38,6 +39,7 @@ export function QuickAiConnect({ onDismiss, storageStatus }: { onDismiss: () => 
       await testAndSaveAi(subscriptionConfig(provider), {
         read: () => localStorage.getItem(LLM_KEY), probe: backend.llmProbe, save: saveUserLlm,
       }, controller.signal);
+      void mirrorAiConnection(subscriptionConfig(provider));
       onDismiss();
     } catch (e) {
       if (!controller.signal.aborted) {

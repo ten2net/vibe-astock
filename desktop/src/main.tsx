@@ -6,6 +6,7 @@ import "./index.css";
 import { router } from "./verticals/finance/router";
 import { hydrateNotes } from "./verticals/finance/lib/notes";
 import { hydrateWatch } from "./verticals/finance/lib/watchlist";
+import { hydrateAiConnection } from "./verticals/finance/lib/aiConnectionMirror";
 import { PRODUCT_NAME } from "./verticals/finance/lib/brand";
 
 /**
@@ -56,7 +57,7 @@ function fatal(message: string, detail: string) {
   root!.append(box);
 }
 
-Promise.all([hydrateNotes(), hydrateWatch()])
+Promise.all([hydrateNotes(), hydrateWatch(), hydrateAiConnection()])
   .then(() => {
     createRoot(root).render(
       <StrictMode>
