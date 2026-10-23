@@ -85,7 +85,7 @@ services:
       # 拼「发给使用者的链接」用的公网根地址（只用于拼链接，不是监听地址）
       VRA_PUBLIC_URL: https://a2.luckybrother.cc
       # CodeBuddy 订阅大脑：远程模式下页面不能改 CLI 位置，用环境变量钉死。
-      # 指向下面挂进来的持久化 CLI（与旧版容器共用同一对卷）。
+      # 指向下面挂进来的 v2 专用持久化 CLI（与旧版容器的卷已分开，互不影响）。
       CODEBUDDY_BIN: /root/.local/bin/codebuddy
       # 代理：境外数据源与被重置的源走它（fetchEnv 会把代理变量透传给取数子进程）。
       # no_proxy 口径沿用旧容器实测可用的配置；若实测某源容器内直连不通，
@@ -100,12 +100,12 @@ services:
     volumes:
       # 新版私有层：配置、运行产物、对话、台账、知识层档案、访问口令；容器重建不丢
       - astock-v2-local:/app/.local
-      # CodeBuddy 订阅接入：登录态与 CLI 本体。**与旧版容器共用**同一对卷
-      # （旧容器已完成登录和 CLI 安装），v2 的页面「接入 AI」直接选 WorkBuddy /
-      # CodeBuddy 即可用；容器重建不丢，也不重复占空间。
-      # 注意：两个容器会同时只读使用 CLI，登录/升级 CLI 时建议先停另一个容器。
-      - astock-codebuddy:/root/.codebuddy        # OAuth 登录态
-      - astock-codebuddy-cli:/root/.local        # CLI 本体（版本目录 + bin 软链）
+      # CodeBuddy 订阅接入：登录态与 CLI 本体各用各的卷,**不再与旧版共用**。
+      # 共用时两边同时跑 CodeBuddy 进程会并发读写同一套登录/会话文件(令牌刷新竞争、
+      # 会话锁互踩 → 间歇性「登录失效/要重新接入」),一边升级 CLI 版本另一边也被迫跟着变。
+      # 初始内容从旧卷整卷复制(登录态 + CLI 2.171.0),此后 v1 / v2 互不影响。
+      - astock-v2-codebuddy:/root/.codebuddy        # OAuth 登录态(v2 专用)
+      - astock-v2-codebuddy-cli:/root/.local        # CLI 本体（版本目录 + bin 软链，v2 专用）
       # Claude / Codex 本机 CLI 大脑的登录态家目录（~/.claude、CODEX_HOME 缺省
       # ~/.codex）。镜像里还没装这两个 CLI，先挂空卷占位，将来在容器里登录一次
       # 即持久化，不用挂卷迁移。
@@ -158,8 +158,10 @@ volumes:
   astock-agent:
   astock-duanxian:
   astock-market:
-  astock-codebuddy:      # CodeBuddy 登录态（旧版 v1 与 v2 共用）
-  astock-codebuddy-cli:  # CodeBuddy CLI 本体（含版本目录；v1 与 v2 共用）
+  astock-codebuddy:      # CodeBuddy 登录态（仅旧版 v1 使用；v2 已改用 astock-v2-codebuddy）
+  astock-codebuddy-cli:  # CodeBuddy CLI 本体（仅旧版 v1 使用；v2 已改用 astock-v2-codebuddy-cli）
+  astock-v2-codebuddy:      # CodeBuddy 登录态（v2 专用，与 v1 分开，互不干扰）
+  astock-v2-codebuddy-cli:  # CodeBuddy CLI 本体（v2 专用，版本与升级独立）
   astock-v2-local:       # 新版 v2 私有层（配置 / 运行产物 / 访问口令）
   astock-v2-claude:      # Claude CLI 登录态（备用占位）
   astock-v2-codex:       # Codex CLI 登录态（备用占位）
