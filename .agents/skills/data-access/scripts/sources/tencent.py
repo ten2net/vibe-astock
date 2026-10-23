@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from typing import Optional
 
@@ -141,3 +142,66 @@ def ah_premium(code: str, side: str = "A") -> dict:
         out["ah_ratio"] = round(a_price / (h_price * rate), 4)
         out["premium_pct"] = round((out["ah_ratio"] - 1) * 100, 2)
     return out
+
+
+def tencent_minute_today(code: str) -> dict:
+    """个股当日分钟线(腾讯)→ **5 分钟聚合**的主动净买入累计曲线(DDX 近似)。
+
+    proxy.finance minute/query 的 amount 为**累计**成交额(元),price 为该分钟末价。
+    估算口径:每分钟主动净额 = sign(本分钟末价 − 上分钟末价) × 本分钟成交额增量。
+    🔴 分钟级方向噪声极大(开盘一分钟就能 ±300bp),必须聚合后用**相对自身**的
+       横盘/拉升判定(见编排器 fflow_pattern.ts),这里只做三件事降噪:
+       1) 丢掉 09:30 那根(集合竞价噪声);2) 砍掉尾部零成交的占位分钟;
+       3) 按 5 分钟桶求和再累计。
+    返回 {"series": [{"time": "HH:MM"(桶起点), "price": 桶末价, "main": 累计主动净额(元)}],
+          "day_amount": 当日累计成交额(元), "points": 桶数, "bar_minutes": 5}
+    ⚠️ 估算值,不是交易所/东财的大单定义;北交所(4/8/92 开头)腾讯分钟线不支持,返回空。
+    """
+    digits = str(code).strip().lower().removeprefix("sh").removeprefix("sz")
+    if not re.fullmatch(r"\d{6}", digits) or digits.startswith(("4", "8", "92")):
+        return {"series": [], "day_amount": None, "points": 0, "bar_minutes": 5}
+    sym = tencent_prefix(digits)
+    r = http_get("https://proxy.finance.qq.com/ifzqgtimg/appstock/app/minute/query",
+                 params={"code": sym}, headers=_HDR, timeout=10, ext="json")
+    d = r.json()
+    rows = (((d.get("data") or {}).get(sym) or {}).get("data") or {}).get("data") or []
+    minute_net: list[tuple[str, float, float]] = []  # (time, price, 该分钟主动净额)
+    prev_price: Optional[float] = None
+    prev_amount = 0.0
+    day_amount: Optional[float] = None
+    for row in rows:
+        parts = str(row).split()
+        if len(parts) < 4:
+            continue
+        hhmm, price_s, _vol_s, amount_s = parts[0], parts[1], parts[2], parts[3]
+        try:
+            price, amount = float(price_s), float(amount_s)
+        except ValueError:
+            continue
+        if hhmm == "0930":
+            prev_price = price
+            prev_amount = amount
+            day_amount = amount
+            continue  # 集合竞价那根不进曲线
+        minute_amount = max(amount - prev_amount, 0.0)
+        direction = 0.0 if prev_price is None else (1.0 if price > prev_price else (-1.0 if price < prev_price else 0.0))
+        minute_net.append((f"{hhmm[:2]}:{hhmm[2:4]}", price, direction * minute_amount))
+        prev_price = price
+        prev_amount = amount
+        day_amount = amount
+    # 尾部零成交占位分钟:主动净额恒 0,留着只会稀释「最后一分钟仍向上」的判定
+    while len(minute_net) > 1 and minute_net[-1][2] == 0.0:
+        minute_net.pop()
+    buckets: dict[str, dict] = {}
+    for t, price, net in minute_net:
+        hh, mm = t.split(":")
+        key = f"{hh}:{int(mm) // 5 * 5:02d}"
+        b = buckets.setdefault(key, {"price": price, "net": 0.0})
+        b["price"] = price
+        b["net"] += net
+    series: list[dict] = []
+    cum = 0.0
+    for key in sorted(buckets):
+        cum += buckets[key]["net"]
+        series.append({"time": key, "price": buckets[key]["price"], "main": round(cum, 2)})
+    return {"series": series, "day_amount": day_amount, "points": len(series), "bar_minutes": 5}

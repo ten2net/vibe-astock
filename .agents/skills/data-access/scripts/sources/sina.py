@@ -264,3 +264,41 @@ def sina_board_flow(board_type: str = "industry") -> dict:
                      "net": _f(x.get("netamount")), "inflow": _f(x.get("inamount")), "outflow": _f(x.get("outamount")), "net_ratio": pct(x.get("ratioamount")),
                      "leader": str(x.get("ts_name") or ""), "leader_pct": pct(x.get("ts_changeratio")), "_raw": ref})
     return {"board_type": board_type, "rows": rows}
+
+
+def sina_market_money_rank(top_n: int = 150) -> dict:
+    """新浪沪深京 A 股资金流榜,按主力净额(r0_net,大单)降序前 N。
+
+    MoneyFlow.ssl_bkzj_ssggzj?bankuai=hs_a 给全市场个股资金流(流入 / 流出 / 净额 + r0 大单四档),
+    服务端 sort=r0_net desc 实测可用;单页最多 1000 条,前 N ≤ 1000 一页就够。
+    返回 {"total": 全市场只数(尽力取,取不到为 None), "returned": N, "expected": N,
+          "rows": [{"rank", "code", "name", "price", "pct"(小数), "main_net"(r0_net,元),
+                    "netamount"(元), "amount"(元)}]}
+    ⚠️ 客观公开榜单,只做客观展示 —— 非推荐、非预测、不评分。新浪不给流通市值,留 null。
+    """
+    top_n = int(top_n)
+    if not 1 <= top_n <= 1000:
+        raise ValueError("top_n 须在 1~1000 之间")
+    arr = _sina_list("MoneyFlow.ssl_bkzj_ssggzj", {"page": 1, "num": top_n, "sort": "r0_net", "asc": 0, "bankuai": "hs_a"})
+    total = None
+    try:
+        total = int(str(http_get(_SINA_JSON + "Market_Center.getHQNodeStockCount", params={"node": "hs_a"}, headers=_SINA_HDR, timeout=10, ext="json").text).strip().strip('"'))
+    except (ValueError, OSError, RuntimeError):
+        total = None
+    rows = []
+    for i, x in enumerate(arr[:top_n]):
+        if not isinstance(x, dict):
+            continue
+        symbol = str(x.get("symbol") or "")
+        m = re.search(r"(\d{6})", symbol)
+        if not m:
+            continue
+        try:
+            pct_v = float(x.get("changeratio") or 0) / 100
+        except (TypeError, ValueError):
+            pct_v = None
+        rows.append({"rank": i + 1, "code": m.group(1), "name": str(x.get("name") or ""),
+                     "price": _f(x.get("trade")), "pct": pct_v,
+                     "main_net": _f(x.get("r0_net")), "netamount": _f(x.get("netamount")),
+                     "amount": _f(x.get("amount"))})
+    return {"total": total, "returned": len(rows), "expected": min(top_n, total) if total else top_n, "rows": rows}

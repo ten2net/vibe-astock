@@ -12,6 +12,7 @@ import { Section } from "./FactsPanels";
 import { finite, pctColor, signed, yi } from "./format";
 import { GapsAndSource } from "./ViewBits";
 import { useWatchPoll } from "./useWatchPoll";
+import { FflowSection } from "./FflowPanel";
 import type { AlertKind, LadderWatchRow, WatchAlert, WatchRow, WatchView } from "./watchTypes";
 
 export const THRESHOLDS = [1.5, 3, 5];
@@ -172,6 +173,8 @@ export function LiveView({ v, threshold, scope, ladderMin, onThreshold, onScope,
       </div>
 
       <AlertFeed v={v} threshold={threshold} scope={scope} onThreshold={onThreshold} onScope={onScope} />
+
+      <FflowSection />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section icon={Wallet} title="持仓" hint="只列现价、今日涨跌和浮动盈亏 %;股数和成本在「自选与持仓」页。">

@@ -211,7 +211,11 @@ def em_concept_blocks(result: dict, ctx: dict) -> dict:
 
 
 def em_fund_flow_minute(result: list, ctx: dict) -> dict:
-    """分钟资金流:东财 fflow/kline 的各档净额为**当日累计值**(盘中逐分钟刷新,收盘后为全天值),不做求和。"""
+    """分钟资金流:东财 fflow/kline 的各档净额为**当日累计值**(盘中逐分钟刷新,收盘后为全天值),不做求和。
+
+    extra.minute_series = 整条累计曲线(主力/超大/大单),供分时形态识别(横盘→拉升)使用;
+    每点 {"time","main","super","large"},单位元。点很多(盘中 240),只进 extra 不进证据。
+    """
     if not result:
         return empty("当日无分钟资金流(非交易时段 / ETF 不覆盖 / 接口不通)")
     last = result[-1]
@@ -221,7 +225,32 @@ def em_fund_flow_minute(result: list, ctx: dict) -> dict:
            ev(ctx, "super_net_inflow_intraday_cum", last.get("super_net"), "元", day, as_of=day, note=f"超大单净流入当日累计至 {t}"),
            ev(ctx, "large_net_inflow_intraday_cum", last.get("large_net"), "元", day, as_of=day, note=f"大单净流入当日累计至 {t}"),
            ev(ctx, "fund_flow_minute_points", len(result), "条", day, currency="n/a", as_of=day)]
-    return out(evs, extra={"first_time": result[0].get("time"), "last_time": t})
+    series = [{"time": str(r.get("time", "")), "main": r.get("main_net"), "super": r.get("super_net"), "large": r.get("large_net")} for r in result]
+    return out(evs, extra={"first_time": result[0].get("time"), "last_time": t, "minute_series": series})
+
+
+def em_market_main_net_rank(result: dict, ctx: dict) -> dict:
+    """全市场主力净流入榜 → 逐行证据(record_key = 代码) + extra.rows 结构化名单。
+
+    ⚠️ 客观公开榜单,只做客观展示 —— 非推荐、非预测、不评分。
+    """
+    rows = result.get("rows") or []
+    total = result.get("total") or 0
+    ictx = {**ctx, "symbol": "MARKET", "market": "CN"}
+    evs = []
+    for r in rows:
+        code = str(r.get("code") or "")
+        if not code:
+            continue
+        name = r.get("name") or code
+        note = f"{name}({code});主力净流入榜第 {r.get('rank')} 名(全市场 {total} 只)"
+        for field, val, unit in (("main_net_rank", r.get("main_net"), "元"),
+                                 ("main_net_pct", r.get("main_pct"), "%")):
+            evs.append(ev(ictx, field, val, unit, today_str(), record_key=f"stock|{code}", note=note))
+    extra = {"rows": rows, "total": total}
+    if result.get("expected") is not None and result.get("returned") != result.get("expected"):
+        extra["partial"] = True
+    return out(evs, extra=extra)
 
 
 def em_fund_flow_120d(result: list, ctx: dict) -> dict:

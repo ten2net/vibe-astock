@@ -480,3 +480,55 @@ def sina_board_flow_map(result: dict, ctx: dict) -> dict:
     evs = rows_fields(ctx, rows, specs, period_of=lambda r: day, key_of=lambda r: f"{bt}|{r.get('code') or r.get('name')}",
                       note_of=lambda r: f"{r.get('name')} 排名 {r.get('rank')};领涨 {r.get('leader') or '—'} {'' if r.get('leader_pct') is None else str(r['leader_pct']) + '%'};新浪口径(流入 − 流出),不是东财主力净额")
     return out(evs, extra={"board_type": bt, "total": len(rows)})
+
+
+def sina_market_money_rank_map(result: dict, ctx: dict) -> dict:
+    """新浪资金流榜(按主力净额 r0_net 降序)→ 证据 + extra.rows 结构化名单。
+
+    与 em_market_main_net_rank 同 schema(code/name/price/pct/main_net/float_cap),
+    视图层两条通道可以互替;float_cap 新浪不给,置 None(形态识别改用当日成交额做分母)。
+    ⚠️ 客观公开榜单,非推荐、非预测。
+    """
+    rows = (result or {}).get("rows") or []
+    total = (result or {}).get("total") or 0
+    ictx = {**ctx, "symbol": "MARKET", "market": "CN"}
+    evs = []
+    for r in rows:
+        code = str(r.get("code") or "")
+        if not code:
+            continue
+        rk = f"stock|{code}"
+        note = f"{r.get('name', code)}({code});主力净额榜第 {r.get('rank')} 名(新浪沪深京 A 股,共 {total} 只)"
+        for field, key, unit in (("main_net_rank", "main_net", "元"), ("netamount_rank", "netamount", "元")):
+            if r.get(key) is not None:
+                evs.append(ev(ictx, field, r[key], unit, ctx.get("as_of") or today_str(), record_key=rk, note=note))
+    if not evs:
+        return empty("新浪资金流榜一条都没取到")
+    structured = [{"code": str(r.get("code") or ""), "name": r.get("name") or "", "price": r.get("price"),
+                   "pct": r.get("pct"), "main_net": r.get("main_net"), "float_cap": None, "amount": r.get("amount")}
+                  for r in rows]
+    extra = {"rows": structured, "total": total}
+    if (result or {}).get("expected") is not None and (result or {}).get("returned") != (result or {}).get("expected"):
+        extra["partial"] = True
+    return out(evs, extra=extra)
+
+
+def tx_minute_today_map(result: dict, ctx: dict) -> dict:
+    """腾讯分钟线 → 主动净买入估算曲线(DDX 近似,5 分钟聚合)。
+
+    extra.minute_series = [{"time", "main"(累计主动净额,元)}](5 分钟桶,桶起点),
+    extra.day_amount = 当日累计成交额(元), extra.bar_minutes = 5。
+    与 em_fund_flow_minute 的 minute_series 同形状(累计主力净额),视图识别层通用;
+    ⚠️ 估算口径见 tencent_minute_today,不是大单定义。
+    """
+    series = (result or {}).get("series") or []
+    if not series:
+        return empty("当日无分钟线(非交易时段 / 北交所不支持 / 接口不通)")
+    day = today_str()
+    pts = len(series)
+    evs = [ev(ctx, "fund_flow_minute_points", pts, "条", day, currency="n/a", as_of=day, note="腾讯分钟线 5 分钟聚合;主动净买入为方向估算(DDX 近似)"),
+           ev(ctx, "active_net_intraday_cum", series[-1].get("main"), "元", day, as_of=day, note=f"累计主动净买入估算至 {series[-1].get('time')};共 {pts} 个 5 分钟桶")]
+    return out(evs, extra={"first_time": series[0].get("time"), "last_time": series[-1].get("time"),
+                           "minute_series": [{"time": p.get("time"), "main": p.get("main")} for p in series],
+                           "day_amount": (result or {}).get("day_amount"),
+                           "bar_minutes": (result or {}).get("bar_minutes") or 5})

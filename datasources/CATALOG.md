@@ -1,4 +1,4 @@
-# 数据源端点目录(registry v1.0.0,共 182 个)
+# 数据源端点目录(registry v1.0.0,共 185 个)
 
 由 `datasources/gen_catalog.py` 从 `registry.json` 生成,勿手改。调用方式:`.venv/bin/python .agents/skills/data-access/scripts/fetch_endpoint.py --endpoint <id> --symbol <代码> [--args '<JSON>'] --out-dir <运行目录>`;legacy 端点为 Phase 0 的独立脚本。合规级:cn-public = 国内公开网页接口;S = 官方政府数据;B = 非官方 / 个人研究;C = 仅个人研究(CBOE 条款);rss-public = 公开 RSS。
 symbol_kind:cn6 = A 股 6 位码;us = 美股 ticker;hk = 港股 5 位;global = 美股 / 港股自动判别;raw = 原样透传(指数 / 关键词 / 期权标的);none = 不需要标的。
@@ -22,13 +22,14 @@ symbol_kind:cn6 = A 股 6 位码;us = 美股 ticker;hk = 港股 5 位;global = �
 | `st_stock_list` | ST / *ST 股票名单(沪深京) | CN | eastmoney | cn-public | none | - | 东财名单不可用时上游自动改用 baostock(只覆盖沪深,结果标 partial 并写明原因)。上游 a-stock-data §6 |
 | `em_main_business` | 主营构成(按行业 / 产品 / 地区;收入 / 占比 / 毛利率) | CN | eastmoney | cn-public | cn6 | profile:optional | 收入占比 / 毛利率是源给的小数(0.86 = 86%) |
 
-## 1 行情(11)
+## 1 行情(12)
 
 | id | 标题 | 市场 | 源 | 合规 | symbol_kind | 阶段 | 鉴权 / 备注 |
 |---|---|---|---|---|---|---|---|
 | `fetch_quote` | 实时行情 / 估值快照(含僵尸报价判定) | CN | tencent | cn-public | cn6 | profile:required | 关键 |
 | `fetch_trade_calendar` | 交易日历(参考报价日 / 盘前盘后) | CN | baostock | cn-public | none | profile:required |  |
 | `fetch_kline` | 日 K 前复权序列 | CN | tencent | cn-public | cn6 | risk:optional |  |
+| `tx_minute_today` | 个股当日分钟线(腾讯,含主动净买入估算) | CN | tencent | cn-public | cn6 | - | 东财 fflow 分钟资金流被墙环境的替代:按分钟涨跌方向×成交额增量估算累计主动净买入(DDX 近似),北交所不支持。 |
 | `tx_quote` | 腾讯实时行情(个股 / 指数 / ETF / 北交所,含僵尸报价判定) | CN | tencent | cn-public | raw | - | 指数 / ETF 请带前缀(sh000001 / sh510050);fetch_quote 仍是阶段必需的主行情脚本 |
 | `tx_quotes_batch` | 腾讯批量行情(默认 A股四大指数 + 美股道指纳指 + 港股恒生与恒生科技) | CN/US/HK | tencent | cn-public | none | - |  |
 | `sina_adjust_factor` | 新浪复权因子(qfq / hfq) | CN | sina | cn-public | cn6 | - |  |
@@ -56,7 +57,7 @@ symbol_kind:cn6 = A 股 6 位码;us = 美股 ticker;hk = 港股 5 位;global = �
 | `cninfo_announcements` | 巨潮公告(全文检索,动态 orgId) | CN | cninfo | cn-public | cn6 | risk:optional |  |
 | `exchange_announcements` | 公告备源(深市深交所 / 沪市北交所东财 np-anotice,带 PDF 直链) | CN | szse+eastmoney | cn-public | cn6 | - |  |
 
-## 3 信号(11)
+## 3 信号(13)
 
 | id | 标题 | 市场 | 源 | 合规 | symbol_kind | 阶段 | 鉴权 / 备注 |
 |---|---|---|---|---|---|---|---|
@@ -71,6 +72,8 @@ symbol_kind:cn6 = A 股 6 位码;us = 美股 ticker;hk = 港股 5 位;global = �
 | `ths_hot_reason` | 同花顺当日强势股 + 题材归因 | CN | ths | cn-public | none | - | --args {"date":"YYYY-MM-DD"} |
 | `ths_hsgt_realtime` | 沪深股通分钟累计净买入(亿元) | CN | ths | cn-public | none | - |  |
 | `exchange_dragon_tiger` | 龙虎榜官方备源(深交所结构化 + 上交所全文) | CN | szse+sse | cn-public | none | - | --args {"trade_date":"YYYY-MM-DD"},默认北京时间当天 |
+| `sina_market_money_rank` | 全市场资金流榜(沪深京 A 股,按主力净额降序) | SH/SZ/BJ | sina | cn-public | none | - | 东财 push2 被墙环境的替代榜(东财主力净额榜取不到时兜底);r0_net=大单净额。客观公开榜单,非推荐、非预测。 |
+| `em_market_main_net_rank` | 全市场主力净流入榜(沪深京 A 股,当日) | SH/SZ/BJ | eastmoney | cn-public | none | - | 客观公开榜单(东财行情中心同款),只做客观展示 —— 非推荐、非预测、不评分。盘中随分钟刷新;extra.rows 带流通市值,可把净额换算成 bp。 |
 
 ## 4 资金筹码(12)
 

@@ -70,3 +70,35 @@ export interface IntradayResult {
   generated_at: string;
 }
 export interface CaptureResult { slot: string; ok: boolean; already: boolean; reason: string | null }
+
+/** 分时资金「横盘→稳步拉升」榜(shortline_fflow 视图) */
+export interface FflowCandidate {
+  code: string; name: string;
+  price: number | null; pct: number | null;
+  /** 主力净流入当日累计(元) */
+  main_net: number | null;
+  /** 流通市值(元),形态识别按它换算 bp */
+  float_cap: number | null;
+  /** 当日分钟点数 */
+  points: number;
+  flat_minutes: number; rise_minutes: number;
+  /** 横盘段累计曲线带宽 / 拉升段涨幅,单位 bp(占流通市值的万分比) */
+  flat_band_bp: number; rise_bp: number;
+  /** 拉升段上涨分钟占比(稳步度) */
+  up_ratio: number;
+  score: number;
+  /** 累计曲线尾部(bp,最多 60 个点,供迷你走势图) */
+  series_bp: number[];
+}
+export interface FflowView {
+  day: string | null;
+  as_of: string | null;
+  /** 这轮实际走的数据通道(新浪+腾讯估算 / 东财) */
+  source_label: string;
+  poll_ms: number;
+  total_scanned: number;
+  with_data: number;
+  matched: number;
+  stocks: FflowCandidate[];
+  notes: string[];
+}

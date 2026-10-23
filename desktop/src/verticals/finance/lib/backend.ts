@@ -279,7 +279,7 @@ async function ensureSelectedLocalAgentReady(llm: unknown, signal?: AbortSignal)
   throw new ApiError(message, 409, code);
 }
 
-export type ShortlineViewId = "shortline_history" | "shortline_verify" | "shortline_samples" | "shortline_structure" | "shortline_weekly" | "shortline_review" | "shortline_weekly_review";
+export type ShortlineViewId = "shortline_history" | "shortline_verify" | "shortline_samples" | "shortline_structure" | "shortline_weekly" | "shortline_review" | "shortline_weekly_review" | "shortline_fflow";
 
 /** AI 复盘 / AI 周报开工:先确认选中的本地订阅能用,再带上 AI 配置发给后端 */
 async function startShortlineAi<T>(view: "shortline_review" | "shortline_weekly_review", date: string, signal?: AbortSignal): Promise<T> {
@@ -423,6 +423,8 @@ export const backend = {
     if (query.refresh) qs.set("refresh", "1");
     return call<T>(`/view/${id}?${qs}`, { signal });
   },
+  /** 分时资金「横盘→稳步拉升」榜:实时动态页自轮询(后端结果缓存 45s,约 60s 一问)。类型见 shortline/watchTypes.ts */
+  shortlineFflow: <T>(signal?: AbortSignal) => call<T>("/view/shortline_fflow", { signal }),
   /** 明日验证:整晚的条件一起替换(没变的条目不重写) */
   shortlineVerifySave: (date: string, items: { metric: string; direction: string; reason: string }[]) =>
     call<{ date: string; items: unknown[] }>("/view/shortline_verify", { method: "POST", body: JSON.stringify({ action: "save", date, items }) }),

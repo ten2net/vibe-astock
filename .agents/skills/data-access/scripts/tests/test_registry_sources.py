@@ -84,6 +84,58 @@ def test_mappers_basic_shapes():
     m = mappers.em_fund_flow_minute([{"time": "2026-08-21 09:31", "main_net": 1.0, "super_net": 0.5, "large_net": 0.5}, {"time": "2026-08-21 15:00", "main_net": 9.0, "super_net": 4.0, "large_net": 5.0}], _ctx())
     cum = [e for e in m["evidence"] if e["field"] == "main_net_inflow_intraday_cum"][0]
     assert cum["value"] == 9.0 and cum["period"] == "2026-08-21"
+    # 整条分钟曲线进 extra(分时形态识别用),证据条数不变
+    series = m["extra"]["minute_series"]
+    assert len(series) == 2 and series[0]["main"] == 1.0 and series[-1]["time"] == "2026-08-21 15:00"
+    assert len(m["evidence"]) == 4
+
+
+def test_em_market_main_net_rank_mapper():
+    from sources import mappers
+    result = {"total": 5200, "returned": 2, "expected": 2,
+              "rows": [{"rank": 1, "code": "600519", "name": "贵州茅台", "price": 1700.0, "pct": 1.2,
+                        "main_net": 52000000.0, "main_pct": 8.5, "float_cap": 2100000000000.0},
+                       {"rank": 2, "code": "300308", "name": "中际旭创", "price": 130.5, "pct": 3.4,
+                        "main_net": 31000000.0, "main_pct": 6.1, "float_cap": 150000000000.0}]}
+    m = mappers.em_market_main_net_rank(result, _ctx())
+    assert m["extra"]["rows"][0]["code"] == "600519" and m["extra"]["total"] == 5200
+    ev1 = [e for e in m["evidence"] if e["record_key"] == "stock|600519" and e["field"] == "main_net_rank"][0]
+    assert ev1["value"] == 52000000.0 and "第 1 名" in ev1["note"]
+    assert not m["extra"].get("partial")
+    half = mappers.em_market_main_net_rank({**result, "returned": 2, "expected": 100}, _ctx())
+    assert half["extra"].get("partial") is True, "取回不足预期要标 partial"
+
+
+def test_sina_market_money_rank_map():
+    from sources.mappers_cn import sina_market_money_rank_map
+    result = {"total": 5576, "returned": 2, "expected": 2,
+              "rows": [{"rank": 1, "code": "300308", "name": "中际旭创", "price": 900.0, "pct": 0.0382,
+                        "main_net": 3273033000.0, "netamount": 3300000000.0, "amount": 8.1e9},
+                       {"rank": 2, "code": "688825", "name": "长鑫科技", "price": 210.0, "pct": 0.0798,
+                        "main_net": 1846614000.0, "netamount": 1900000000.0, "amount": 5.2e9}]}
+    m = sina_market_money_rank_map(result, _ctx())
+    rows = m["extra"]["rows"]
+    assert rows[0]["code"] == "300308" and rows[0]["float_cap"] is None, "新浪不给流通市值,形态识别回落到当日成交额"
+    assert rows[0]["main_net"] == 3273033000.0
+    assert m["extra"]["total"] == 5576
+    ev = [e for e in m["evidence"] if e["record_key"] == "stock|300308" and e["field"] == "main_net_rank"][0]
+    assert ev["value"] == 3273033000.0 and "第 1 名" in ev["note"]
+    empty = sina_market_money_rank_map({"rows": [], "total": 0}, _ctx())
+    assert empty["status"] == "failed"
+
+
+def test_tx_minute_today_map():
+    from sources.mappers_cn import tx_minute_today_map
+    result = {"series": [{"time": "09:35", "price": 10.1, "main": 1200000.0}],
+              "day_amount": 500000000.0, "points": 1, "bar_minutes": 5}
+    m = tx_minute_today_map(result, _ctx())
+    series = m["extra"]["minute_series"]
+    assert len(series) == 1 and series[0]["main"] == 1200000.0
+    assert m["extra"]["day_amount"] == 500000000.0
+    assert m["extra"]["bar_minutes"] == 5, "5 分钟桶标记要透传,识别层按它换算分钟"
+    assert any(e["field"] == "active_net_intraday_cum" for e in m["evidence"])
+    empty = tx_minute_today_map({"series": [], "day_amount": None, "points": 0}, _ctx())
+    assert empty["status"] == "failed"
 
 
 def test_em_reports_truncated_list_is_not_a_full_year_count(monkeypatch):

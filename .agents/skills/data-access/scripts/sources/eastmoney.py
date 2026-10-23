@@ -803,6 +803,39 @@ def market_turnover_rank(top_n: int = 20) -> dict:
     return {"total": max(total, len(items)), "returned": len(rows), "expected": min(top_n, total) if total else None, "rows": rows}
 
 
+def market_main_net_rank(top_n: int = 100) -> dict:
+    """全市场主力净流入榜(沪深京 A 股按当日主力净额降序 TopN)。
+
+    ⚠️ 客观公开榜单,只做客观展示 —— 非推荐、非预测、不评分。
+    盘中数据随分钟刷新;收盘后为当日全天值。净流出最多的排在末尾(主净额为负)。
+    字段与 market_turnover_rank 对齐(float_cap 用于把净额换算成相对流通市值的 bp)。
+    """
+    base = {"pz": "100", "po": "1", "np": "1", "fltt": "2", "invt": "2", "fid": "f62",
+            "fs": _A_SHARE_FS, "fields": "f12,f14,f2,f3,f6,f20,f21,f62,f184"}
+
+    def page(pn: int):
+        d = _push2_json("/api/qt/clist/get", params={**base, "pn": str(pn)}, headers={"User-Agent": UA}, timeout=15).get("data") or {}
+        return (d.get("diff") or []), int(d.get("total") or 0)
+
+    items, total = page(1)
+    page_size = len(items) or 1
+    pn = 2
+    while len(items) < top_n and not (total and len(items) >= total):
+        more, _ = page(pn)
+        if not more:
+            break
+        items += more
+        pn += 1
+        if len(more) < page_size:
+            break
+
+    rows = [{"rank": i + 1, "code": str(it.get("f12", "")), "name": it.get("f14", ""),
+             "price": it.get("f2"), "pct": it.get("f3"), "amount": it.get("f6"),
+             "float_cap": it.get("f21"), "main_net": it.get("f62"), "main_pct": it.get("f184")}
+            for i, it in enumerate(items[:top_n])]
+    return {"total": max(total, len(items)), "returned": len(rows), "expected": min(top_n, total) if total else None, "rows": rows}
+
+
 # ---------- 复盘:全市场涨跌分布 / 三所家数与成交额 / 主要指数中长线 / 全市场两融 ----------
 def _zdfb_label(k: int) -> str:
     """东财涨跌分布的档位 → 中文。

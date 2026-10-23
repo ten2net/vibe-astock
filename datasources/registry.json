@@ -231,6 +231,26 @@
       "cache_max_age_sec": 300
     },
     {
+      "id": "tx_minute_today",
+      "title": "个股当日分钟线(腾讯,含主动净买入估算)",
+      "layer": "1 行情",
+      "market": ["CN"],
+      "source": "tencent",
+      "compliance": "cn-public",
+      "module": "tencent",
+      "function": "tencent_minute_today",
+      "symbol_kind": "cn6",
+      "symbol_param": "code",
+      "mapper_module": "mappers_cn",
+      "mapper": "tx_minute_today_map",
+      "endpoint_label": "proxy.finance.qq.com minute/query",
+      "args": {},
+      "enabled": true,
+      "cache_max_age_sec": 120,
+      "notes": "东财 fflow 分钟资金流被墙环境的替代:按分钟涨跌方向×成交额增量估算累计主动净买入(DDX 近似),北交所不支持。",
+      "stages": {}
+    },
+    {
       "market": [
         "CN"
       ],
@@ -3598,6 +3618,41 @@
       "enabled": true,
       "cache_max_age_sec": 300,
       "notes": "客观公开榜单(东财行情中心同款),只做客观展示 —— 非推荐、非预测、不评分。",
+      "stages": {}
+    },
+    {
+      "id": "sina_market_money_rank",
+      "title": "全市场资金流榜(沪深京 A 股,按主力净额降序)",
+      "layer": "3 信号",
+      "market": ["SH", "SZ", "BJ"],
+      "source": "sina",
+      "compliance": "cn-public",
+      "module": "sina",
+      "function": "sina_market_money_rank",
+      "symbol_kind": "none",
+      "mapper_module": "mappers_cn",
+      "mapper": "sina_market_money_rank_map",
+      "args": {"top_n": 150},
+      "enabled": true,
+      "cache_max_age_sec": 120,
+      "notes": "东财 push2 被墙环境的替代榜(东财主力净额榜取不到时兜底);r0_net=大单净额。客观公开榜单,非推荐、非预测。",
+      "stages": {}
+    },
+    {
+      "id": "em_market_main_net_rank",
+      "title": "全市场主力净流入榜(沪深京 A 股,当日)",
+      "layer": "3 信号",
+      "market": ["SH", "SZ", "BJ"],
+      "source": "eastmoney",
+      "compliance": "cn-public",
+      "module": "eastmoney",
+      "function": "market_main_net_rank",
+      "symbol_kind": "none",
+      "mapper": "em_market_main_net_rank",
+      "args": {"top_n": 100},
+      "enabled": true,
+      "cache_max_age_sec": 120,
+      "notes": "客观公开榜单(东财行情中心同款),只做客观展示 —— 非推荐、非预测、不评分。盘中随分钟刷新;extra.rows 带流通市值,可把净额换算成 bp。",
       "stages": {}
     },
     {
