@@ -19,6 +19,7 @@ import path from "node:path";
 import { PROVIDER_ID_RE, apiCapabilityOf, apiVerificationOf, loadProviderProfile, providerUrlError, renamedProviderHint, type StructuredOutputMode } from "./providers.ts";
 import { loadProductConfig } from "./productConfig.ts";
 import type { LocalAgentId } from "./local_agent_runtime.ts";
+import { readAiConnection } from "./ai_connection_store.ts";
 
 /** 界面传下来的那一份。字段名与开源版一致，便于上游页面直接复用。 */
 export interface LlmOverride {
@@ -193,17 +194,33 @@ function customEndpoint(name: string, base: string, key: string, model: string, 
 }
 
 /**
- * 解析这次请求实际会使用的 AI 来源。未传请求级配置时读后台默认
- * (`<数据根>/config.json` 的 `provider.profile` / 环境变量 `VRA_PROVIDER`)。
- *
- * 🔴 后台默认**没配就报错**:v1 有一个"产品自带引擎 + 产品专用登录"的隐式默认,v2 已经没有了;
- *    这里再编一个默认出来,就是在用户不知情时替他选了大脑。
+ * 没给请求级来源时的兜底链:后台默认(`config.json` 的 `provider.profile` / 环境变量 `VRA_PROVIDER`)
+ * → **服务端镜像的本机订阅档**。镜像就是用户在「接入 AI」实测并保存过的那一家
+ * (ai_connection_store.ts,无密钥),不是产品替他挑的默认大脑;浏览器 localStorage 被清/
+ * 换入口地址导致页面没带 llm 时,对话和研究不再整盘报「未选择来源」。
+ * 镜像也没有才抛原来的 ai_source_not_configured;其它错(缺 key、认不出等)原样上抛。
+ */
+export function defaultLlmOrMirror(repoRoot: string, dataRoot: string, baseEnv: NodeJS.ProcessEnv = process.env, opts: DefaultSourceOptions = {}): LlmOverride {
+  try {
+    return defaultLlm(repoRoot, dataRoot, baseEnv, opts);
+  } catch (error) {
+    if (!(error instanceof RuntimeProviderError) || error.code !== "ai_source_not_configured") throw error;
+    const mirror = readAiConnection(dataRoot);
+    if (!mirror) throw error;
+    console.error(`[runtime] AI 来源未配置,回落到服务端镜像的订阅档:${mirror.provider}`);
+    return { provider: mirror.provider };
+  }
+}
+
+/**
+ * 解析这次请求实际会使用的 AI 来源。未传请求级配置时走 defaultLlmOrMirror 的兜底链
+ * (后台默认 → 服务端镜像的本机订阅档;都没有才报 ai_source_not_configured,不替用户挑大脑)。
  */
 export function resolveSelectedRuntime(
   repoRoot: string, dataRoot: string, llm?: LlmOverride, baseEnv: NodeJS.ProcessEnv = process.env,
   opts: DefaultSourceOptions = {},
 ): ResolvedRuntimeProvider {
-  return resolveRuntimeProvider(repoRoot, dataRoot, llm ?? defaultLlm(repoRoot, dataRoot, baseEnv, opts), baseEnv);
+  return resolveRuntimeProvider(repoRoot, dataRoot, llm ?? defaultLlmOrMirror(repoRoot, dataRoot, baseEnv, opts), baseEnv);
 }
 
 /** 命令行对后台默认的临时覆盖(`--provider` / `--model` / `--config`);页面请求不用它 */

@@ -36,7 +36,11 @@ test("🔴 传输层自己带上用户配置 —— 不靠每个调用方记得�
   assert.ok(/readAiRuntime\(\)/.test(helperBody), "传输层必须读取全局 AI 来源");
   assert.ok(/"broken"/.test(helperBody) && /"unavailable"/.test(helperBody), "必须把「坏了」「读不到」与「没配」分开处理");
   assert.ok(/throw new ApiError/.test(helperBody), "坏了 / 读不到要报出来，不能静默回落");
-  assert.ok(/"none"/.test(helperBody) && /"ai_not_configured"/.test(helperBody), "真没配也必须引导接入 AI，不能借后端默认值替用户选择");
+  // 真没配(llm 置 undefined → JSON 整键省略)不再当场拒绝:交给后端兜底链
+  // (后台默认 → 服务端镜像里用户实测保存过的订阅档,见 ai_connection_store.ts),都没有后端才回
+  // ai_source_not_configured。镜像本身就是用户的显式选择,不违反「不替用户挑大脑」;
+  // 显式 "llm":null 依旧被边界校验拒(bad_llm),不给「静默换一家」留后门(Codex r3)。
+  assert.ok(/"none"/.test(helperBody) && /llm: undefined/.test(helperBody), "真没配要让 llm 键整键缺席交给后端兜底链,不许借后端默认值静默替用户选择");
 
   const seg = /chat:\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{([\s\S]*?)\n  \},/.exec(src);
   assert.ok(seg, "没解析到 backend.chat 的实现，断言等于没做");

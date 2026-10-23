@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { backend } from "../src/verticals/finance/lib/backend.ts";
 import { clearMirroredAiConnection, hydrateAiConnection, mirrorAiConnection } from "../src/verticals/finance/lib/aiConnectionMirror.ts";
 import { LLM_KEY, clearUserLlm, readAiRuntime } from "../src/verticals/finance/lib/llmStore.ts";
 
@@ -76,11 +77,28 @@ test("镜像里没有内容时不写存储", async () => {
 
 test("镜像接口失败不影响启动(保持未接入)", async () => {
   storageFixture();
-  const { restore } = fetchFixture({ "GET /api/ai-connection": new ServiceErrorStub("boom") });
+  const { calls, restore } = fetchFixture({ "GET /api/ai-connection": new ServiceErrorStub("boom") });
   try {
-    await hydrateAiConnection();
+    await hydrateAiConnection(1);
     assert.equal(readAiRuntime().status, "none");
+    assert.equal(calls.length, 1);
   } finally { restore(); }
+});
+
+test("hydrate 重试:首次失败、再次成功照样恢复", async () => {
+  storageFixture();
+  let fails = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    fails++;
+    if (fails === 1) return new Response(JSON.stringify({ error: "backend_warming_up" }), { status: 502, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ connection: { provider: "cli-codebuddy", model: "codebuddy" } }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    await hydrateAiConnection(3);
+    assert.equal(readAiRuntime().status, "ok");
+    assert.equal(fails, 2, "第一次失败后重试成功");
+  } finally { globalThis.fetch = oldFetch; }
 });
 
 test("mirrorAiConnection:订阅档落镜像,API 档清镜像;失败不抛出", async () => {
@@ -104,6 +122,20 @@ test("mirrorAiConnection:订阅档落镜像,API 档清镜像;失败不抛出", a
     try {
       await mirrorAiConnection({ provider: "cli-codebuddy", model: "codebuddy", baseURL: "", apiKey: "" });
     } finally { restoreDown(); }
+  } finally { restore(); }
+});
+
+test("本地没有可用配置时,AI 请求**整键省略 llm** 交给后端兜底链(后台默认→服务端镜像)", async () => {
+  storageFixture(); // 本地无配置
+  const { calls, restore } = fetchFixture({
+    "POST /api/chat": { session: "s", reply: "ok", redacted: 0, duration_ms: 1 },
+  });
+  try {
+    await backend.chat("你好");
+    assert.equal(calls.length, 1);
+    const body = calls[0]?.body as Record<string, unknown>;
+    assert.equal("llm" in body, false, "本地没配就整键省略 llm(显式 null 会被后端边界校验拒)");
+    assert.equal(body.executionMode, "agent");
   } finally { restore(); }
 });
 

@@ -64,7 +64,7 @@ const SAFE_AGENT_MESSAGE_CODES = new Set([
   "review_busy", "capacity_full", "no_data",
   "invalid_task_request", "invalid_task", "invalid_material_resolution", "material_resolution_failed",
   "operation_not_available", "quick_not_eligible", "quick_provider_unsupported", "route_changed", "cancelled",
-  "ai_not_configured", "agent_required", "agent_runtime_unsupported", "direct_provider_unsupported", "bad_execution_mode",
+  "ai_not_configured", "ai_source_not_configured", "agent_required", "agent_runtime_unsupported", "direct_provider_unsupported", "bad_execution_mode",
   "network_error", "http_error", "redirect", "bad_json", "upstream_error", "empty_choice",
   // 模型 API 拒绝 key / 限流 / 拒绝请求 / 地址跳转:文案是后端 publicApiFailure 写死的,不含上游原文
   "api_key_rejected", "api_rate_limited", "api_request_rejected", "api_redirect",
@@ -206,7 +206,11 @@ function requestRuntime(llm?: unknown): { llm: unknown; executionMode: Execution
     throw new ApiError("浏览器不让读本地存储（隐私模式？）—— 「接入 AI」的配置这一轮用不了", 400, "llm_unavailable");
   }
   if (r.status === "none" || !r.config) {
-    throw new ApiError("请先到「接入 AI」选择订阅或 API，连接成功后再使用 AI 功能", 409, "ai_not_configured");
+    // 本地没配:不再当场拒绝。llm 置 undefined —— JSON.stringify 会**整键省略**,
+    // 后端按「没传」走兜底链(后台默认 → 服务端镜像的本机订阅档;Codex r3 后门防线:
+    // 显式 "llm":null 依旧被边界校验拒绝,只有真没传才进兜底)。
+    // 浏览器存储被清/按源隔离导致本地没记录时,对话和研究照样走用户实测保存过的那家订阅。
+    return { llm: undefined, executionMode: "agent" };
   }
   return { llm: r.config.source, executionMode: "agent" };
 }

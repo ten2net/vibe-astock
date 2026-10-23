@@ -17,16 +17,31 @@ import { readAiRuntime, saveUserLlm, type LlmConfig } from "./llmStore.ts";
 
 const isCli = (provider: string): boolean => provider.startsWith("cli-");
 
-/** 页面启动时调用(与 hydrateNotes/hydrateWatch 并列):本地空 → 用服务端镜像恢复订阅档连接。 */
-export async function hydrateAiConnection(): Promise<void> {
+/**
+ * 页面启动时调用(与 hydrateNotes/hydrateWatch 并列):本地空 → 用服务端镜像恢复订阅档连接。
+ * 启动那一次可能撞上后端还没起好/网络抖:默认重试 3 次(1.5s/3s 退避)再放弃;
+ * 运行中组件发现仍无配置时用 hydrateAiConnectionOnce() 再补一轮(main.tsx 那轮失败的自愈)。
+ */
+export async function hydrateAiConnection(attempts = 3): Promise<void> {
   if (readAiRuntime().status !== "none") return;
-  try {
-    const { connection } = await backend.aiConnection();
-    if (!connection || !isCli(connection.provider)) return;
-    saveUserLlm({ provider: connection.provider, model: connection.model, baseURL: "", apiKey: "" });
-  } catch {
-    /* 镜像读不到(旧版本后端/网络抖)不是致命错误:保持未接入,用户可照常手动接入 */
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { connection } = await backend.aiConnection();
+      if (connection && isCli(connection.provider)) {
+        saveUserLlm({ provider: connection.provider, model: connection.model, baseURL: "", apiKey: "" });
+      }
+      return; // 拿到结果(含"没有镜像")就不再重试
+    } catch {
+      if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 1500 * (i + 1)));
+    }
   }
+}
+
+let hydrateInFlight: Promise<void> | null = null;
+/** 同一时刻只跑一次的恢复(main.tsx 与组件自愈共用,避免并发重复打镜像接口)。 */
+export function hydrateAiConnectionOnce(): Promise<void> {
+  hydrateInFlight ??= hydrateAiConnection(2).finally(() => { hydrateInFlight = null; });
+  return hydrateInFlight;
 }
 
 /** 「测试并保存」成功后调用:订阅档落一份服务端镜像;API 档清掉旧镜像(不替用户留过期选择)。 */

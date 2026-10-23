@@ -21,9 +21,10 @@ import { FETCH_ENV_KEYS, RUN_ID_RE, stages as packStages, fetchEnv } from "./con
 import { researchFailure } from "./research_failure.ts";
 import { runAlerts, InsufficientRunsError, type AlertDiff } from "./alerts.ts";
 import { NOFOLLOW_FLAG, nowIso, readJson, readJsonIfExists } from "./fsutil.ts";
+import { readAiConnection as storeRead, writeAiConnection as storeWrite, removeAiConnection as storeRemove, AiConnectionError, type MirroredAiConnection } from "./ai_connection_store.ts";
 import { ChatError, REPLY_TRUNCATED, applyGate, chatSend as chatSendCore, llmProbe as llmProbeCore, parseHeadlineTranslationReply, prepareHeadlineTranslation, translateHeadlines as translateHeadlinesCore, type ChatTurnResult, type HeadlineTranslationResult, type LlmProbeResult } from "./chat.ts";
 import { DirectTransportError, chatCompletion } from "./engines/direct_transport.ts";
-import { REQUEST_LLM_META_VAR, RUNTIME_KEY_VAR, assertExecutionMode, defaultLlm, requestLlmMeta, resolveDirectProvider, resolveRuntimeProvider, resolveSelectedRuntime, runtimeSourceFingerprint, RuntimeProviderError, templateMatrix, type LlmOverride, type DefaultSourceOptions } from "./runtime_provider.ts";
+import { REQUEST_LLM_META_VAR, RUNTIME_KEY_VAR, assertExecutionMode, defaultLlmOrMirror, requestLlmMeta, resolveDirectProvider, resolveRuntimeProvider, resolveSelectedRuntime, runtimeSourceFingerprint, RuntimeProviderError, templateMatrix, type LlmOverride, type DefaultSourceOptions } from "./runtime_provider.ts";
 import { DebateError, MAX_DEBATE_MESSAGE, DEBATE_TURN_TIMEOUT_MS, advanceDebate, startDebate, type DebateState } from "./debate.ts";
 import { IngestError, MAX_TOTAL_BYTES, ingestFiles as ingestFilesCore, type IngestFileInput, type IngestResult } from "./ingest.ts";
 import { LedgerError, checkRecord as checkLedgerRecord, insertRecords as insertLedgerRecords, kinds as ledgerKindDefs, labels as ledgerLabelDefs, listRecordsChecked, listRecords as listRecordsOf, removeRecord as removeLedgerRecord, replaceRecords as replaceLedgerRecords, upsertRecord as upsertLedgerRecord, type LedgerIssue, type LedgerRecord } from "./ledger.ts";
@@ -179,7 +180,8 @@ export function researchRuntimeEnv(ctx: Pick<ServiceContext, "repoRoot" | "dataR
   baseEnv: NodeJS.ProcessEnv = process.env, defaults: DefaultSourceOptions = {}): Record<string, string> {
   try {
     // defaults = 命令行对后台默认的临时覆盖(批量运行的 --provider / --model);页面请求自带 llm,用不到它
-    const selected = llm ?? defaultLlm(ctx.repoRoot, ctx.dataRoot, baseEnv, defaults);
+    // 页面没配/没带 llm 时按同一兜底链走:后台默认 → 服务端镜像的本机订阅档(与对话入口一致)
+    const selected = llm ?? defaultLlmOrMirror(ctx.repoRoot, ctx.dataRoot, baseEnv, defaults);
     const runtime = resolveRuntimeProvider(ctx.repoRoot, ctx.dataRoot, selected, baseEnv);
     const out: Record<string, string> = {};
     if (runtime.runtime === "local-agent") {
@@ -1241,48 +1243,27 @@ function credentialOrThrow(id: string) {
 }
 
 /**
- * 「接入 AI」页的服务端镜像:只镜像**订阅档**(cli-*)连接,那份配置里没有密钥 ——
- * 凭据在各自 CLI 自己的登录态里。浏览器 API key 按纪律**永不落服务端**(见 api.ts /chat 与 AGENTS.md 6.3),
- * 所以 API 档连接根本不镜像:换了浏览器/丢了本地存储,API 档本来就要重新填 key 实测。
- * 存在用户数据区(0600),容器重建不丢 —— 解决「测试并保存」成功、页面一刷新又变未接入
- * (浏览器存储被隐私模式/内嵌 WebView 清掉,或换了入口地址,localStorage 按源隔离)。
+ * 「接入 AI」页的服务端镜像(订阅档连接,无密钥)——薄封装,实现在 ai_connection_store.ts
+ * (那边不能 import service,否则和 runtime_provider 形成循环依赖)。
+ * 浏览器 API key 按纪律**永不落服务端**(见 api.ts /chat 与 AGENTS.md 6.3),API 档不镜像。
  */
-export interface MirroredAiConnection { provider: string; model: string }
-
-const AI_CONNECTION_FILE = "ai-connection.json";
-const CLI_PROVIDERS = new Set(["cli-codex", "cli-claude", "cli-codebuddy"]);
-
-function aiConnectionPath(ctx: Pick<ServiceContext, "dataRoot">): string {
-  return safePath(ctx, AI_CONNECTION_FILE);
-}
+export type { MirroredAiConnection } from "./ai_connection_store.ts";
 
 export function readAiConnection(ctx: Pick<ServiceContext, "dataRoot">): MirroredAiConnection | null {
+  return storeRead(ctx.dataRoot);
+}
+
+export function saveAiConnection(ctx: Pick<ServiceContext, "dataRoot">, body: unknown): MirroredAiConnection {
   try {
-    const raw = JSON.parse(fs.readFileSync(aiConnectionPath(ctx), "utf8")) as Partial<MirroredAiConnection>;
-    if (raw && typeof raw.provider === "string" && CLI_PROVIDERS.has(raw.provider) && typeof raw.model === "string" && raw.model.trim()) {
-      return { provider: raw.provider, model: raw.model };
-    }
-    return null;
-  } catch {
-    return null;
+    return storeWrite(ctx.dataRoot, body);
+  } catch (error) {
+    if (error instanceof AiConnectionError) throw new ServiceError(error.code, error.message);
+    throw error;
   }
 }
 
-/** 镜像写入:只收订阅档 provider/model;请求里若带 apiKey 一律拒绝 —— 密钥永远不进这个文件 */
-export function saveAiConnection(ctx: Pick<ServiceContext, "dataRoot">, body: unknown): MirroredAiConnection {
-  const b = body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {};
-  if (typeof b.apiKey === "string" && b.apiKey) throw new ServiceError("bad_ai_connection", "服务端镜像只存订阅档连接,不接受 API key");
-  const provider = typeof b.provider === "string" ? b.provider : "";
-  const model = typeof b.model === "string" ? b.model.trim() : "";
-  if (!CLI_PROVIDERS.has(provider)) throw new ServiceError("bad_ai_connection", "服务端镜像只支持本机订阅 Agent(claude / codex / codebuddy)");
-  if (!model || model.length > 100) throw new ServiceError("bad_ai_connection", "模型标识不合规");
-  const conn: MirroredAiConnection = { provider, model };
-  fs.writeFileSync(aiConnectionPath(ctx), JSON.stringify(conn), { mode: 0o600 });
-  return conn;
-}
-
 export function clearAiConnection(ctx: Pick<ServiceContext, "dataRoot">): void {
-  try { fs.unlinkSync(aiConnectionPath(ctx)); } catch { /* 没有就当作已清除 */ }
+  storeRemove(ctx.dataRoot);
 }
 
 /** 设置页选填凭据的状态(垂类声明,见 Plugin.savedCredentials):只给来源和打码后的样子,不回传原文 */
