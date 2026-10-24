@@ -141,6 +141,9 @@ cd .. && node orchestrator/src/run.ts --symbol 300308 --market SZ --provider cli
   `get_evidence` / `list_runs` / `knowledge_recall`;`--repo-root` 或 `VRA_REPO_ROOT` 指定仓库)。接进你自己的 Agent,例如
   `claude mcp add vibe-research -- node <仓库绝对路径>/orchestrator/src/mcp.ts` 或 `codex mcp add vibe-research -- node <仓库绝对路径>/orchestrator/src/mcp.ts`
   (写进使用者自己的 Agent 配置,由使用者决定)。`start_research` 用后台默认 AI 来源,没有配置就报错。
+  Cursor / Windsurf 在 `.cursor/mcp.json`(或设置 → MCP)加 `{"mcpServers":{"vibe-research":{"command":"node","args":["<仓库绝对路径>/orchestrator/src/mcp.ts"]}}}`;
+  后台默认 AI 来源在 `<数据根>/config.json` 的 `provider.profile` 或环境变量 `VRA_PROVIDER`(如 `cli-claude` / `cli-codex`),模型 API 的 key 只从环境变量读。
+  只读场景(取数 / 校验)不需要 AI 来源:工具上传 `no_agent=true` 即可。
 - **HTTP API** `node orchestrator/src/api.ts [--port 8770]`:页面背后的本机服务,默认只绑 127.0.0.1;**每个请求都要鉴权**
   (`Authorization: Bearer <token>`,token 取 `VRA_API_TOKEN`,否则自动生成并写入 `.local/api.token`,权限 0600);
   非本机 Origin / 跨站 Sec-Fetch-Site / 非 `application/json` 的 POST 一律拒绝(防浏览器 CSRF);绑非回环地址必须显式设 `VRA_API_TOKEN`。
