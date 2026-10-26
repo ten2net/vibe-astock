@@ -132,7 +132,13 @@ export function detectSidewaysRise(series: readonly FflowPoint[], denomYuan: num
 
 type Fetch = (ctx: ServiceContext, req: Parameters<typeof fetchEndpoint>[1]) => Promise<Pick<FetchResult, "envelope">>;
 
-interface RankRow { code: string; name: string; price: number | null; pct: number | null; main_net: number | null; float_cap: number | null }
+interface RankRow {
+  code: string; name: string; price: number | null;
+  /** 今日涨跌幅,**百分数单位**(3.2 = +3.2%),与 watch 视图/前端 signed() 一致;
+   *  榜单源(新浪/东财)给小数比率,这里统一换算。 */
+  pct: number | null;
+  main_net: number | null; float_cap: number | null;
+}
 
 const extraOf = (env: unknown): Record<string, unknown> => {
   const e = (env as { extra?: unknown } | null)?.extra;
@@ -146,7 +152,8 @@ function rankRows(env: unknown): RankRow[] {
     const o = r as Record<string, unknown>;
     return {
       code: str(o.code), name: str(o.name) || str(o.code),
-      price: num(o.price), pct: num(o.pct),
+      price: num(o.price),
+      pct: (() => { const p = num(o.pct); return p === null ? null : Math.round(p * 10000) / 100; })(),
       main_net: num(o.main_net), float_cap: num(o.float_cap),
     };
   }).filter((r) => /^\d{6}$/.test(r.code));

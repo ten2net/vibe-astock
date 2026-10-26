@@ -28,7 +28,8 @@ export const PACK_TERMS = [
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const wan = (yuan) => (num(yuan) === null ? "—" : `${(yuan / 1e4).toFixed(0)}万`);
-const pct = (v) => (num(v) === null ? "—" : `${v > 0 ? "+" : ""}${(v * 100).toFixed(2)}%`);
+// pct 已是百分数单位(后端视图统一换算过,3.2 = +3.2%)
+const pct = (v) => (num(v) === null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
 const cell = (v) => (v === null || v === undefined || v === "" ? "—" : String(v));
 
 /** 资金榜(横盘→拉升)一节。视图形状见 watchTypes.ts FflowView。 */

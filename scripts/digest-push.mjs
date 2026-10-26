@@ -30,7 +30,8 @@ export function buildDigest(view, opts = {}) {
   const day = view?.day ?? "今日";
   const link = opts.link ?? "";
   const wan = (yuan) => (typeof yuan === "number" && Number.isFinite(yuan) ? `${(yuan / 1e4).toFixed(0)}万` : "—");
-  const pct = (v) => (typeof v === "number" && Number.isFinite(v) ? `${v > 0 ? "+" : ""}${(v * 100).toFixed(2)}%` : "—");
+  // pct 已是百分数单位(后端视图统一换算过,3.2 = +3.2%)
+  const pct = (v) => (typeof v === "number" && Number.isFinite(v) ? `${v > 0 ? "+" : ""}${v.toFixed(2)}%` : "—");
   const lines = [
     `**分时资金 · 横盘后拉升榜(${day})**`,
     `扫描 ${view?.total_scanned ?? "—"} 只,命中 ${view?.matched ?? 0} 只 · 通道:${view?.source_label ?? "—"}`,

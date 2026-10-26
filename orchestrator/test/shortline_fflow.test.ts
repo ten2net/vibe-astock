@@ -97,7 +97,7 @@ function tmpCtx(): ServiceContext {
 const rankEnv = (codes: string[]) => ({
   // 新浪榜 schema:不给 float_cap(分母回落到当日成交额),带 amount
   extra: {
-    rows: codes.map((c, i) => ({ rank: i + 1, code: c, name: `股${c}`, price: 10 + i, pct: 1.5, main_net: 5e7 - i * 1e6, float_cap: null, amount: 8e8 })),
+    rows: codes.map((c, i) => ({ rank: i + 1, code: c, name: `股${c}`, price: 10 + i, pct: 0.015, main_net: 5e7 - i * 1e6, float_cap: null, amount: 8e8 })),
     total: 5000,
   },
 });
@@ -133,6 +133,7 @@ test("视图:取榜→逐只识别→按 score 取前 20,结果带通道标注�
     assert.ok(calls.some((c) => c.includes("tx_minute_today:600000")), "分钟线走腾讯通道");
     assert.ok(!calls.some((c) => c.includes("em_fund_flow_minute")), "主通道可用时不该碰东财分钟");
     assert.equal(v1.stocks[0]!.flat_minutes % 5, 0, "5 分钟桶换算成分钟");
+    assert.equal(v1.stocks[0]!.pct, 1.5, "榜单源是小数比率(0.015),视图统一输出百分数单位(1.5)");
     const callsAfterFirst = calls.length;
     const v2 = await shortlineFflow(ctx, {}, new AbortController().signal, { fetch: fetch as never, now: () => now + 10_000 }) as FflowView;
     assert.equal(calls.length, callsAfterFirst, "45s 内必须走缓存,不再取数");
@@ -149,7 +150,7 @@ test("视图:主通道(新浪)不通时兜底东财通道;分母用流通市值"
     const fetch = async (_c: unknown, req: { endpoint?: string; symbol?: string }) => {
       if (req.endpoint === "sina_market_money_rank") return { envelope: { extra: { rows: [] } } };
       if (req.endpoint === "em_market_main_net_rank") {
-        return { envelope: { extra: { rows: [{ code: "600519", name: "贵州茅台", price: 1335, pct: 1.76, main_net: 5.2e8, float_cap: CAP, amount: 7.6e9 }] } } };
+        return { envelope: { extra: { rows: [{ code: "600519", name: "贵州茅台", price: 1335, pct: 0.0176, main_net: 5.2e8, float_cap: CAP, amount: 7.6e9 }] } } };
       }
       return { envelope: minuteEnv(makeBars(240, 100, 4, 80), "2026-10-23 15:00:00", null, 1) };
     };

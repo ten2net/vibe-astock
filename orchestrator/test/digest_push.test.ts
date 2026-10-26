@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+// @ts-ignore 纯 JS 脚本无类型声明,以运行时行为为准(同目录测试覆盖)
 import { buildDigest } from "../../scripts/digest-push.mjs";
 
 const VIEW = {
@@ -10,8 +11,8 @@ const VIEW = {
   with_data: 150,
   matched: 6,
   stocks: [
-    { code: "300307", name: "慈星股份", pct: 0.061, main_net: 3.2e8, flat_minutes: 15, rise_minutes: 185, rise_bp: 4038.93 },
-    { code: "002241", name: "歌尔股份", pct: 0.021, main_net: 1.9e8, flat_minutes: 20, rise_minutes: 180, rise_bp: 3422.64 },
+    { code: "300307", name: "慈星股份", pct: 6.10, main_net: 3.2e8, flat_minutes: 15, rise_minutes: 185, rise_bp: 4038.93 },
+    { code: "002241", name: "歌尔股份", pct: 2.10, main_net: 1.9e8, flat_minutes: 20, rise_minutes: 180, rise_bp: 3422.64 },
     { code: "000559", name: "万向钱潮", pct: null, main_net: null, flat_minutes: 105, rise_minutes: 80, rise_bp: 3323.36 },
   ],
   notes: [],

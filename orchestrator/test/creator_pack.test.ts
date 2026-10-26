@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+// @ts-ignore 纯 JS 脚本无类型声明,以运行时行为为准(同目录测试覆盖)
 import { PACK_TERMS, buildPack, fflowSection, structureSection, weeklySection } from "../../scripts/export-pack.mjs";
 
 const FFLOW = {
   day: "2026-10-24", as_of: "2026-10-24 15:00:00", source_label: "新浪资金流榜 + 腾讯分钟线估算",
   total_scanned: 150, with_data: 150, matched: 2, poll_ms: 60_000,
   stocks: [
-    { code: "300307", name: "慈星股份", pct: 0.002, main_net: 3.19e8, float_cap: 1e10, points: 50, flat_minutes: 15, rise_minutes: 185, flat_band_bp: 1.98, rise_bp: 4038.93, up_ratio: 0.76, score: 3933.2, series_bp: [1, 2] },
-    { code: "002241", name: "歌尔股份", pct: 0.001, main_net: 8.99e8, float_cap: 2e10, points: 50, flat_minutes: 20, rise_minutes: 180, flat_band_bp: 1.35, rise_bp: 3422.64, up_ratio: 0.75, score: 3403.7, series_bp: [1] },
+    { code: "300307", name: "慈星股份", pct: 0.20, main_net: 3.19e8, float_cap: 1e10, points: 50, flat_minutes: 15, rise_minutes: 185, flat_band_bp: 1.98, rise_bp: 4038.93, up_ratio: 0.76, score: 3933.2, series_bp: [1, 2] },
+    { code: "002241", name: "歌尔股份", pct: 0.10, main_net: 8.99e8, float_cap: 2e10, points: 50, flat_minutes: 20, rise_minutes: 180, flat_band_bp: 1.35, rise_bp: 3422.64, up_ratio: 0.75, score: 3403.7, series_bp: [1] },
   ],
   notes: ["名单:资金流榜前 150 只"],
 };
