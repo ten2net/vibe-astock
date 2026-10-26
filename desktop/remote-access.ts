@@ -149,7 +149,7 @@ export function createAccessGate(token: string, opts: AccessGateOptions = {}): M
   const expected = digest(token);
   const matches = (value: string | null) => value !== null && timingSafeEqual(digest(value), expected);
   // 邀测版:在令牌表里按常量时间比对找受邀者记录;主口令优先,表是增量能力
-  const findInvite = (value: string | null): InviteTokenEntry | null | undefined => {
+  const findInvite = (value: string | null): InviteTokenEntry | undefined => {
     if (!opts.store || value === null) return undefined;
     const hv = digest(value);
     return opts.store.list().find((e) => timingSafeEqual(hv, digest(e.token)));
@@ -174,7 +174,7 @@ export function createAccessGate(token: string, opts: AccessGateOptions = {}): M
         return;
       }
       const invite = findInvite(given);
-      if (invite === undefined) { deny(req, res); return; }
+      if (!invite) { deny(req, res); return; }
       if (isInviteExpired(invite)) { denyTrialExpired(req, res, invite.expires_at ?? null, opts.renewUrl ?? undefined); return; }
       // 受邀者:cookie 的有效期截到试用到期日,过期自然失效
       url.searchParams.delete(ACCESS_PARAM);
@@ -195,7 +195,7 @@ export function createAccessGate(token: string, opts: AccessGateOptions = {}): M
     if (matches(cookieValue(req, ACCESS_COOKIE))) { next(); return; }
     // 邀测版:主口令不匹配再受邀者表;过期给续费指路,没到期放行
     const invite = findInvite(cookieValue(req, ACCESS_COOKIE));
-    if (invite === undefined) { deny(req, res); return; }
+    if (!invite) { deny(req, res); return; }
     if (isInviteExpired(invite)) { denyTrialExpired(req, res, invite.expires_at ?? null, opts.renewUrl ?? undefined); return; }
     next();
   };
