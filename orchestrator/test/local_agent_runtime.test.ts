@@ -130,6 +130,7 @@ let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>input+
     return;
   }
   if(process.env.FAKE_EXEC_NOT_LOGGED==='1'){console.log('Authentication required. Please use /login command to sign in to your account');return}
+  if(process.env.FAKE_MAX_TURNS==='1'){console.log('E: Max turns (32) exceeded');process.exit(0)}
   const profiles=['HOME','USERPROFILE','APPDATA','LOCALAPPDATA'].every(k=>!process.env['FAKE_BASE_'+k]||process.env[k]!==process.env['FAKE_BASE_'+k]);
   const result={result:input+'|api='+Boolean(process.env.CODEBUDDY_API_KEY)+'|token='+Boolean(process.env.CODEBUDDY_AUTH_TOKEN)+'|base='+Boolean(process.env.CODEBUDDY_BASE_URL)+'|tools='+a.slice(a.indexOf('--tools'),a.indexOf('--tools')+2).join(':')+'|memory='+process.env.CODEBUDDY_DISABLE_AUTO_MEMORY+'|ephemeral='+Boolean(process.env.FAKE_BASE_HOME&&process.env.HOME!==process.env.FAKE_BASE_HOME)+'|profiles='+profiles+'|noSession='+a.includes('--no-session-persistence')+'|permission='+a[a.indexOf('--permission-mode')+1]};
   if(process.env.FAKE_ECHO_MCP_ENV==='1') result.result+='|wait='+process.env.CODEBUDDY_WAIT_FOR_MCP_SERVERS_ENABLED+'|prewait='+process.env.CODEBUDDY_FIRST_RUN_MCP_PREWAIT_TIMEOUT_MS;
@@ -892,6 +893,16 @@ test("WorkBuddy 桌面端旧 CLI 复用现有订阅登录，但回答只在一�
     });
     assert.equal(out, "USER_SECRET_PROMPT|api=false|token=true|base=false|tools=--tools:|memory=1|ephemeral=true|profiles=true|noSession=false|permission=default");
     assert.deepEqual(fs.readdirSync(baseHome), [], "真实 WorkBuddy 用户目录不得写入运行会话");
+  } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test("CodeBuddy 在工具轮上限处结束会话(exit 0 + 纯文本)报 agent_turn_cap，不冒充坏输出", async () => {
+  const f = fakeCodeBuddy();
+  try {
+    await assert.rejects(runLocalAgent("codebuddy", {
+      systemPrompt: "规则", userPrompt: "做估值阶段",
+      env: { ...PLATFORM_ENV, CODEBUDDY_BIN: f.bin, PATH: process.env.PATH, FAKE_MAX_TURNS: "1" },
+    }), (e: unknown) => e instanceof LocalAgentError && e.code === "agent_turn_cap");
   } finally { fs.rmSync(f.dir, { recursive: true, force: true }); }
 });
 

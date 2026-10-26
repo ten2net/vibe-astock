@@ -144,15 +144,25 @@ export class LocalAgentStageAgent implements AgentRunner {
               VRA_PYTHON: this.#options.python,
             },
             allowedTools,
-            maxTurns: 32,
+            // 2026-10-26 顺网科技深挖实测:valuation/risk 的 calculate+write_stage 轮数超过 32,
+            // CLI 在上限处结束(exit 0 + 纯文本)曾连废 5 轮。放宽到 96 并配合 turn_cap 优雅处理
+            // (撞上限 = 收工检查/续跑,不再整轮作废)。
+            maxTurns: 96,
           },
         });
       } catch (error) {
+        if (error instanceof LocalAgentError && error.code === "agent_turn_cap") {
+          // CLI 在工具轮上限处结束会话:等价于模型主动收工 —— 工具产物已落盘,缺最终汇报。
+          // 不当失败处理(否则产物恰好过校验也会被整轮作废重跑);交给下面的收工检查裁决:
+          // 产物齐 → 收工;缺 → 带问题清单起续跑会话(与正常收工未过完全同一条路)。
+          this.log(stage, "local_agent.turn_capped", { attempt, session: sessions, agent: this.#options.agent });
+        } else {
         failed = error instanceof LocalAgentError ? `${error.code}: ${error.message}` : error instanceof Error ? error.message : String(error);
         if (error instanceof LocalAgentError && FATAL_LOCAL_AGENT_ERRORS.has(error.code)) fatal = error;
         this.log(stage, "local_agent.turn_failed", { attempt, session: sessions, agent: this.#options.agent,
           code: error instanceof LocalAgentError ? error.code : "unknown", message: failed });
         break;
+        }
       }
       // 会话正常结束 = 大脑想收工:过收工检查
       const verdict = guard.check();

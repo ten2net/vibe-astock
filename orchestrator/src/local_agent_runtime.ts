@@ -1568,7 +1568,9 @@ export async function runLocalAgent(agent: LocalAgentId, opts: RunLocalAgentOpti
         // Windows：taskkill /F 之后 stdio 管道收尾与子树退出可能超过 2 秒，实测出现
         // "进程树退出未确认"的假阴性（2026-10-14，vibe-astock 旧架构上复现）。确认窗口
         // 放宽到 5 秒，期间树仍活着就每秒补一次 KILL；确认成功或窗口耗尽才落定。
-        const confirmWindowMs = process.platform === "win32" ? 5_000 : 2_000;
+        // POSIX 同样 5 秒:2026-10-26 深挖运行超时杀树时,CodeBuddy 的 MCP/快照子进程
+        // 收尾超过原 2 秒窗口,整次运行被误报 agent_shutdown_failed 中止。
+        const confirmWindowMs = 5_000;
         const retryKillMs = process.platform === "win32" ? 1_000 : confirmWindowMs;
         const hardKillAt = Date.now();
         let lastKill = hardKillAt;
@@ -1646,6 +1648,14 @@ export async function runLocalAgent(agent: LocalAgentId, opts: RunLocalAgentOpti
         } catch (error) {
           // CodeBuddy 2.143.1 在未登录时会以 exit 0 输出一行纯文本，而不是 JSON。
           // 只有解析已经失败时才把已知的登录 / 限流诊断升级为受控错误，避免误读正常模型回答。
+          // 🔴 CLI 在**工具轮上限**处结束会话(exit 0 + 纯文本 "Max turns (N) exceeded")不是执行失败:
+          //    工具产物已落盘,缺的只是最终汇报。按 agent_turn_cap 交给阶段运行器走收工检查
+          //    (产物齐 → 收工;不齐 → 续跑会话),不再误判成整轮作废 —— 2026-10-26 顺网科技深挖
+          //    valuation/risk 因此连废 5 轮、运行中止。
+          if (agent === "codebuddy" && code === 0 && /max turns?(\s*\(\d+\))?\s*exceeded/i.test(stdout)) {
+            reject(new LocalAgentError("agent_turn_cap", `${label} 达到单会话工具轮上限，会话已结束（产物以运行目录为准）`));
+            return;
+          }
           const classified = failureMessage(agent, diagnostics, stderr, code);
           reject(classified.code === "agent_failed" ? error : classified);
         }

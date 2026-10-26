@@ -77,6 +77,25 @@ test("本机订阅 Agent 失败转成 turn failure，不把它冒充成模型空
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test("工具轮上限(agent_turn_cap)不当轮失败:产物过收工检查则照常收工", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vra-local-stage-cap-"));
+  const runDir = path.join(root, "run");
+  fs.mkdirSync(path.join(runDir, "stages"), { recursive: true });
+  try {
+    const runner = new LocalAgentStageAgent({ agent: "codebuddy", runId: "cap", runDir,
+      repoRoot: root, python: "python3", eventsPath: path.join(runDir, "events.jsonl"), timeoutMs: 10_000,
+      complete: async () => {
+        fs.writeFileSync(path.join(runDir, "stages", "profile.json"), "{}\n");
+        throw new LocalAgentError("agent_turn_cap", "CodeBuddy 达到单会话工具轮上限，会话已结束（产物以运行目录为准）");
+      } });
+    const result = await runner.runTurn("profile", 1, "做公司画像");
+    assert.equal(result.failed, null, "turn_cap 不得记成轮失败");
+    const events = fs.readFileSync(path.join(runDir, "events.jsonl"), "utf8");
+    assert.match(events, /local_agent\.turn_capped/);
+    assert.doesNotMatch(events, /local_agent\.turn_failed/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test("本机订阅 Agent 登录失效时立即终止研究，不做无意义的阶段重试", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vra-local-stage-auth-"));
   try {

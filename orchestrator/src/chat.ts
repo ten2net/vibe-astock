@@ -189,6 +189,7 @@ function publicLocalAgentFailure(error: LocalAgentError): ChatError {
     agent_cancelled: "本地 Agent 请求已取消。",
     unsupported_cli: "当前只支持已经接通的本地 Agent。请到「接入 AI」重新选择。",
     agent_bad_output: "本地 Agent 本轮没有返回可用结果。请重试，或到「接入 AI」检查当前连接。",
+    agent_turn_cap: "本地 Agent 本轮工具调用达到上限，已停止。请把问题拆小一点再问一次。",
     agent_failed: "本地 Agent 本轮没有返回可用结果。请重试，或到「接入 AI」检查当前连接。",
     agent_empty_output: "本地 Agent 本轮没有返回可用结果。请重试，或到「接入 AI」检查当前连接。",
     agent_start_failed: "本地 Agent 本轮没有返回可用结果。请重试，或到「接入 AI」检查当前连接。",
