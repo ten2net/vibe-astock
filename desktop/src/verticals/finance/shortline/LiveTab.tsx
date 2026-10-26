@@ -13,7 +13,7 @@ import { finite, pctColor, signed, yi } from "./format";
 import { GapsAndSource } from "./ViewBits";
 import { useWatchPoll } from "./useWatchPoll";
 import { FflowSection } from "./FflowPanel";
-import { StockName } from "./StockLink";
+import { StockName } from "../components/StockLink";
 import type { AlertKind, LadderWatchRow, WatchAlert, WatchRow, WatchView } from "./watchTypes";
 
 export const THRESHOLDS = [1.5, 3, 5];

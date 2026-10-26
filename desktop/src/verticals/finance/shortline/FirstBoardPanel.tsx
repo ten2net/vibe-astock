@@ -8,6 +8,7 @@ import { useAiDraft } from "../../../core/ai/pageContext";
 import { cn } from "@/lib/utils";
 import { Caliber } from "./Caliber";
 import { finite, hhmm, pctColor, safeArray, signed, yi } from "./format";
+import { StockNameWithWatch } from "../components/StockLink";
 import type { FirstBoardResult, FirstBoardStock } from "./types";
 
 /** 问 AI 这只票为什么涨停:只给已发生的客观数据,约束照 VA 原样(不预测个股、不给参与倾向) */
@@ -66,7 +67,7 @@ export function FirstBoardPanel({ fb }: { fb: FirstBoardResult }) {
               {stocks.map((s) => (
                 <tr key={s.code} className="border-b border-border/30">
                   <td className="whitespace-nowrap px-2 py-1.5">
-                    <span className="font-medium">{s.name}</span> <span className="text-[10px] text-muted-foreground">{s.code}</span>
+                    <StockNameWithWatch code={s.code} name={s.name} className="font-medium" /> <span className="text-[10px] text-muted-foreground">{s.code}</span>
                     {s.rebound && <span className="ml-1 rounded bg-warning/15 px-1 text-[10px] font-bold text-warning">反包</span>}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 font-mono text-muted-foreground">{hhmm(s.first_seal)}</td>

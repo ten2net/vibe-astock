@@ -19,6 +19,7 @@ import { ReviewTiersCard } from "@/components/ReviewTiersCard";
 import { TIER_PROMPT_RULES, tiersSummary, type ReviewTiersResult } from "@/lib/reviewTiers";
 import { BREADTH_RULE, SPECULATION_RULE, aboveMa, blockOf, parseReview, reviewLines, staleNote, yiText, type ReviewBlockId } from "@/lib/marketReview";
 import { cn } from "@/lib/utils";
+import { StockNameWithWatch } from "../components/StockLink";
 
 // A股红涨绿跌。全球市场（美股/港股指数）**也沿用红涨**——与整个看板及东财等中国平台一致，
 // 对中国用户最不易看错（Simon 2026-07-05 确认；非国际绿涨惯例，是有意选择，勿改）。
@@ -524,7 +525,7 @@ export function DailyReview() {
                   <tbody>
                     {lianban.slice(0, 40).map((s) => (
                       <tr key={s.code} className="border-b border-border/30">
-                        <td className="whitespace-nowrap px-2 py-2"><span className="font-medium">{s.name || s.code}</span> <span className="text-xs text-muted-foreground/60">{s.code}</span></td>
+                        <td className="whitespace-nowrap px-2 py-2"><StockNameWithWatch code={s.code} name={s.name} className="font-medium" /> <span className="text-xs text-muted-foreground/60">{s.code}</span></td>
                         <td className="whitespace-nowrap px-2 py-2 font-mono font-bold text-primary">{s.boards} 板</td>
                         <td className="px-2 py-2 font-mono text-xs">{s.firstSeal ?? "—"}</td>
                         <td className="px-2 py-2 font-mono">{fmt(s.price)}</td>
@@ -660,7 +661,7 @@ export function DailyReview() {
                   {TV.rows.map((s, i) => (
                     <tr key={s.code} className="border-b border-border/30">
                       <td className="px-2 py-2 font-mono text-xs text-muted-foreground/50">{i + 1}</td>
-                      <td className="whitespace-nowrap px-2 py-2"><span className="font-medium">{s.name || s.code}</span> <span className="text-xs text-muted-foreground/60">{s.code}</span></td>
+                      <td className="whitespace-nowrap px-2 py-2"><StockNameWithWatch code={s.code} name={s.name} className="font-medium" /> <span className="text-xs text-muted-foreground/60">{s.code}</span></td>
                       <td className="px-2 py-2 font-mono">{fmt(s.price)}</td>
                       <td className={cn("px-2 py-2 font-mono", pctColor(s.pct))}>{pctText(s.pct)}</td>
                       <td className="whitespace-nowrap px-2 py-2 font-mono">{yiText(s.amount)}</td>
@@ -689,7 +690,7 @@ export function DailyReview() {
                     {col.rows.map((x) => (
                       <div key={x.code} className="border-b border-border/30 pb-1.5 text-sm last:border-0">
                         <div className="flex items-center gap-2">
-                          <span className="flex-1 truncate"><span className="font-medium">{x.name || x.code}</span> <span className="text-xs text-muted-foreground/60">{x.code}</span></span>
+                          <span className="flex-1 truncate"><StockNameWithWatch code={x.code} name={x.name} className="font-medium" /> <span className="text-xs text-muted-foreground/60">{x.code}</span></span>
                           <span className={cn("font-mono text-xs", pctColor(x.pct))}>{pctText(x.pct)}</span>
                           <span className={cn("w-24 text-right font-mono text-xs", pctColor(x.net))}>{signedYi(x.net)}</span>
                         </div>

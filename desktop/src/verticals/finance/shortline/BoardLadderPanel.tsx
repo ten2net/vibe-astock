@@ -8,6 +8,7 @@ import { AlertCircle, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Caliber } from "./Caliber";
 import { DOWN_TEXT, finite, hhmm, pctColor, rate, safeArray, signed, yi } from "./format";
+import { StockNameWithWatch } from "../components/StockLink";
 import type { BoardLadderResult, LadderFell, LadderLevel, LadderStock } from "./types";
 
 const CALIBER =
@@ -40,7 +41,7 @@ function StockChip({ s }: { s: LadderStock }) {
   const tags = safeArray<string>(s.tags).slice(0, 2);
   return (
     <li title={stockTitle(s)} className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 rounded-lg border border-danger/30 bg-danger/[0.06] px-2 py-1 text-[12px]">
-      <b className="font-semibold">{s.name}</b>
+      <b className="font-semibold"><StockNameWithWatch code={s.code} name={s.name} /></b>
       {s.rebound && <span className="rounded bg-warning/15 px-1 text-[10px] font-bold text-warning">{s.label}</span>}
       {s.board && s.board !== "10cm" && <span className="text-[10px] text-muted-foreground">{s.board}</span>}
       <span className="font-mono text-[10px] text-muted-foreground">{hhmm(s.first_seal)}</span>
@@ -53,7 +54,7 @@ function StockChip({ s }: { s: LadderStock }) {
 function FellChip({ f }: { f: LadderFell }) {
   return (
     <li title={`${f.name} ${f.code} · 昨天 ${f.prev_label} · 今天${f.outcome}`} className="inline-flex items-baseline gap-1 rounded-lg border border-dashed border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground">
-      <span>{f.name}</span>
+      <StockNameWithWatch code={f.code} name={f.name} />
       {f.prev_label !== `${f.prev_boards}板` && <span className="text-[10px]">({f.prev_label})</span>}
       <span className={OUTCOME_TEXT[f.outcome] ?? "text-muted-foreground"}>{f.outcome}</span>
       <span className={cn("font-mono", pctColor(f.ret))}>{signed(f.ret)}</span>

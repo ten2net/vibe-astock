@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { Section } from "./FactsPanels";
 import { useWatchCodes } from "../hooks/useWatchCodes";
 import { finite, pctColor, signed } from "./format";
-import { StockName, WatchToggle } from "./StockLink";
+import { StockName, WatchToggle } from "../components/StockLink";
 import type { FflowCandidate, FflowView } from "./watchTypes";
 
 const wan = (yuan: number | null) => (yuan === null || !Number.isFinite(yuan) ? "—" : `${(yuan / 1e4).toFixed(0)}万`);

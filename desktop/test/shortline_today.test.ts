@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement } from "react";
-import { textOf, withRenderer } from "./helpers/render.ts";
+import { routed, textOf, withRenderer } from "./helpers/render.ts";
 
 const FX = JSON.parse(readFileSync(new URL("./fixtures/shortline-2026-10-09.json", import.meta.url), "utf8"));
 const done = (result: unknown, extra: Record<string, unknown> = {}) => ({
@@ -17,12 +17,14 @@ async function renderToday(panels: Record<string, unknown>, day: string | null =
     const { TodayTab } = await r.load("/src/verticals/finance/shortline/TodayTab.tsx");
     const { AiPageProvider } = await r.load("/src/core/ai/pageContext.tsx");
     const Page = () => createElement(AiPageProvider, null, createElement(TodayTab, { day, panels }));
-    return textOf(r.html(Page, {}));
+    // 页面里的股票名带 <Link>（去研究 / 自选），SSR 要包 MemoryRouter
+    return textOf(await routed(r)(Page, {}));
   });
 }
 
 test("今日情绪：四项读数、反馈矩阵、梯队断层、题材、首板都画出来，数字和真实数据一致", async () => {
   const t = await renderToday(ALL);
+  assert.match(t, /首板名单/, "首板名单在页内");
   assert.match(t, /复盘日 2026-10-09 ,对比前一交易日 2026-10-08/);
   assert.match(t, /涨停 \d+ 家\(前一交易日 \d+ 家\)/);
   // 赚钱效应：中位 +1.95%、翻红率 63%（0.628）、样本 43 只
@@ -133,10 +135,18 @@ test("连板天梯:反包标「N天M板」;前一天池子没取到时不写晋�
     const two = someNoReason.ladder.levels.find((l: { boards: number }) => l.boards === 2);
     two.stocks.push({ ...two.stocks[0], code: "920111", name: "北交股", board: "北交所", reason: "", tags: [] });
     const { BoardLadderPanel } = await r.load("/src/verticals/finance/shortline/BoardLadderPanel.tsx");
-    const html = r.html(BoardLadderPanel, { r: someNoReason });
+    const html = await routed(r)(BoardLadderPanel, { r: someNoReason });
     assert.match(textOf(html), /;1 只沪深涨停股没有原因/);
     assert.match(html, /涨停原因:同花顺不收录北交所/);
     assert.doesNotMatch(html, /涨停原因:没取到/);
+    // 天梯里的股票名：雪球链接 + 去研究 + 自选开关（三样并列，不嵌套）
+    const first = two.stocks[0];
+    // 001300 是深市（SZ 前缀）；沪市 60/68 才是 SH
+    const sym = /^[68]/.test(first.code) ? "SH" : "SZ";
+    assert.match(html, new RegExp(`href="https://xueqiu.com/S/${sym}${first.code}"`), "名称链到雪球");
+    assert.match(html, new RegExp(`<a[^>]+aria-label="去研究"[^>]+href="/research\\?symbol=${first.code}"`));
+    assert.match(html, /<\/a><button[^>]+aria-label="加入自选"|<\/a><button[^>]+aria-label="移出自选"/, "星标在链接之外");
+    assert.doesNotMatch(html, /href="\/research[^"]*"[^>]*>\s*<button/, "去研究里不能套按钮");
   });
 });
 
