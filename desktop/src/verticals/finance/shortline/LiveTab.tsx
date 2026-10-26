@@ -13,6 +13,7 @@ import { finite, pctColor, signed, yi } from "./format";
 import { GapsAndSource } from "./ViewBits";
 import { useWatchPoll } from "./useWatchPoll";
 import { FflowSection } from "./FflowPanel";
+import { StockName } from "./StockLink";
 import type { AlertKind, LadderWatchRow, WatchAlert, WatchRow, WatchView } from "./watchTypes";
 
 export const THRESHOLDS = [1.5, 3, 5];
@@ -66,7 +67,7 @@ function Price({ r }: { r: WatchRow }) {
 }
 
 function Name({ r }: { r: WatchRow }) {
-  return <span className="whitespace-nowrap"><span className="font-medium">{r.name}</span> <span className="font-mono text-[11px] text-muted-foreground">{r.code}</span></span>;
+  return <span className="whitespace-nowrap"><StockName code={r.code} name={r.name} className="font-medium" /> <span className="font-mono text-[11px] text-muted-foreground">{r.code}</span></span>;
 }
 
 type Col = { key: string; head: string; cell: (r: never) => ReactNode; className?: string };
@@ -136,7 +137,7 @@ function AlertFeed({ v, threshold, scope, onThreshold, onScope }: { v: WatchView
             <li key={`${a.ts}-${a.code}-${a.kind}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
               <span className="font-mono text-muted-foreground">{a.ts}</span>
               <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-medium", KIND_STYLE[a.kind])}>{a.kind}</span>
-              <span className="font-medium">{a.name}</span>
+              <StockName code={a.code} name={a.name} className="font-medium" />
               <span className="font-mono text-[11px] text-muted-foreground">{a.code}</span>
               <span className="text-muted-foreground">{a.msg}</span>
               {a.sources.map((s) => <span key={s} className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{s}</span>)}

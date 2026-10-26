@@ -473,6 +473,28 @@ scripts/start --remote --no-open --public-url https://<平台给页面端口（�
 - 远程模式的页面端口不会自动换（云平台映射的是固定端口）：5940 被占用时先停掉占用它的程序，或用 `--port` 换成平台开放的端口。
 - 程序一直开着的云端电脑适合跑收盘取数和盘中快照，不会因为本机关机漏存。
 
+### 用 Docker 部署（自建服务器）
+
+仓库根目录的 `docker-compose.yml` 里有两组服务，互不影响：旧版应用（`vibe-astock`，页面 8910）和 v2 研究编排器（`vibe-astock-v2`，页面 5940，构建用 `Dockerfile.v2`）。两组各配一条 Cloudflare Tunnel，分别发布到 `a.luckybrother.cc` 与 `a2.luckybrother.cc`。
+
+v2 重建要连带隧道一起做，不能只重建应用容器：
+
+```bash
+# 构建镜像 + 重建 vibe-astock-v2 和 cloudflared-v2 + 核对健康与公网入口
+sh scripts/docker-v2-rebuild.sh
+
+# 镜像已是最新（只改了数据或配置）时，跳过构建
+sh scripts/docker-v2-rebuild.sh --no-build
+
+# 不探测公网入口
+sh scripts/docker-v2-rebuild.sh --no-verify
+```
+
+- 为什么不能只跑 `docker compose up -d vibe-astock-v2`：隧道容器用 `network_mode: service:vibe-astock-v2` 共享 v2 的网络命名空间。单独重建 v2 时，旧隧道仍指向已被销毁的命名空间，会被停掉（退出码 137），公网入口随即断连。脚本把两个服务放进同一条 `docker compose up -d --force-recreate`，由 `depends_on: service_healthy` 保证先起应用、健康后再起隧道。
+- 脚本结束前会核对：v2 处于 `healthy`、隧道容器在运行、公网地址可访问（远程口令生效时返回 401 属正常）。任一项不符会打印排查提示并返回非零。
+- 可用环境变量调整：`V2_PUBLIC_URL`（默认 `https://a2.luckybrother.cc`）、`WAIT_SECONDS`（等隧道注册的秒数，默认 20）。
+- 隧道掉线时可直接看日志：`docker logs --tail 50 vibe-astock-cloudflared-v2-1`。
+
 ### 从旧版（v1.x）升级
 
 旧版 v1.x 是 Python 程序（数据在 `~/.duanxian-agents`，页面在 8910 端口），新版是另一套程序，不能原地升级：

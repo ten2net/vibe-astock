@@ -1,7 +1,7 @@
 // 盯盘两个分页:实时动态、竞价与盘中路径。数据形状照后端 watch.ts / intraday.ts,断言用户看得到什么。
 import assert from "node:assert/strict";
 import test from "node:test";
-import { textOf, withRenderer } from "./helpers/render.ts";
+import { routed, textOf, withRenderer } from "./helpers/render.ts";
 import type { IntradayResult, Snapshot, WatchView } from "../src/verticals/finance/shortline/watchTypes.ts";
 
 const DIR = "/src/verticals/finance/shortline";
@@ -34,7 +34,7 @@ test("实时动态:盯盘中的状态、异动流带来源;持仓只列现价涨
   await withRenderer(async (r) => {
     const { LiveView } = await r.load(`${DIR}/LiveTab.tsx`);
     const props = { v: LIVE, threshold: 1.5, scope: "all", ladderMin: 1, onThreshold: noop, onScope: noop, onLadderMin: noop, error: null };
-    const html = r.html(LiveView, props);
+    const html = await routed(r)(LiveView, props);
     const t = textOf(html);
     assert.match(t, /盯盘中 · 上午连续竞价 北京时间 10:01:32 · 每 3 秒刷新/);
     assert.match(t, /10:01:30 封板 新华传媒 600825 触及涨停 8\.8 昨日9板/);
@@ -55,10 +55,27 @@ test("实时动态:盯盘中的状态、异动流带来源;持仓只列现价涨
     assert.match(html, /text-danger">\+1\.20%</);
     assert.match(html, /text-success">-3\.50%</);
     // 取不到时的提示
-    assert.match(textOf(r.html(LiveView, { ...props, error: "超时" })), /这次没取到:超时。先显示上一次的内容,稍后自动重试/);
-    const paused = textOf(r.html(LiveView, { ...props, paused: true }));
+    assert.match(textOf(await routed(r)(LiveView, { ...props, error: "超时" })), /这次没取到:超时。先显示上一次的内容,稍后自动重试/);
+    const paused = textOf(await routed(r)(LiveView, { ...props, paused: true }));
     assert.match(paused, /页面在后台,已暂停刷新\(北京时间 \S+ 的读数\);切回来就接着取/, "切到后台要说已暂停");
     assert.doesNotMatch(paused, /盯盘中|每 3 秒刷新/, "暂停时不说在盯");
+  });
+});
+
+test("实时动态表格:股票名是雪球超链接,旁边有去研究和自选开关;自选里的显示为「移出自选」", async () => {
+  await withRenderer(async (r) => {
+    const { LiveView } = await r.load(`${DIR}/LiveTab.tsx`);
+    const props = { v: LIVE, threshold: 1.5, scope: "all", ladderMin: 1, onThreshold: noop, onScope: noop, onLadderMin: noop, error: null };
+    const html = await routed(r)(LiveView, props);
+    // 持仓 / 自选 / 梯队 / 大票 / 成交额 / 异动流 的名称都走雪球
+    for (const [code, sym] of [["000001", "SZ000001"], ["300750", "SZ300750"], ["600825", "SH600825"], ["601318", "SH601318"], ["601138", "SH601138"]]) {
+      assert.match(html, new RegExp(`href="https://xueqiu\\.com/S/${sym}"`), `${code} 应链到雪球`);
+    }
+    assert.match(html, /href="https:\/\/xueqiu\.com\/S\/SH600825"[^>]*>新华传媒<\/a>/, "异动流的股票名也是链接");
+    // 去研究 → 站内个股页
+    assert.match(html, /<a[^>]+aria-label="去研究"[^>]+href="\/research\?symbol=000001"/);
+    // 去研究 = 站内个股页（原站内链接改到名称上，图标补回来）
+    assert.match(html, /<a[^>]+aria-label="去研究"[^>]+href="\/research\?symbol=601318"/, "大票行也有去研究");
   });
 });
 
@@ -74,15 +91,15 @@ test("异动筛选:幅度只筛急拉急跌,封板开板一直在;「只看持�
     // 午休 / 休市:后端不说封没封 → 不写 0;今天一只都没取到 → 说下面是哪天的读数,不写「上涨 0 · 下跌 0」
     const noSeal = LIVE.ladder!.rows.map((x) => ({ ...x, at_limit: null }));
     assert.equal(ladderStats(noSeal).sealed, null);
-    assert.match(textOf(r.html(LiveView, { ...props, v: { ...LIVE, ladder: { ...LIVE.ladder!, rows: noSeal } } })), /取到今天行情 2\/3 只 · 上涨 1 · 下跌 1 · 封住 —/);
+    assert.match(textOf(await routed(r)(LiveView, { ...props, v: { ...LIVE, ladder: { ...LIVE.ladder!, rows: noSeal } } })), /取到今天行情 2\/3 只 · 上涨 1 · 下跌 1 · 封住 —/);
     const weekend = { ...LIVE, date: "2026-10-10", quote_day: "2026-10-09", phase_label: "周末休市", trading_day: false, detecting: false,
       ladder: { ...LIVE.ladder!, rows: noSeal.map((x) => ({ ...x, today: false })) } };
-    const wt = textOf(r.html(LiveView, { ...props, v: weekend }));
+    const wt = textOf(await routed(r)(LiveView, { ...props, v: weekend }));
     assert.match(wt, /今天还没取到这 3 只的行情,下面是 2026-10-09 的读数\(标「非今日」\)/);
     assert.doesNotMatch(wt, /上涨 0|下跌 0|封住 0/);
     assert.match(liveSummary(weekend), /今天还没取到这 3 只的行情,下面是 2026-10-09 的读数/);
     const base = { v: LIVE, threshold: 5, scope: "mine", ladderMin: 2, onThreshold: noop, onScope: noop, onLadderMin: noop, error: null };
-    const t = textOf(r.html(LiveView, base));
+    const t = textOf(await routed(r)(LiveView, base));
     assert.match(t, /按当前筛选没有异动\(今天共记下 3 条\)/);
     assert.match(t, /2板 新和成/);
     assert.doesNotMatch(t, /首板 万科A/, "2板以上不列首板");
@@ -93,10 +110,10 @@ test("实时动态:收盘后 / 休市不判断异动,写清原因和刷新间隔
   await withRenderer(async (r) => {
     const { LiveView } = await r.load(`${DIR}/LiveTab.tsx`);
     const props = { threshold: 1.5, scope: "all", ladderMin: 1, onThreshold: noop, onScope: noop, onLadderMin: noop, error: null };
-    const closed = textOf(r.html(LiveView, { ...props, v: { ...LIVE, phase: "closed", phase_label: "已收盘", detecting: false, poll_ms: 60000, alerts: [] } }));
+    const closed = textOf(await routed(r)(LiveView, { ...props, v: { ...LIVE, phase: "closed", phase_label: "已收盘", detecting: false, poll_ms: 60000, alerts: [] } }));
     assert.match(closed, /已收盘 北京时间 10:01:32 · 每 60 秒刷新/);
     assert.match(closed, /已收盘,不判断异动;连续竞价时段\(9:30–11:30、13:00–14:57\)页面开着就会盯/);
-    const holiday = textOf(r.html(LiveView, { ...props, v: { ...LIVE, phase_label: "今天休市", trading_day: false, detecting: false, poll_ms: 60000, alerts: [], ladder: null, bigcap: null, turnover: null } }));
+    const holiday = textOf(await routed(r)(LiveView, { ...props, v: { ...LIVE, phase_label: "今天休市", trading_day: false, detecting: false, poll_ms: 60000, alerts: [], ladder: null, bigcap: null, turnover: null } }));
     assert.match(holiday, /今天休市,不判断异动。/);
     assert.match(holiday, /昨日梯队这次没取到/);
     assert.match(holiday, /大票名单这次没取到/);

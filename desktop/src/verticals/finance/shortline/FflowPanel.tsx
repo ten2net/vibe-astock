@@ -17,7 +17,9 @@ import { TrendingUp } from "lucide-react";
 import { backend } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { Section } from "./FactsPanels";
+import { useWatchCodes } from "../hooks/useWatchCodes";
 import { finite, pctColor, signed } from "./format";
+import { StockName, WatchToggle } from "./StockLink";
 import type { FflowCandidate, FflowView } from "./watchTypes";
 
 const wan = (yuan: number | null) => (yuan === null || !Number.isFinite(yuan) ? "—" : `${(yuan / 1e4).toFixed(0)}万`);
@@ -46,6 +48,17 @@ export function fflowSummary(v: FflowView): string {
 }
 
 export function FflowPanelView({ v }: { v: FflowView }) {
+  // 自选真源在台账：订阅后，本页加入 / 移除与别的页面同时生效，星标不会各说各话
+  const { codes: watchCodes, toggle } = useWatchCodes();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [watchErr, setWatchErr] = useState<string | null>(null);
+  const onToggle = (code: string) => {
+    setBusy(code);
+    setWatchErr(null);
+    void toggle(code)
+      .catch((e) => setWatchErr(`${code} 没保存上：${e instanceof Error ? e.message : String(e)}`))
+      .finally(() => setBusy(null));
+  };
   return (
     <Section icon={TrendingUp} title="分时资金 · 横盘后拉升(前 20)"
       hint={`当日分钟级资金(DDX 近似):先横盘(带宽≤阈值、≥15分钟)后稳步拉升(≥阈值、上涨分钟≥60%、尾盘仍向上)。名单:资金流榜前 ${v.total_scanned} 只;通道:${v.source_label};数据截至 ${v.as_of ?? "—"}。客观资金形态,不是推荐也不是预测。`}>
@@ -75,7 +88,11 @@ export function FflowPanelView({ v }: { v: FflowView }) {
               {v.stocks.map((s, i) => (
                 <tr key={s.code} className="border-t border-border/40">
                   <td className="px-2 py-1 font-mono text-muted-foreground">{i + 1}</td>
-                  <td className="whitespace-nowrap px-2 py-1"><span className="font-medium">{s.name}</span> <span className="font-mono text-[11px] text-muted-foreground">{s.code}</span></td>
+                  <td className="whitespace-nowrap px-2 py-1">
+                    <StockName code={s.code} name={s.name} className="font-medium" />
+                    <WatchToggle code={s.code} inWatch={watchCodes.includes(s.code)} onToggle={onToggle} busy={busy === s.code} />{" "}
+                    <span className="font-mono text-[11px] text-muted-foreground">{s.code}</span>
+                  </td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">{s.price ?? "—"}</td>
                   <td className={cn("whitespace-nowrap px-2 py-1 text-right font-mono font-semibold tabular-nums", pctColor(s.pct))}>{signed(s.pct)}</td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono text-danger">{wan(s.main_net)}</td>
@@ -89,6 +106,7 @@ export function FflowPanelView({ v }: { v: FflowView }) {
           </table>
         </div>
       )}
+      {watchErr && <p role="alert" className="mt-2 text-[11px] text-warning">{watchErr}</p>}
       {v.notes.length > 0 && <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{v.notes.join(" · ")}</p>}
     </Section>
   );

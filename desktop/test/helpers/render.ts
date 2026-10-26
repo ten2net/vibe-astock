@@ -28,6 +28,23 @@ export async function withRenderer<T>(fn: (r: Renderer) => Promise<T>): Promise<
   }
 }
 
+/**
+ * 组件里有 <Link>（react-router-dom）时，SSR 必须包一层 MemoryRouter，
+ * 否则 Link 里取不到路由上下文，报「basename of useContext(...) is null」。
+ * 用法：`const html = routed(r)(Component, props)`。
+ *
+ * ⚠️ MemoryRouter 必须从 **vite SSR 那边** 取：测试文件里的 react-router-dom 和组件里的
+ *    是两份模块实例，各有一份 Context —— 用测试文件里的包一层，组件仍看不到路由。
+ */
+export function routed(r: Renderer) {
+  return async function render<P extends object>(component: ComponentType<P>, props: P, entry = "/"): Promise<string> {
+    const { MemoryRouter } = (await r.load("/src/test-router.tsx")) as { MemoryRouter: ComponentType<{ initialEntries: string[] }> };
+    return renderToStaticMarkup(
+      createElement(MemoryRouter, { initialEntries: [entry] }, createElement(component, props)),
+    );
+  };
+}
+
 const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#x27;": "'", "&nbsp;": " " };
 
 /** HTML 里用户看得到的文字：去掉标签、还原转义、合并空白。断言文案用它，不受标签拆分和换行影响 */

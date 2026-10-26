@@ -9,7 +9,8 @@
  *
  * 没有代码的地方一律不加链接：链接需要代码，拿不到就不伪造成可点。
  */
-import { ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ExternalLink, Search } from "lucide-react";
 import { cn } from "./utils";
 
 const XUEQIU_BASE = "https://xueqiu.com/S/";
@@ -84,6 +85,29 @@ export function StockExternalBadge({
     >
       <ExternalLink className="h-3 w-3" />
     </a>
+  );
+}
+
+/** 旁挂的小图标站内链接 —— 名称已经指向站外（雪球）时，用它补一个「去研究」入口。 */
+export function StockResearchBadge({
+  code,
+  name,
+  className,
+}: {
+  code?: string | null;
+  name?: string;
+  className?: string;
+}) {
+  if (!stockUrl(code)) return null;
+  return (
+    <Link
+      to={`/stock-data?symbol=${code}`}
+      title={`${name ? name + " " : ""}${code} · 去研究`}
+      aria-label="去研究"
+      className={className ?? "ml-1 inline-flex align-middle text-muted-foreground hover:text-primary"}
+    >
+      <Search className="h-3 w-3" />
+    </Link>
   );
 }
 
