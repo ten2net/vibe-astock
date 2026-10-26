@@ -69,6 +69,14 @@ def normalize_code(text: str) -> Optional[str]:
     return ticker if _US_TICKER.match(ticker) else None
 
 
+#: 新浪联想把指数 / 板块塞在 A 股的类型里（如「中证煤炭 399998」「绿色煤炭 399436」），
+#: 类型字段分不出来，只能按代码段排除：沪深两市的指数 / 板块是 399xxx、950xxx，以及
+#: 沪市 000xxx（000001 上证指数与平安银行同号，新浪把指数标成沪A、把股票标成 000001 深A，
+#: 这里按「深市 000xxx 是股票、沪市 000xxx 是指数」区分）。深市场内基金 15/16 开头不受影响。
+_SINA_INDEX = re.compile(r"^(?:950\d{3}|399\d{3}|39[0-9]{4})$")
+_SINA_SH_INDEX = re.compile(r"^000\d{3}$")
+
+
 def _match_of(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """东财一行 → 本产品的候选；不是三地可处理的标的返回 None。"""
     code = str(row.get("Code") or "").strip()
@@ -79,6 +87,8 @@ def _match_of(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not code or not name:
         return None
     if mkt in ("0", "1") and re.fullmatch(r"\d{6}", code) and stype in A_TYPES:
+        if row.get("_sina") and (_SINA_INDEX.match(code) or (mkt == "1" and _SINA_SH_INDEX.match(code))):
+            return None   # 新浪备源里的指数 / 板块
         return {"symbol": code, "name": name, "market": "CN", "kind": A_TYPES[stype], "board": stype, "pinyin": pinyin}
     if mkt == HK_MKT and re.fullmatch(r"\d{5}", code) and 1 <= int(code) <= 9999:
         return {"symbol": f"{code}.HK", "name": name, "market": "HK", "kind": "港股", "board": "港股", "pinyin": pinyin}
@@ -100,13 +110,52 @@ def _clean_query(q: Any) -> str:
     return q
 
 
+#: 上一次联想实际走的源（东财 / 新浪），给返回值里的 source 用
+_LAST_SOURCE = "东财搜索联想"
+
+
+def _use_source(name: str) -> None:
+    global _LAST_SOURCE
+    _LAST_SOURCE = name
+
+
+def _suggest_rows(query: str) -> List[Dict[str, Any]]:
+    """联想接口取原始行：先东财，不通或返回里一条可用的都没有时改走新浪。
+
+    🔴 2026-10 起东财 searchapi 对任何关键词都只回「搜索用户」的 JSONP
+    （没有 QuotationCodeTable），名称 / 拼音搜索全挂；它 HTTP 200，只是内容换了，
+    所以不能只靠异常判断，要看解析出来是否为空。
+    """
+    from sources.eastmoney import suggest_rows
+
+    problems: List[str] = []
+    empty: List[str] = []
+    try:
+        rows = [{**r, "_sina": False} for r in suggest_rows(query, FETCH_COUNT)]
+        if rows:
+            _use_source("东财搜索联想")
+            return rows
+        empty.append("东财")
+    except Exception as exc:  # noqa: BLE001 — 网络 / 风控 / 返回不是 JSON，统一成一句能看懂的话
+        problems.append(f"东财{type(exc).__name__}")
+    try:
+        from sources.sina import suggest_rows_sina
+        rows = [{**r, "_sina": True} for r in suggest_rows_sina(query, FETCH_COUNT)]
+        if rows:
+            _use_source("新浪搜索联想")
+            return rows
+        empty.append("新浪")
+    except Exception as exc:  # noqa: BLE001
+        problems.append(f"新浪{type(exc).__name__}")
+    # 两家都通了、只是没有这只票：那是「没搜到」，不是故障，交给 resolve 走代码兜底
+    if not problems:
+        return []
+    raise SearchError("名称搜索暂时不通（" + "、".join(problems) + "），可以直接输入代码：600519 / 00700.HK / AAPL")
+
+
 def search(query: str, limit: int = DEFAULT_LIMIT) -> List[Dict[str, Any]]:
     """一次联想：去重后按接口原顺序给前 limit 个。接口不通抛 SearchError。"""
-    from sources.eastmoney import suggest_rows   # 延迟导入：入参校验不需要联网层
-    try:
-        rows = suggest_rows(query, FETCH_COUNT)
-    except Exception as exc:  # noqa: BLE001 — 网络 / 风控 / 返回不是 JSON，统一成一句能看懂的话
-        raise SearchError(f"名称搜索暂时不通（{type(exc).__name__}），可以直接输入代码：600519 / 00700.HK / AAPL") from exc
+    rows = _suggest_rows(query)
     out: List[Dict[str, Any]] = []
     seen = set()
     for row in rows:
@@ -165,12 +214,13 @@ def build(req: Dict[str, Any]) -> Dict[str, Any]:
             # code：这段文字如果当代码理解是什么（纯字母没搜到时，界面可以让用户确认「就按美股代码加」）
             # resolve 收窄了候选时，它给的 matches 覆盖前面的完整列表
             items.append({"query": q, "code": normalize_code(q), "matches": matches, **resolve(q, matches)})
-        return {"items": items, "source": "东财搜索联想"}
+        return {"items": items, "source": _LAST_SOURCE}
     q = _clean_query(req.get("query"))
     limit = req.get("limit", DEFAULT_LIMIT)
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_LIMIT:
         raise SearchError(f"limit 要是 1 到 {MAX_LIMIT} 的整数")
-    return {"query": q, "matches": search(q, limit), "source": "东财搜索联想"}
+    matches = search(q, limit)
+    return {"query": q, "matches": matches, "source": _LAST_SOURCE}
 
 
 CATALOG = {

@@ -111,6 +111,54 @@ def sina_fund_flow(code: str, days: int = 60) -> list[dict]:
     return [{"date": x.get("opendate"), "close": x.get("trade"), "net_amount": x.get("netamount"), "turnover": x.get("turnover")} for x in arr]
 
 
+# ---------- 备源:代码 / 名称 / 拼音联想 ----------
+#: 新浪联想 type → 本产品理解的 MktNum / SecurityTypeName（与东财 suggest_rows 的字段对齐，
+#: 让调用方只用一套过滤规则）。新浪把板块（如「中证煤炭 399998」）也标成 11/13，按代码段在调用方再筛。
+_SUGGEST_TYPE = {
+    "11": ("1", "沪A"), "12": ("1", "沪A"), "13": ("0", "深A"), "14": ("0", "深A"), "15": ("0", "深A"),
+    "21": ("1", "基金"), "22": ("1", "基金"), "23": ("0", "基金"), "24": ("0", "基金"),
+    "31": ("116", "港股"), "33": ("116", "港股"),
+    "41": ("105", "美股"), "42": ("105", "美股"), "103": ("105", "美股"),
+}
+
+
+def suggest_rows_sina(keyword: str, count: int = 10) -> list[dict]:
+    """新浪联想接口（suggest3.sinajs.cn）→ 与东财 suggest_rows 同形的各行。
+
+    东财 searchapi 的联想接口 2026-10 起对任何查询都只回搜索用户的 JSONP（没有
+    QuotationCodeTable），名称 / 拼音搜索全挂。这个备源认中文名、拼音首字母和代码，
+    返回 GBK 的一行 suggestvalue，各条以 ; 分隔、字段以 , 分隔。
+    """
+    r = http_get("https://suggest3.sinajs.cn/suggest/type=&key=" + keyword,
+                 headers=_HDR, timeout=10, encoding="gbk", ext="txt")
+    body = r.text
+    i = body.find("\"")
+    j = body.rfind("\"")
+    if i < 0 or j <= i:
+        raise RuntimeError("新浪联想响应异常: " + body[:120])
+    rows: list[dict] = []
+    for item in body[i + 1: j].split(";"):
+        f = item.split(",")
+        if len(f) < 5 or not f[2].strip():
+            continue
+        mkt, stype = _SUGGEST_TYPE.get(f[1], ("", ""))
+        if not mkt:
+            continue
+        code = f[2].strip()
+        # 美股用小写代码，东财那边是大写；港股 / A 股是数字
+        rows.append({
+            "Code": code.upper() if mkt in ("105", "106", "107") else code,
+            "Name": f[4].strip(),
+            "MktNum": mkt,
+            "SecurityTypeName": stype,
+            # 接口不给拼音列，占位空串（调用方按名称 / 代码匹配）
+            "PinYin": "",
+        })
+        if len(rows) >= count:
+            break
+    return rows
+
+
 # ---------- 9.1 ETF 期权 ----------
 def _opt_f(x):
     try:

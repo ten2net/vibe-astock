@@ -50,6 +50,27 @@ SAMPLES = {
 
 
 @pytest.fixture
+def no_backup_network(monkeypatch):
+    """默认把新浪备源变成「没找到」：单测不打网络，需要备源的用例自己再改。
+
+    返回落空的备源会抛（=新浪也挂了），比返回空列表更接近真实故障路径；
+    要测「东财空、新浪有」的用例会自己 monkeypatch 回来。
+    """
+    import sources.sina as sina
+
+    def boom(*_a, **_k):
+        raise RuntimeError("测试里不打网络")
+    # 只换实现，不换引用：别的用例 monkeypatch.setattr(sina, "http_get", ...) 之后，
+    # 备份原函数再还原时会把这里的替身一起还原掉。
+    import contextlib
+    import io
+    real = sina.suggest_rows_sina
+    monkeypatch.setattr(sina, "suggest_rows_sina", boom)
+    yield
+    monkeypatch.setattr(sina, "suggest_rows_sina", boom)  # 兜底：有用例 undo 也不能把网络放回来
+
+
+@pytest.fixture
 def fake(monkeypatch):
     calls = []
 
@@ -100,13 +121,79 @@ def test_dropped_rows(r):
     assert S._match_of(r) is None
 
 
+def test_sina_index_rows_are_dropped(monkeypatch):
+    """新浪把指数 / 板块标成 A 股（沪A/深A），只能按代码段排除；深市场内基金 15/16 开头不受影响。"""
+    import sources.sina as sina
+    monkeypatch.setattr(em, "suggest_rows", lambda *_a, **_k: [])
+    monkeypatch.setattr(sina, "suggest_rows_sina", lambda *_a, **_k: [
+        row("399436", "绿色煤炭", "1", "沪A"), row("399998", "中证煤炭", "1", "沪A"),   # 新浪把深市指数标成沪A
+        row("000001", "上证指数", "1", "沪A"), row("000589", "贵州轮胎", "1", "沪A"),  # 新浪把深市股票也标成沪A
+        row("159915", "创业板ETF", "0", "基金"), row("600519", "贵州茅台", "1", "沪A"),
+    ])
+    assert [m["symbol"] for m in S.search("meitan")] == ["159915", "600519"], "指数剔除；15 开头的场内基金保留"
+
+
 def test_limit_and_dedupe(fake, monkeypatch):
     monkeypatch.setitem(SAMPLES, "dup", [row("600519", "贵州茅台", "1", "沪A")] * 3 + [row("000001", "平安银行", "0", "深A")])
     assert [m["symbol"] for m in S.search("dup")] == ["600519", "000001"]
     assert len(S.search("腾讯", limit=1)) == 1
 
 
-def test_api_failure_says_type_the_code(monkeypatch, capsys):
+def test_falls_back_to_sina_when_eastmoney_returns_nothing(monkeypatch):
+    """东财 2026-10 起联想接口只回搜索用户的 JSONP：HTTP 200、没有 QuotationCodeTable。
+    这种「不报错但没候选」必须切到新浪，名字/拼音搜索才不至于整条瘫掉。"""
+    import sources.sina as sina
+
+    monkeypatch.setattr(em, "suggest_rows", lambda *_a, **_k: [])
+    seen = []
+
+    def sina_rows(keyword, count=10):
+        seen.append((keyword, count))
+        return [row("600519", "贵州茅台", "1", "沪A", "AStock", "GZMT")]
+    monkeypatch.setattr(sina, "suggest_rows_sina", sina_rows)
+
+    got = S.search("gzmt")
+    assert [m["symbol"] for m in got] == ["600519"]
+    assert got[0]["name"] == "贵州茅台"
+    assert seen == [("gzmt", S.FETCH_COUNT)], "备源同样多要一些，过滤后才够数"
+
+
+def test_both_sources_down_names_both(monkeypatch, capsys, no_backup_network):
+    monkeypatch.setattr(em, "suggest_rows", lambda *_a, **_k: [])
+    with pytest.raises(S.SearchError) as ei:
+        S.search("茅台")
+    msg = str(ei.value)
+    assert "新浪RuntimeError" in msg, "新浪也挂了要说明"
+    assert "直接输入代码" in msg
+
+
+def test_both_sources_empty_is_not_a_failure(monkeypatch):
+    """两家都通了、只是没有这只票：算「没搜到」，不当接口故障报错。"""
+    import sources.sina as sina
+    monkeypatch.setattr(em, "suggest_rows", lambda *_a, **_k: [])
+    monkeypatch.setattr(sina, "suggest_rows_sina", lambda *_a, **_k: [])
+    assert S.search("zzzqqq") == []
+    it = S.resolve("BRK.B", [])
+    assert it["pick"]["symbol"] == "BRK.B"
+
+
+def test_sina_rows_map_to_eastmoney_shape(monkeypatch):
+    """新浪那行 GBK 文本 → 与东财 suggest_rows 同形的行，让上游只维护一套过滤规则。"""
+    import sources.sina as sina
+
+    body = 'var suggestvalue="贵州茅台,11,600519,sh600519,贵州茅台,,贵州茅台,99,1,ESG,,;腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,,;AAPL,103,aapl,aapl,AAPL,,AAPL,99,1,,,;"'
+
+    class R:
+        text = body
+    monkeypatch.setattr(sina, "http_get", lambda *_a, **_k: R())
+    rows = sina.suggest_rows_sina("茅台", 10)
+    assert rows[0] == {"Code": "600519", "Name": "贵州茅台", "MktNum": "1", "SecurityTypeName": "沪A", "PinYin": ""}
+    assert rows[1]["MktNum"] == "116" and rows[1]["Code"] == "00700"
+    assert rows[2]["MktNum"] == "105" and rows[2]["Code"] == "AAPL", "美股代码统一成大写"
+    assert [m["symbol"] for m in (S._match_of(r) for r in rows)] == ["600519", "00700.HK", "AAPL"]
+
+
+def test_api_failure_says_type_the_code(monkeypatch, capsys, no_backup_network):
     def boom(*_a, **_k):
         raise ConnectionError("reset")
     monkeypatch.setattr(em, "suggest_rows", boom)
@@ -181,7 +268,15 @@ def test_normalize_code_matches_frontend(text, want):
 
 
 def test_batch(fake):
-    out = S.build({"queries": ["茅台", "中国平安", "BRK.B", "zzzqqq"]})
+    # "zzzqqq" 两个源都没有候选（东财空、新浪也空），此时按「什么都没搜到」处理而不是报错：
+    # 批量粘贴里出现一个查不到的词，不该让整批失败。逐词兜底由 search() 负责，单测直接给它空结果。
+    import sources.sina as sina
+    real = sina.suggest_rows_sina
+    sina.suggest_rows_sina = lambda *_a, **_k: []
+    try:
+        out = S.build({"queries": ["茅台", "中国平安", "BRK.B", "zzzqqq"]})
+    finally:
+        sina.suggest_rows_sina = real
     items = out["items"]
     assert [(i["query"], (i["pick"] or {}).get("symbol")) for i in items] == [
         ("茅台", "600519"), ("中国平安", None), ("BRK.B", "BRK.B"), ("zzzqqq", None)]
@@ -213,3 +308,4 @@ def test_main_catalog(monkeypatch, capsys):
     S.main()
     d = json.loads(capsys.readouterr().out)
     assert d["ok"] is True and "拼音" in d["catalog"]["description"]
+
