@@ -563,3 +563,19 @@ def test_eastmoney_datacenter_business_failure_raises_not_empty(monkeypatch):
     monkeypatch.setattr(eastmoney, "em_json", lambda *a, **k: replies["empty"])
     zero = mappers.em_block_trade(eastmoney.block_trade("600519"), _ctx(market="CN", symbol="600519"))
     assert zero["evidence"][0]["field"] == "block_trade_count" and zero["evidence"][0]["value"] == 0, "明确无数据才是 0 笔"
+
+
+def test_sina_market_money_rank_pct_is_fraction_not_percent(monkeypatch):
+    """新浪 changeratio 是小数比率(0.0382=3.82%):2026-10-26 回归 —— 多除 100 会让 +3.82% 显示成 +0.04%。"""
+    from sources import sina
+    rows = [{"symbol": "sz300308", "name": "中际旭创", "trade": "900.0", "changeratio": "0.0382",
+             "amount": "8100000000", "netamount": "3300000000", "r0_net": "3273033000.0"},
+            {"symbol": "sh600000", "name": "浦发银行", "trade": "12.0", "changeratio": "-0.0115",
+             "amount": "900000000", "netamount": "-100000000", "r0_net": "-50000000.0"}]
+    monkeypatch.setattr(sina, "_sina_list", lambda path, params: rows)
+    # total 计数那次 http_get 失败也要兜底(total=None 可接受)
+    monkeypatch.setattr(sina, "http_get", lambda *a, **k: (_ for _ in ()).throw(OSError("no net")))
+    r = sina.sina_market_money_rank(5)
+    assert r["rows"][0]["pct"] == 0.0382, f"pct 必须是小数比率,实际 {r['rows'][0]['pct']}"
+    assert r["rows"][0]["main_net"] == 3273033000.0
+    assert r["rows"][1]["pct"] == -0.0115, "负数涨跌幅同样不得变形"

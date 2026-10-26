@@ -294,7 +294,9 @@ def sina_market_money_rank(top_n: int = 150) -> dict:
         if not m:
             continue
         try:
-            pct_v = float(x.get("changeratio") or 0) / 100
+            # 🔴 新浪给的是小数比率(0.0382 = 3.82%),**不许再除** —— 前端按「×100 显示 %」用。
+            # 2026-10-26 实测:除 100 会让 +3.82% 显示成 +0.04%,涨停股显示成 +0.10%。
+            pct_v = float(x.get("changeratio"))
         except (TypeError, ValueError):
             pct_v = None
         rows.append({"rank": i + 1, "code": m.group(1), "name": str(x.get("name") or ""),

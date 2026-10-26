@@ -830,7 +830,9 @@ def market_main_net_rank(top_n: int = 100) -> dict:
             break
 
     rows = [{"rank": i + 1, "code": str(it.get("f12", "")), "name": it.get("f14", ""),
-             "price": it.get("f2"), "pct": it.get("f3"), "amount": it.get("f6"),
+             # f3 是百分数(3.82 = 3.82%),前端按「×100 显示 %」用 → 统一换算成小数比率(同 market_stock_list 的口径)
+             "price": it.get("f2"), "pct": round(it["f3"] / 100, 4) if isinstance(it.get("f3"), (int, float)) else None,
+             "amount": it.get("f6"),
              "float_cap": it.get("f21"), "main_net": it.get("f62"), "main_pct": it.get("f184")}
             for i, it in enumerate(items[:top_n])]
     return {"total": max(total, len(items)), "returned": len(rows), "expected": min(top_n, total) if total else None, "rows": rows}
