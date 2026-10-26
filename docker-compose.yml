@@ -84,6 +84,10 @@ services:
     environment:
       # 拼「发给使用者的链接」用的公网根地址（只用于拼链接，不是监听地址）
       VRA_PUBLIC_URL: https://a2.luckybrother.cc
+      # 邀测版(可选):受邀者令牌表(scripts/trial.mjs 维护,主口令行为不变);
+      # 到期拒绝页/错误里指路 VRA_RENEW_URL(面包多/爱发电商品页,先留空则提示联系部署者)。
+      VRA_ACCESS_TOKENS_FILE: /app/.local/access.tokens.json
+      VRA_RENEW_URL: ""
       # CodeBuddy 订阅大脑：远程模式下页面不能改 CLI 位置，用环境变量钉死。
       # 指向下面挂进来的 v2 专用持久化 CLI（与旧版容器的卷已分开，互不影响）。
       CODEBUDDY_BIN: /root/.local/bin/codebuddy

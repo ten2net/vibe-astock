@@ -15,7 +15,12 @@ const lan = process.env.VRA_LAN === "1";
 // 远程访问模式(scripts/start --remote，给云端 Agent 部署后发链接给使用者)：先打包，再由 vite preview 对外，
 // 每个请求都要过访问口令(见 remote-access.ts)。不把开发服务器直接暴露到公网。
 const remote = process.env.VRA_REMOTE === "1";
-const remoteGate = remote ? remoteAccessMiddlewares(process.env.VRA_ACCESS_TOKEN, { publicUrl: process.env.VRA_PUBLIC_URL || null }) : [];
+// 邀测版(可选):受邀者令牌表 + 到期续费指路。不配置则与原来单口令行为完全一致。
+const remoteGate = remote ? remoteAccessMiddlewares(process.env.VRA_ACCESS_TOKEN, {
+  publicUrl: process.env.VRA_PUBLIC_URL || null,
+  tokensFile: process.env.VRA_ACCESS_TOKENS_FILE || null,
+  renewUrl: process.env.VRA_RENEW_URL || null,
+}) : [];
 
 /** 启动器选好的端口经环境变量传进来（见 orchestrator/src/startup_ports.ts）；没给就用 brand 里的默认端口 */
 function envPort(name: string, fallback: number): number {

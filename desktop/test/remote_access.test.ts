@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { preview, resolveConfig } from "vite";
 
-import { ACCESS_COOKIE, createAccessGate, createRemoteOriginGuard, requestIsHttps, type Middleware } from "../remote-access.ts";
+import { ACCESS_COOKIE, createAccessGate, createRemoteOriginGuard, fileInviteTokenStore, requestIsHttps, type Middleware } from "../remote-access.ts";
 import { API_PORT, UI_PORT } from "../src/verticals/finance/lib/brand.ts";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -31,10 +31,10 @@ function raw(port: number, opts: { method?: string; path: string; headers?: Reco
   });
 }
 
-/** 不起服务器,直接把一个假请求过一道中间件:记下状态码、响应头,以及是否放行到下一步 */
+/** 不起服务器,直接把一个假请求过一道中间件:记下状态码、响应头、响应体,以及是否放行到下一步 */
 function pass(mw: Middleware, req: { method?: string; url?: string; headers?: Record<string, string> }) {
-  const out = { status: 0, headers: {} as Record<string, unknown>, passed: false };
-  const res = { writeHead(status: number, headers: Record<string, unknown>) { out.status = status; out.headers = headers; return res; }, end() {} };
+  const out = { status: 0, headers: {} as Record<string, unknown>, body: "", passed: false };
+  const res = { writeHead(status: number, headers: Record<string, unknown>) { out.status = status; out.headers = headers; return res; }, end(body?: string) { out.body = String(body ?? ""); } };
   mw({ method: "GET", url: "/", ...req, headers: req.headers ?? {} } as unknown as http.IncomingMessage,
     res as unknown as http.ServerResponse, () => { out.passed = true; });
   return out;
@@ -318,4 +318,54 @@ test("端口:启动器选好的端口经 VRA_UI_PORT / VRA_API_PORT 传进来,�
         /VRA_UI_PORT 要填 1–65535/, bad);
     } finally { restore(); }
   }
+});
+
+test("邀测版:受邀者令牌表(到期拒 + 续费指路),主口令路径不受影响", () => {
+  const master = "unit-master-token-0123456789abcdef0123456789abcdef";
+  const alive = "unit-invite-alive-0123456789abcdef0123456789abcdef";
+  const expired = "unit-invite-dead--0123456789abcdef0123456789abcdef";
+  const renewUrl = "https://pay.example.com/renew";
+  const day = 24 * 3600 * 1000;
+  const mkStore = () => fileInviteTokenStore(storePath);
+  const storePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "vra-invite-")), "tokens.json");
+  fs.writeFileSync(storePath, JSON.stringify({ tokens: [
+    { token: alive, label: "张三", expires_at: new Date(Date.now() + 30 * day).toISOString() },
+    { token: expired, label: "李四", expires_at: new Date(Date.now() - day).toISOString() },
+    { token: "short", label: "坏令牌被忽略" },
+  ] }));
+
+  // 文件加载与 mtime 缓存
+  assert.equal(mkStore().list().length, 2, "强度不够的令牌被忽略");
+  const gate = createAccessGate(master, { store: mkStore(), renewUrl });
+  const cookieOf = (t: string) => ({ headers: { cookie: `${ACCESS_COOKIE}=${t}` } });
+
+  // 主口令照旧
+  assert.equal(pass(gate, cookieOf(master)).passed, true, "主口令必须不受影响");
+  // 受邀者:未到期放行,过期拒 + 指路
+  assert.equal(pass(gate, cookieOf(alive)).passed, true, "未到期受邀者放行");
+  const deadApi = pass(gate, { ...cookieOf(expired), url: "/api/health" });
+  assert.equal(deadApi.passed, false);
+  assert.equal(deadApi.status, 403);
+  assert.match(deadApi.body, /"error":"trial_expired"/);
+  assert.match(deadApi.body, /续费请打开:https:\/\/pay\.example\.com\/renew/);
+  const deadPage = pass(gate, { ...cookieOf(expired), url: "/" });
+  assert.equal(deadPage.status, 403);
+  assert.match(deadPage.body, /体验期已到/, "页面拒绝也要说明原因");
+  // 不认识照旧 401 access_required
+  const stranger = pass(gate, cookieOf("unit-stranger-xxx-0123456789abcdef0123456789abcdef"));
+  assert.equal(stranger.passed, false);
+  assert.equal(stranger.status, 401);
+
+  // 邀请链接换 cookie:有效期截到到期日
+  const ok = pass(gate, { url: `/?access=${alive}` });
+  assert.equal(ok.status, 303);
+  const setCookie = String(ok.headers["Set-Cookie"]);
+  assert.match(setCookie, new RegExp(`${ACCESS_COOKIE}=${alive}`));
+  assert.ok(Number(/Max-Age=(\d+)/.exec(setCookie)?.[1]) <= 30 * 24 * 3600, "cookie 有效期不超出试用剩余");
+  const dead = pass(gate, { url: `/?access=${expired}` });
+  assert.equal(dead.status, 403);
+  assert.match(dead.body, /trial_expired|体验期已到/);
+  // 无 store 时行为与原来完全一致(上面的存量测试都在无 store 路径上跑过)
+  const plain = createAccessGate(master);
+  assert.equal(pass(plain, { url: `/?access=${alive}` }).status, 401, "没启用邀测版时受邀者口令就是无效口令");
 });
