@@ -31,7 +31,7 @@ python3 .agents/skills/data-access/scripts/<script>.py --symbol 300308 --out-dir
 | `fetch_pe_history.py` | PE_TTM / PB 日频序列(默认 5 年)→ raw CSV;最新值 | baostock | —(北交所不支持) | ○ 可选(TTM PE 分位) |
 | `fetch_announcements.py` | 最近 N 条公告标题 / 日期 / PDF 链接 | 深市:深交所官方;沪市 / 北交所:东财 | 深市备源东财 | ○ 可选(风险 / 反证线索) |
 | `fetch_kline.py` | 日 K 前复权序列 → raw;最新收盘(逐行校验,坏行剔除→partial) | 腾讯 fqkline | 东财 push2his(本机网络常断) | ○ 可选(stale 二次验证时用) |
-| `fetch_trade_calendar.py` | 全市场交易日历:last_trading_day / previous_trading_day / is_today_trading_day / session_phase(pre_open·trading·post_close·non_trading_day)/ **reference_quote_day**(此刻新鲜报价应有的日期)(evidence symbol=MARKET, market=CN) | baostock query_trade_dates | — | ★ 必需(判定报价日期差异是休市 / 盘前还是个股停牌) |
+| `fetch_trade_calendar.py` | 全市场交易日历:last_trading_day / previous_trading_day / is_today_trading_day / session_phase(pre_open·trading·post_close·non_trading_day)/ **reference_quote_day**(此刻新鲜报价应有的日期)(evidence symbol=MARKET, market=CN) | baostock query_trade_dates(主);akshare 新浪 tool_trade_date_hist_sina(备,主源失败自动退,status=partial) | — | ★ 必需(判定报价日期差异是休市 / 盘前还是个股停牌) |
 
 Phase 0 不在范围(Phase 1 进 `datasources/registry.yaml` 后再接):新闻正文、研报 PDF、资金流、龙虎榜、融资融券、股东户数、解禁、筹码、宏观。
 

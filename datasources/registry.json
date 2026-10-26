@@ -45,11 +45,12 @@
       "market": [
         "CN"
       ],
-      "source": "baostock",
+      "source": "baostock+sina(备)",
       "compliance": "cn-public",
       "module": "legacy",
       "function": "fetch_trade_calendar.py",
       "symbol_kind": "none",
+      "notes": "主源 baostock;登录/翻页间歇失败时自动退 akshare 新浪 tool_trade_date_hist_sina(status=partial,extra.degraded 记降级)",
       "stages": {
         "profile": "required"
       },
