@@ -20,11 +20,11 @@
 - Modify: `.agents/skills/data-access/scripts/fetch_trade_calendar.py`
 - Test: `.agents/skills/data-access/scripts/tests/test_fetch_trade_calendar.py`
 
-- [ ] **Step 1: 读现状**
+- [x] **Step 1: 读现状**
 
 Read `.agents/skills/data-access/scripts/fetch_trade_calendar.py`，确认 `trading` 列表变量名与 `extra` 构造位置（约 :35-61 算列表、:118 附近落 extra）。注意脚本结尾 `finish()` 会 `sys.exit`，测试用 `pytest.raises(SystemExit)` 包。
 
-- [ ] **Step 2: 写失败测试（新建测试文件）**
+- [x] **Step 2: 写失败测试（新建测试文件）**
 
 新建 `.agents/skills/data-access/scripts/tests/test_fetch_trade_calendar.py`（该文件不存在；mock 细节与落盘路径以目录现有测试 test_kline_freshness.py 的真实契约为准，计划的 result.json/meta 只是示意）。测试要点：
 
@@ -37,12 +37,12 @@ def test_trading_day_list_in_extra(monkeypatch, tmp_path):
     # 再补一条 assert days == sorted(d for d in mocked_calendar if d <= fixed_today) 钉死无遗漏
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `cd .agents/skills/data-access/scripts && env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/test_fetch_trade_calendar.py -x -q`
 Expected: FAIL（`KeyError: 'trading_day_list'`）
 
-- [ ] **Step 4: 实现**
+- [x] **Step 4: 实现**
 
 在 `fetch_trade_calendar.py` 的 `extra` 构造处加一行（`trading` 为已算好的升序交易日列表）：
 
@@ -50,12 +50,12 @@ Expected: FAIL（`KeyError: 'trading_day_list'`）
 extra["trading_day_list"] = trading
 ```
 
-- [ ] **Step 5: 跑测试确认通过 + 全量回归**
+- [x] **Step 5: 跑测试确认通过 + 全量回归**
 
 Run: `cd .agents/skills/data-access/scripts && env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q`
 Expected: 全部 PASS（该 skill 脚本 787 测基线全绿，不得新增失败）
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .agents/skills/data-access/scripts/fetch_trade_calendar.py .agents/skills/data-access/scripts/tests/test_fetch_trade_calendar.py
@@ -73,7 +73,7 @@ git commit -m "feat(data-access): fetch_trade_calendar 输出逐日交易日列�
 - Modify: `orchestrator/src/finance/schedule.ts:300-306`（FINANCE_SCHEDULE 增加 beat 分支与 `idFilter`）
 - Test: `orchestrator/test/auto_trade.test.ts`
 
-- [ ] **Step 1: 导出 addInbox**
+- [x] **Step 1: 导出 addInbox**
 
 `orchestrator/src/notify.ts` 约 :295-301，`function addInbox(...)` 改导出（其余不动）：
 
@@ -81,7 +81,7 @@ git commit -m "feat(data-access): fetch_trade_calendar 输出逐日交易日列�
 export function addInbox(dataRoot: string, items: InboxItem[]): Promise<void> { ... }
 ```
 
-- [ ] **Step 2: 写引擎常量与买入过滤的失败测试**
+- [x] **Step 2: 写引擎常量与买入过滤的失败测试**
 
 Create `orchestrator/test/auto_trade.test.ts`（setup 沿用 `orchestrator/test/holdings.test.ts:194-235` 惯例，见 Step 5）：
 
@@ -133,7 +133,7 @@ test("涨停阈值按板块区分", () => {
 });
 ```
 
-- [ ] **Step 3: 写仓位、冷却、卖出规则、note 的失败测试（同文件追加）**
+- [x] **Step 3: 写仓位、冷却、卖出规则、note 的失败测试（同文件追加）**
 
 ```ts
 import type { AutoTradeHistory, AutoTradeHolding, CalendarFacts, Order } from "../src/finance/auto_trade.ts";
@@ -215,12 +215,12 @@ export function buyOrders(
 
 修正上面用例：`buyOrders(CFG, [...five, cand({ code: "600006" })], [])` 应只产出 5 笔（额度 50 万 ÷ 10 万/笔 = 5 笔），第 6 只被额度拒掉。把该断言改为 `assert.equal(buyOrders(CFG, [...five, cand({ code: "600006" })], []).length, 5)`。
 
-- [ ] **Step 4: 跑测试确认失败**
+- [x] **Step 4: 跑测试确认失败**
 
 Run: `cd orchestrator && env -u PYTHONPATH node --test test/auto_trade.test.ts`
 Expected: FAIL（`Cannot find module ... auto_trade.ts`）
 
-- [ ] **Step 5: 实现 auto_trade.ts（纯函数引擎）**
+- [x] **Step 5: 实现 auto_trade.ts（纯函数引擎）**
 
 Create `orchestrator/src/finance/auto_trade.ts`：
 
@@ -373,18 +373,18 @@ export function sellOrders(
 
 实现时删除 `oi` placeholder 行（那是草稿残留）；引擎里所有 `cfg, candidates, ...` 参数补全 TS 类型（照上文 interface）。
 
-- [ ] **Step 6: 跑引擎测试确认通过**
+- [x] **Step 6: 跑引擎测试确认通过**
 
 Run: `cd orchestrator && env -u PYTHONPATH node --test test/auto_trade.test.ts`
 Expected: 全部 PASS
 
-- [ ] **Step 7: 修 spec 的两处实现级偏差**
+- [x] **Step 7: 修 spec 的两处实现级偏差**
 
 Edit `docs/superpowers/specs/2026-10-27-auto-fflow-ledger-design.md`：
 1. 第 4 节改为：「初始资金 100 万由执行器状态文件记账（台账 replay 无现金概念，`opening` 只会生成伪持仓污染持仓页）；成交仍全部写 `trade`，盈亏由重放算出。」
 2. 第 5 节「非上市 <60 日新股」改为：「无上市日期数据源，v1 不做新股过滤（榜单候选本身已排除大部分次新异动票）」。
 
-- [ ] **Step 8: 实现 auto_trade_runner.ts**
+- [x] **Step 8: 实现 auto_trade_runner.ts**
 
 Create `orchestrator/src/finance/auto_trade_runner.ts`：
 
@@ -548,12 +548,12 @@ export async function autoTradeBeat(
 
 注意：`newId` 需确认 notify.ts 有同名导出（deliver 里用了 `newId()`，如无导出则补导出或改用 `crypto.randomUUID()`）。`rowsOf` 若未从 schedule.ts 导出则一并补导出（quoteCodeOf/symbolOfQuoteKey 同理，以编译为准）。`SessionPhase` 未用则不 import。卖出冷却语义：「冷却 1 个交易日」实现为**卖出当日 + 次日**不买（防止止损当日反复接回），与测试用例一致。
 
-- [ ] **Step 9: 编译检查**
+- [x] **Step 9: 编译检查**
 
 Run: `cd orchestrator && npx tsc --noEmit`
 Expected: 无新增错误（若有存量错误，与基线对比）
 
-- [ ] **Step 10: 接入 FINANCE_SCHEDULE.beat**
+- [x] **Step 10: 接入 FINANCE_SCHEDULE.beat**
 
 Edit `orchestrator/src/finance/schedule.ts:300-306`：
 
@@ -566,7 +566,7 @@ Edit `orchestrator/src/finance/schedule.ts:300-306`：
   },
 ```
 
-- [ ] **Step 11: 给 beat 加 idFilter（同日失败重试不连环炸）**
+- [x] **Step 11: 给 beat 加 idFilter（同日失败重试不连环炸）**
 
 Edit `orchestrator/src/notify.ts` 的 `ScheduleDef`（约 :83-88）加可选字段：
 
@@ -583,7 +583,7 @@ Edit `orchestrator/src/notify.ts` 的 `ScheduleDef`（约 :83-88）加可选字�
 
 实现说明：`r.beat` 是 beat 返回的 id 字符串（参照 tick 现有日志逻辑）；把这条过滤插在「解析出 beat id、与 beat_run 对比」的循环里，不匹配就跳过该条重试。若 tick 现有结构不便插拔，退而求其次：在 `runJob` 的 beat 分支调用处统一过滤（同一语义）。
 
-- [ ] **Step 12: 全量测试 + Commit**
+- [x] **Step 12: 全量测试 + Commit**
 
 Run: `cd orchestrator && env -u PYTHONPATH node --test --test-concurrency=1 test/auto_trade.test.ts test/schedule.test.ts test/notify.test.ts test/holdings.test.ts test/shortline_fflow.test.ts test/shortline_intraday.test.ts`
 Expected: 全 PASS（这些文件原有用例不得回归）
@@ -600,26 +600,26 @@ git commit -m "feat(finance): 分时资金榜自动记账代理(规则引擎+bea
 **Files:**
 - 无新文件；部署与验证
 
-- [ ] **Step 1: orchestrator 全量测试**
+- [x] **Step 1: orchestrator 全量测试**
 
 Run: `cd orchestrator && env -u PYTHONPATH node --test --test-concurrency=1 test/*.test.ts`
 Expected: 1462 + 新增 ≈ 1480 测，除固定 10 个环境基线失败外全 PASS
 
-- [ ] **Step 2: 重建 v2 容器**
+- [x] **Step 2: 重建 v2 容器**
 
 ```bash
 docker compose up -d --build vibe-astock-v2 cloudflared-v2
 docker logs --tail 30 vibe-astock-v2   # 确认启动无异常
 ```
 
-- [ ] **Step 3: 检查公网可访问**
+- [x] **Step 3: 检查公网可访问**
 
 ```bash
 docker exec vibe-astock-v2 sh -c "tr -d '\n' < /app/.local/access.token"   # 拿口令
 curl -s -c /tmp/jar "https://a2.luckybrother.cc/?access=<口令>" -o /dev/null -w "%{http_code}\n"   # 期望 200/302,非 530
 ```
 
-- [ ] **Step 4: 手工触发一次 beat 验证**
+- [x] **Step 4: 手工触发一次 beat 验证**
 
 交易日的 09:35–14:50 之间观察：
 
@@ -630,7 +630,7 @@ ls /app/.local/auto_trade/ 2>/dev/null   # 窗口 state 文件应逐 5 分钟出
 
 窗口外或非交易日不执行即正确行为。成交发生时：持仓页（/view/holdings）出现带 auto_fflow note 的持仓，收件箱有「自动记账」条目。
 
-- [ ] **Step 5: Commit + Push**
+- [x] **Step 5: Commit + Push**
 
 ```bash
 git log --oneline -3   # 确认 Task 1/2 的提交都在
