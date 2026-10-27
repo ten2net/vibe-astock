@@ -123,3 +123,17 @@ test("T+1 防御:openedAt=今天即不卖,即使 history 缺当日买入记录",
   const orders = sellOrders(CFG, [held({ openedAt: "2026-10-27", price: 1700 * 0.9 })], hist([]), CAL, DAYS);
   assert.equal(orders.length, 0);   // 现价破止损,但 T+1 新仓必须跳过
 });
+
+test("卖出释放额度补位:5 只吃满 50 万预算时新票被拒,卖出一只后同候选补 1 笔", () => {
+  const fiveHeld: AutoTradeHolding[] = [1, 2, 3, 4, 5].map((i) => ({
+    symbol: `60001${i}`, name: `持${i}`, shares: 5000, unitCost: 20,
+    openedAt: "2026-10-23", price: 20, mainToday: 1e8, negMinutes: 0,
+    positionValue: 1e5,                    // 每只 10 万,吃满 50 万预算
+  }));
+  const signal = cand({ code: "600099", name: "新票", price: 10 });
+  assert.equal(buyOrders(CFG, [signal], fiveHeld).length, 0);   // 额度满(上限 5 只,预算也满)
+  const afterSell = fiveHeld.slice(0, 4);                       // 卖出一只:重放后 holdings 只剩 4 只
+  const [o] = buyOrders(CFG, [signal], afterSell) as Extract<Order, { kind: "buy" }>[];
+  assert.equal(o.symbol, "600099");
+  assert.equal(o.shares, 9900);                                 // 仍按单笔 10 万整手补位
+});
