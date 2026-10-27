@@ -101,3 +101,40 @@ def test_missing_core_fields_mark_the_result_partial(monkeypatch):
     monkeypatch.setattr(eastmoney, "eastmoney_datacenter", lambda *a, **k: [{"EX_DIVIDEND_DATE": "2026-06-20 00:00:00", "PRETAX_BONUS_RMB": 280.0}])
     m = mappers.em_dividend(eastmoney.dividend_history("600000"), _ctx(symbol="600000", market="CN", source="eastmoney", ep={"id": "em_dividend"}))
     assert not m["missing"], "只派现、没转增送股是常态,不算缺"
+
+
+def test_sw_ca_bundle_uses_aia_certificate(tmp_path, monkeypatch):
+    """申万站点只发叶子证书、不发中间 CA:拼 certifi 根 + AIA 里的中间证书再完整校验。
+
+    回归点:2026-10 起直接请求报 unable to get local issuer certificate,
+    被误判成「本机代理劫持 TLS」;真正原因是服务端没发中间证书。
+    """
+    import base64
+
+    import certifi
+
+    # 一张随手造的 DER 字节即可：被测函数只负责拼进 bundle，不看内容
+    class R:
+        content = base64.b64decode("MIIBkTCB+wIJAKH" + "A" * 40 + "==")
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(sw, "http_get", lambda *a, **k: R())
+    monkeypatch.setattr(sw, "_SW_ISSUER_CACHE", None)
+    bundle = sw._sw_ca_bundle()
+    assert bundle is not None
+    text = open(bundle, "rb").read()
+    with open(certifi.where(), "rb") as f:
+        roots = f.read()
+    assert text.startswith(roots.rstrip(b"\n")), "根证书在前,certifi 原有的都不丢"
+    assert b"-----BEGIN CERTIFICATE-----" in text
+    assert text.count(b"-----BEGIN CERTIFICATE-----") == roots.count(b"-----BEGIN CERTIFICATE-----") + 1
+
+
+def test_sw_ca_bundle_returns_none_when_aia_unreachable(monkeypatch):
+    """取不到中间证书时回落到默认校验（不静默关掉校验）。"""
+    def boom(*_a, **_k):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(sw, "http_get", boom)
+    monkeypatch.setattr(sw, "_SW_ISSUER_CACHE", None)
+    assert sw._sw_ca_bundle() is None

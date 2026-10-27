@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import io
 import os
+import ssl
 import sys
+import tempfile
 import time
+from pathlib import Path
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,6 +19,35 @@ _CACHE = None
 #: 握手偶发失败时的重试次数与退避(秒);**只重试,不降低校验强度**
 SSL_RETRIES = 3
 SSL_RETRY_SLEEP = 0.6
+
+#: 2026-10 实测:该站只回叶子证书、**不发中间 CA**(GeoTrust G2 TLS CN RSA4096 SHA256 2022 CA1),
+#: 客户端拼不出链,报 unable to get local issuer certificate。这和代理无关 —— 手机、浏览器能打开
+#: 是因为它们会按 AIA 自己补链,Python / requests 默认不会。
+#: ⇒ 补上这张中间证书再校验(仍然完整验证签名与域名,不是关校验)。
+SW_ISSUER_URL = "http://cacerts.digicert.cn/GeoTrustG2TLSCNRSA4096SHA2562022CA1.crt"
+_SW_ISSUER_CACHE: Optional[str] = None
+
+
+def _sw_ca_bundle() -> Optional[str]:
+    """certifi 根证书 + 申万缺的那张中间证书,拼成临时 bundle；取不到中间证书返回 None。"""
+    global _SW_ISSUER_CACHE
+    if _SW_ISSUER_CACHE is not None:
+        return _SW_ISSUER_CACHE or None
+    import certifi
+    try:
+        r = http_get(SW_ISSUER_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30, ext="crt")
+        r.raise_for_status()
+        body = r.content
+        # 站点给的是 DER；万一以后改回 PEM 也认
+        pem = body if b"-----BEGIN CERTIFICATE-----" in body else ssl.DER_cert_to_PEM_cert(body).encode()
+        out = Path(tempfile.gettempdir()) / "vra-swsresearch-chain.pem"
+        with open(certifi.where(), "rb") as f:
+            roots = f.read()
+        out.write_bytes(roots + (b"" if roots.endswith(b"\n") else b"\n") + pem)
+        _SW_ISSUER_CACHE = str(out)
+    except Exception:  # noqa: BLE001 — 拿不到就回落到默认校验,由上层给出可执行的报错
+        _SW_ISSUER_CACHE = ""
+    return _SW_ISSUER_CACHE or None
 
 
 def sw_industry_history():
@@ -35,7 +67,10 @@ def sw_industry_history():
     last_ssl: Optional[Exception] = None
     for attempt in range(SSL_RETRIES):
         try:
-            r = http_get(SW_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=60, ext="xls")
+            # 带上补好的链再校验；取不到中间证书时 verify 回落到默认(系统 / certifi 根)
+            ca = _sw_ca_bundle()
+            r = http_get(SW_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=60, ext="xls",
+                         **({"verify": ca} if ca else {}))
             last_ssl = None
             break
         except requests.exceptions.SSLError as e:
@@ -47,9 +82,9 @@ def sw_industry_history():
         if not insecure_tls_allowed():
             raise RuntimeError(
                 f"申万站点证书校验连续 {SSL_RETRIES} 次失败({type(last_ssl).__name__})。"
-                "最常见原因是**本机流量经代理**(VPN / Clash 之类会用自己的证书接管 TLS):"
-                "先确认代理是否在跑、该域名走的哪条规则,或临时关掉代理重试。"
-                "确属站点证书链问题、且你接受风险时,才设 VRA_ALLOW_INSECURE_TLS=1 降级(仅研究用)"
+                "该站只发叶子证书、不发中间 CA,正常做法是补上中间证书(本程序会自动从 AIA 下载合并到 certifi);"
+                "补链失败时先确认能访问 cacerts.digicert.cn,再排除本机代理拦截 TLS(VPN / Clash 会用自己的证书)。"
+                f"原始错误:{last_ssl}"
             ) from last_ssl
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
