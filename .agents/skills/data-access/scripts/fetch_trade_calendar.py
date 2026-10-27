@@ -116,6 +116,7 @@ def main() -> None:
                                         currency="n/a", note="extracted:SDK/接口行数据拼装;全市场日历,非个股;"
                                                              f"session_phase 按 Asia/Shanghai 当前时刻推算;来源:{source}"))
     res["extra"].update({"window": [trading[0], trading[-1]], "trading_days": len(trading),
+                         "trading_day_list": trading,
                          "last_trading_day": last_td, "previous_trading_day": prev_td, "is_today_trading_day": is_today_td,
                          "session_phase": phase, "reference_quote_day": ref_day, "checked_at": now_iso(),
                          "provenance": lib_versions("baostock")})
