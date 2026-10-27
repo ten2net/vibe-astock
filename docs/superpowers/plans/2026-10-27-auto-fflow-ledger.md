@@ -24,18 +24,17 @@
 
 Read `.agents/skills/data-access/scripts/fetch_trade_calendar.py`，确认 `trading` 列表变量名与 `extra` 构造位置（约 :35-61 算列表、:118 附近落 extra）。注意脚本结尾 `finish()` 会 `sys.exit`，测试用 `pytest.raises(SystemExit)` 包。
 
-- [ ] **Step 2: 写失败测试**
+- [ ] **Step 2: 写失败测试（新建测试文件）**
 
-在 `.agents/skills/data-access/scripts/tests/test_fetch_trade_calendar.py` 追加（沿用该文件现有 monkeypatch/finish 惯例）：
+新建 `.agents/skills/data-access/scripts/tests/test_fetch_trade_calendar.py`（该文件不存在；mock 细节与落盘路径以目录现有测试 test_kline_freshness.py 的真实契约为准，计划的 result.json/meta 只是示意）。测试要点：
 
 ```python
 def test_trading_day_list_in_extra(monkeypatch, tmp_path):
-    """extra.trading_day_list 含完整逐日交易日列表(升序、含今天),供持有天数计算"""
-    ...  # 与现有测试相同的日历 mock;调用 finish 流程
-    out = json.loads((tmp_path / "result.json").read_text())
-    days = out["extra"]["trading_day_list"]
-    assert days == sorted(days)
-    assert out["meta"]["trade_date"] in days
+    """extra.trading_day_list 含完整逐日交易日列表(升序、含今天、无未来日、无遗漏)"""
+    # mock 主源返回升序且含未来日的日历;备源 mock 成 pytest.fail(防走降级)
+    # 断言:SystemExit.code == 0;days == sorted(days);today in days;future not in days
+    # 加固(质量评审意见):monkeypatch fetch_trade_calendar.today_str 固定时钟防午夜 flaky;
+    # 再补一条 assert days == sorted(d for d in mocked_calendar if d <= fixed_today) 钉死无遗漏
 ```
 
 - [ ] **Step 3: 跑测试确认失败**
