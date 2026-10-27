@@ -35,20 +35,36 @@ const writeState = (dataRoot: string, day: string, winMin: number, v: unknown) =
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
-async function fetchCalendar(ctx: ServiceContext, day: string, signal: AbortSignal): Promise<CalendarFacts | null> {
+/** 可注入的取数(测试用 fake);默认走真实 fetchEndpoint */
+export interface RunnerDeps { fetch?: typeof fetchEndpoint }
+
+/**
+ * 一次取数同时解析日历事实和交易日列表。
+ * ⚠️ fetch_trade_calendar 在 registry 没声明 args(白名单只有全局键):这里**不许**带 args,
+ *    assertArgs 会直接拒,整个窗口白跑(2026-10-27 评审发现的 bug)。
+ */
+async function fetchCalendar(
+  ctx: ServiceContext, day: string, signal: AbortSignal, deps: RunnerDeps,
+): Promise<{ facts: CalendarFacts | null; tradingDayList: string[] | undefined }> {
   try {
-    const r = await fetchEndpoint(ctx, { endpoint: "fetch_trade_calendar", symbol: "300308", signal });
-    const env = r.envelope as { evidence?: { field?: string; value?: unknown; period?: string }[] };
+    const r = await (deps.fetch ?? fetchEndpoint)(ctx, { endpoint: "fetch_trade_calendar", symbol: "300308", signal });
+    const env = r.envelope as {
+      evidence?: { field?: string; value?: unknown; period?: string }[];
+      extra?: { trading_day_list?: string[] };
+    };
     const period = (env.evidence ?? []).find((e) => e.field === "is_today_trading_day")?.period;
-    return period === day ? calendarFromEnvelope(env) : null;
-  } catch { return null; }
+    return {
+      facts: period === day ? calendarFromEnvelope(env) : null,
+      tradingDayList: env.extra?.trading_day_list,
+    };
+  } catch { return { facts: null, tradingDayList: undefined }; }
 }
 
 /** 持仓票的现价:腾讯批量行情(envelope 是证据长表,用 schedule.rowsOf 透视成行) */
-async function fetchQuotes(ctx: ServiceContext, symbols: string[], signal: AbortSignal): Promise<Map<string, number>> {
+async function fetchQuotes(ctx: ServiceContext, symbols: string[], signal: AbortSignal, deps: RunnerDeps): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (!symbols.length) return out;
-  const r = await fetchEndpoint(ctx, { endpoint: "tx_quotes_batch", args: { codes: symbols.map(quoteCodeOf) }, signal });
+  const r = await (deps.fetch ?? fetchEndpoint)(ctx, { endpoint: "tx_quotes_batch", args: { codes: symbols.map(quoteCodeOf) }, signal });
   for (const row of rowsOf(r.envelope)) {
     const price = num(row.f.price?.value);
     if (price !== null) out.set(symbolOfQuoteKey(row.key), price);
@@ -66,15 +82,14 @@ function negativeMinutes(series: { main: number | null }[], barMinutes: number):
   return { neg: (vals.length - i) * barMinutes, last: vals[vals.length - 1]! };
 }
 
-async function runOnce(
-  ctx: ServiceContext, day: string, signal: AbortSignal,
+export async function runOnce(
+  ctx: ServiceContext, day: string, signal: AbortSignal, deps: RunnerDeps = {},
 ): Promise<{ orders: Order[]; error?: string }> {
-  const cal = await fetchCalendar(ctx, day, signal);
-  if (!cal || !cal.is_today_trading_day) return { orders: [], error: "交易日历取不到或今天不是交易日" };
-  const tradingDays = ((await fetchEndpoint(ctx, { endpoint: "fetch_trade_calendar", symbol: "300308", args: { days: 40 }, signal }))
-    .envelope as { extra?: { trading_day_list?: string[] } }).extra?.trading_day_list;
+  const cal = await fetchCalendar(ctx, day, signal, deps);
+  if (!cal.facts || !cal.facts.is_today_trading_day) return { orders: [], error: "交易日历取不到或今天不是交易日" };
+  const tradingDays = cal.tradingDayList;
 
-  const view: FflowView = await shortlineFflow(ctx, {}, signal);
+  const view: FflowView = await shortlineFflow(ctx, {}, signal, { fetch: deps.fetch ?? fetchEndpoint });
   const candidates: CandidateQuote[] = view.stocks.map((s) => ({
     code: s.code, name: s.name, price: s.price, pct: s.pct, mainNet: s.main_net,
     floatCap: s.float_cap, upRatio: s.up_ratio, riseBp: s.rise_bp, score: s.score,
@@ -89,12 +104,12 @@ async function runOnce(
 
   const replay = replayTrades(
     (snap.records.trade ?? []).filter((r) => !bad.has(r.id)).map(tradeOf), "fifo");
-  const quotes = await fetchQuotes(ctx, replay.holdings.map((h) => h.symbol), signal);
+  const quotes = await fetchQuotes(ctx, replay.holdings.map((h) => h.symbol), signal, deps);
   const holdings: AutoTradeHolding[] = [];
   for (const h of replay.holdings) {
     let mainToday: number | null = null, neg = 0;
     try {
-      const env = (await fetchEndpoint(ctx, { endpoint: "em_fund_flow_minute", symbol: h.symbol, signal })).envelope as {
+      const env = (await (deps.fetch ?? fetchEndpoint)(ctx, { endpoint: "em_fund_flow_minute", symbol: h.symbol, signal })).envelope as {
         extra?: { minute_series?: { main: number | null }[]; bar_minutes?: number } };
       const r = negativeMinutes(env.extra?.minute_series ?? [], env.extra?.bar_minutes ?? 1);
       mainToday = r.last; neg = r.neg;
@@ -107,8 +122,8 @@ async function runOnce(
   }
 
   const orders = [
-    ...sellOrders(CONFIG, holdings, history, cal, tradingDays),
-    ...buyOrders(CONFIG, candidates, holdings, history, cal, tradingDays),
+    ...sellOrders(CONFIG, holdings, history, cal.facts, tradingDays),
+    ...buyOrders(CONFIG, candidates, holdings, history, cal.facts, tradingDays),
   ];
   for (const o of orders) {
     ledgerUpsert(ctx, {
@@ -133,6 +148,7 @@ async function runOnce(
 /** FINANCE_SCHEDULE.beat 分支:窗口 = 5 分钟一格的 [09:35, 14:50] */
 export async function autoTradeBeat(
   b: { ctx: ServiceContext; signal: AbortSignal; gate: () => Promise<GateResult> },
+  deps: RunnerDeps = {},
 ): Promise<string | void> {
   const now = new Date();
   const hm = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
@@ -144,7 +160,7 @@ export async function autoTradeBeat(
   if (gate.status === "closed") return;
   let result: { orders: Order[]; error?: string };
   try {
-    result = await runOnce(b.ctx, day, b.signal);
+    result = await runOnce(b.ctx, day, b.signal, deps);
   } catch (e) {
     result = { orders: [], error: e instanceof Error ? e.message : String(e) };
   }
