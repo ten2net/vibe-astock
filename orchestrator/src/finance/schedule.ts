@@ -303,8 +303,8 @@ export const FINANCE_SCHEDULE: ScheduleDef = {
   gate: financeGate,
   // 短线的盘中快照:每一拍看一次是否到了快照时点(09:25 / 09:35 / 10:00 / 11:30 / 14:00 / 15:00)。
   // 动态导入:intraday.ts 反过来要用本文件的 pool / rowsOf,静态互相导入容易在加载顺序上出事。
-  // 两个子运行(auto_fflow_trade 记账、盘中快照)各自按自己的运行 id 记状态与失败重试
-  // (记账按 日+5分钟窗口,快照按 日+时点),互不相干;这里再各自接住异常,一个抛错不拖垮另一个。
+  // 两个子 beat 各自存自己的状态(记账 = <数据目录>/auto_trade/<日>-<窗口>.json,
+  // 快照 = shortline/intraday/<日>/status.json),互不影响;异常互相隔离,只进本拍报告。
   beat: async (b) => {
     const intraday = await import("./shortline/intraday.ts");
     const autoTrade = await import("./auto_trade_runner.ts");

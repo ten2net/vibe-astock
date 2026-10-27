@@ -86,12 +86,6 @@ export interface ScheduleDef {
    * `gate()` 是同一份当日开门判断(按天缓存),要用时再调。返回的一句话和出错都只进本拍报告,不影响定时任务。
    */
   beat?(b: { ctx: ServiceContext; day: string; hm: string; now: Date; signal: AbortSignal; gate: () => Promise<GateResult> }): Promise<string | void>;
-  /**
-   * 可选:同一天失败重试的运行 id 过滤(正则)。tick 里失败的任务 10 分钟后按运行 id 重试;
-   * id 不匹配的任务当天不再重试(照常记失败,等第二天)。组合调度里各子运行(如 auto_fflow_trade、
-   * 盘中快照时点)的失败重试互不相干,此过滤防止一个运行 id 的失败重试连环炸到同一份调度里的其他运行。
-   */
-  idFilter?: RegExp;
 }
 
 const JOB_ID = /^[a-z][a-z0-9_]{0,39}$/;
@@ -711,10 +705,7 @@ export async function tick(ctx: ServiceContext, opts: { now?: Date; clock?: () =
       const st = state.jobs[j.id];
       if (!jobEnabled(settings, j) || jobAt(settings, j) > hm || st?.last_day === day) return false;
       const retry = st?.attempt?.day === day ? Date.parse(st.attempt.retry_after ?? "") : Number.NaN;
-      if (Number.isFinite(retry) && retry > now.getTime()) return false;
-      // idFilter:同一天失败重试的运行 id 过滤,不匹配的 id 当天不再重试(等第二天),失败重试不连环炸到其他运行
-      if (def.idFilter && st?.status === "failed" && st.attempt?.day === day && !def.idFilter.test(j.id)) return false;
-      return true;
+      return !(Number.isFinite(retry) && retry > now.getTime());
     });
     report.due = due.map((j) => j.id);
     if (!due.length) return report;
