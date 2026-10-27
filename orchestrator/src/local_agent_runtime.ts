@@ -1308,7 +1308,11 @@ export function parseCodeBuddyOutput(stdout: string): string {
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    throw new LocalAgentError("agent_bad_output", "CodeBuddy 返回了无法解析的结果");
+    // 带上 stdout 片段:agent_bad_output 的原因只有看了原始输出才知道
+    // (实测出现过 exit 0 + 非 JSON 纯文本的多种形态),消息会进 events.jsonl 与运行日志。
+    const snippet = stdout.trim().slice(0, 200);
+    throw new LocalAgentError("agent_bad_output",
+      `CodeBuddy 返回了无法解析的结果:${snippet ? `开头「${snippet}」` : "(stdout 为空)"}`);
   }
   const candidates = Array.isArray(parsed) ? parsed : [parsed];
   for (const item of [...candidates].reverse()) {
