@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buyOrders, BUY_COOLDOWN_DAYS, limitPctOf, parseAutoNote, PCT_MAX, PCT_MIN,
+  buyOrders, sellOrders, BUY_COOLDOWN_DAYS, limitPctOf, parseAutoNote, PCT_MAX, PCT_MIN,
   RISE_BP_MIN, UP_RATIO_MIN, MAIN_BP_MIN, MAIN_NET_ABS_MIN,
-  type AutoTradeConfig, type CandidateQuote,
+  type AutoTradeConfig, type AutoTradeHolding, type AutoTradeHistory,
+  type CalendarFacts, type CandidateQuote, type Order,
 } from "../src/finance/auto_trade.ts";
 
 const CFG: AutoTradeConfig = {
@@ -25,8 +26,8 @@ test("涨幅在 3%~6% 之外不买", () => {
 
 test("ST、涨停附近、稳步度不够、主力净额不足都剔除", () => {
   assert.equal(buyOrders(CFG, [cand({ name: "ST某某" })], []).length, 0);
-  assert.equal(buyOrders(CFG, [cand({ code: "600000", pct: 9.6 })], []).length, 0);   // 主板涨停
-  assert.equal(buyOrders(CFG, [cand({ code: "300308", pct: 19.2 })], []).length, 0);  // 创业板涨停
+  assert.equal(buyOrders(CFG, [cand({ code: "600000", pct: 9.6 })], []).length, 0);   // 被 PCT_MAX=6 拦下(涨停守卫在 buyOrders 内不可达,属防御常量)
+  assert.equal(buyOrders(CFG, [cand({ code: "300308", pct: 19.2 })], []).length, 0);  // 被 PCT_MAX=6 拦下(同上)
   assert.equal(buyOrders(CFG, [cand({ upRatio: UP_RATIO_MIN - 0.05 })], []).length, 0);
   assert.equal(buyOrders(CFG, [cand({ riseBp: RISE_BP_MIN - 1 })], []).length, 0);
   assert.equal(buyOrders(CFG, [cand({ mainNet: 1e6, floatCap: 8e11 })], []).length, 0); // 0.0125bp < 5bp
@@ -43,9 +44,6 @@ test("涨停阈值按板块区分", () => {
   assert.equal(limitPctOf("688981"), 19);    // 科创板 20%
   assert.equal(limitPctOf("830799"), 29);    // 北交所 30%
 });
-
-import type { AutoTradeHistory, AutoTradeHolding, CalendarFacts, Order } from "../src/finance/auto_trade.ts";
-import { sellOrders } from "../src/finance/auto_trade.ts";
 
 const CAL: CalendarFacts = {
   last_trading_day: "2026-10-27", previous_trading_day: "2026-10-26",
@@ -106,4 +104,22 @@ test("parseAutoNote 只认 auto_fflow 前缀,其余返回 null", () => {
   assert.equal(parseAutoNote("auto_fflow|rule=buy|pct=4")?.rule, "buy");
   assert.equal(parseAutoNote("手工记账"), null);
   assert.equal(parseAutoNote(""), null);
+});
+
+test("日历与 tradingDays 不一致(indexOf=-1):冷却显式禁用放行、不崩溃,到期强平不触发", () => {
+  const days = ["2026-10-20", "2026-10-21", "2026-10-22"];   // 不含 cal.last_trading_day
+  const h = hist([
+    { symbol: "600519", type: "buy", date: "2026-10-26" },
+    { symbol: "600519", type: "sell", date: "2026-10-26" }]);
+  // 冷却判定视为不可用(null):即使 history 里近 3 日有买卖,也放行且不崩溃
+  assert.equal(buyOrders(CFG, [cand()], [], h, CAL, days).length, 1);
+  // 到期强平不触发:openedAt 之后满几个交易日无法确认,保守不卖
+  const expiry = sellOrders(CFG, [held({ openedAt: "2026-10-20", price: 1700 })], hist([]), CAL, days);
+  assert.equal(expiry.length, 0);
+});
+
+test("T+1 防御:openedAt=今天即不卖,即使 history 缺当日买入记录", () => {
+  const DAYS = ["2026-10-23", "2026-10-26", "2026-10-27"];
+  const orders = sellOrders(CFG, [held({ openedAt: "2026-10-27", price: 1700 * 0.9 })], hist([]), CAL, DAYS);
+  assert.equal(orders.length, 0);   // 现价破止损,但 T+1 新仓必须跳过
 });

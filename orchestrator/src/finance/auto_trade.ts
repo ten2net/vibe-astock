@@ -7,8 +7,8 @@ import type { CalendarFacts } from "./session.ts";
 export type { CalendarFacts };
 
 export const PCT_MIN = 3, PCT_MAX = 6;
-export const UP_RATIO_MIN = 0.6;
-export const RISE_BP_MIN = 10;
+export const UP_RATIO_MIN = 0.6;          // 与 shortline/fflow_pattern.ts 的 UP_RATIO 同值,独立常量以免引擎依赖取数模块
+export const RISE_BP_MIN = 10;            // 候选已过 fflow_pattern 形态判定,此处为兜底下限
 export const MAIN_BP_MIN = 5;             // main_net 占流通市值 ≥ 5bp
 export const MAIN_NET_ABS_MIN = 2e7;      // 无流通市值时主力净额 ≥ 2000 万(新浪通道兜底)
 export const BUY_COOLDOWN_DAYS = 3;       // 近 3 个交易日内买过不买
@@ -43,7 +43,7 @@ export type Order =
   | { kind: "buy"; symbol: string; name: string; shares: number; price: number; reason: string; note: string }
   | { kind: "sell"; symbol: string; name: string; shares: number; price: number; reason: string; note: string };
 
-/** 各板块涨停阈值(百分数):主板 10%、创业/科创 20%、北交所 30%,留 0.5% 买不进余量 */
+/** 各板块涨停阈值(百分数),均按「买不进」处理:主板 10% 板留 0.5% 余量,20cm/30cm 板留 1% 余量(档位不同,余量不同) */
 export function limitPctOf(code: string): number {
   if (/^(?:30|68)/.test(code)) return 19;
   if (/^(?:4|8|92)/.test(code)) return 29;
@@ -71,10 +71,11 @@ export function buyOrders(
   const orders: Order[] = [];
   // 冷却窗口:recent(n) = 含今天的最近 n+1 个交易日。买入冷却 3 日 → n=2;
   // 卖出冷却 1 日 → n=1(卖出当日 + 次日不买,防止止损当日反复接回)。
+  // indexOf 找不到返回 -1(不是 NaN):日历与 tradingDays 不一致时返回 null,显式禁用冷却,不静默误判。
   const recent = (n: number) => {
     if (!tradingDays || !cal) return null;
     const tdi = tradingDays.indexOf(cal.last_trading_day);
-    return Number.isNaN(tdi) ? null : new Set(tradingDays.slice(Math.max(0, tdi - n), tdi + 1));
+    return tdi < 0 ? null : new Set(tradingDays.slice(Math.max(0, tdi - n), tdi + 1));
   };
   const rb = recent(cfg.buyCooldownDays - 1), rs = recent(cfg.sellCooldownDays);
   const list = [...candidates].sort((a, b) => b.score - a.score);
@@ -121,7 +122,8 @@ export function sellOrders(
   const tdi = tradingDays ? tradingDays.indexOf(cal.last_trading_day) : Number.NaN;
   for (const h of holdings) {
     if (h.price === null || !(h.price > 0)) continue;              // 停牌等,这轮放弃
-    if (boughtToday.has(h.symbol)) continue;                        // T+1
+    if (boughtToday.has(h.symbol)) continue;                        // T+1(有当日买入记录)
+    if (h.openedAt === cal.last_trading_day) continue;              // T+1 防御:history 缺记录时也跳过当日新仓
     const price = Math.round(h.price / SLIP * 100) / 100;
     const cost = h.unitCost;
     const tag = (rule: string) => ({
@@ -131,8 +133,8 @@ export function sellOrders(
     if (price <= cost * cfg.stopLoss) { orders.push(tag("sell_stop")); continue; }
     if (price >= cost * cfg.takeProfit) { orders.push(tag("sell_take_profit")); continue; }
     if (h.negMinutes >= CURVE_NEG_MIN_MINUTES) { orders.push(tag("sell_curve")); continue; }
-    // 到期强平:openedAt 之后满 holdDays 个交易日(含今天)
-    if (tradingDays && !Number.isNaN(tdi)) {
+    // 到期强平:openedAt 之后满 holdDays 个交易日(含今天);tdi=-1(日历不一致)时不触发,保守不卖
+    if (tradingDays && tdi >= 0) {
       const oi = tradingDays.indexOf(h.openedAt);
       if (oi >= 0 && tdi - oi >= cfg.holdDays) orders.push(tag("sell_expiry"));
     }
