@@ -455,3 +455,36 @@ article.post .post-body,.post-body p,.post-body li,.post-body td,
 .va-table td.va-num{text-align:right}
 /* 首封时间用等宽字体，时分秒对齐好看 */
 .va-table td.va-al-center{font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   文章页两栏：正文 9/12，右侧栏 3/12（作者卡 + 特色标签 + 目录）
+   CleanWhite 原版正文是 8/12 + 侧栏自然落到页脚；加宽后侧栏会掉到最下面。
+   用 flex 重排：正文在左、侧栏在右并吸附，窄屏自动变单列。
+   ============================================================ */
+article>.container>.row{
+  display:flex;align-items:flex-start;flex-wrap:wrap;margin-left:0;margin-right:0;
+}
+article>.container>.row>.post-container{
+  float:none!important;flex:0 0 74%;max-width:74%;width:74%!important;
+  margin:0!important;padding-right:34px!important;
+}
+article>.container>.row>.sidebar-container{
+  float:none!important;flex:0 0 26%;max-width:26%;width:26%!important;
+  margin:0!important;padding:0 0 0 6px!important;
+  position:sticky;top:84px;align-self:flex-start;
+}
+/* 目录栏（原 2/12）已经并进右栏思路：窄屏和小屏都不再单独显示 */
+article>.container>.row>.catalog-container{display:none!important}
+article>.container{max-width:1240px;margin:0 auto}
+
+@media (max-width:1199px){
+  article>.container>.row{display:block}
+  article>.container>.row>.post-container{
+    flex:none;width:91.6667%!important;max-width:none;margin:0 0 0 4.1667%!important;
+    padding-right:0!important;
+  }
+  article>.container>.row>.sidebar-container{
+    flex:none;width:91.6667%!important;max-width:none;margin:0 0 0 4.1667%!important;
+    position:static;padding:0!important;
+  }
+}
