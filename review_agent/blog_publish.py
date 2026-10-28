@@ -206,7 +206,8 @@ def _text_to_md(text: str) -> str:
             continue
         m = re.match(r"^(#{1,6})\s*(.+)$", block)
         if m:
-            level = min(len(m.group(1)) + 1, 3)
+            # 汇总研判里的 # 与 ## 一律当正文小标题：统一成三级（h3），不和分区标题抢
+            level = 3
             if lines and lines[-1] != "":
                 lines.append("")
             lines.extend(["#" * level + " " + m.group(2).strip(), ""])
@@ -1267,8 +1268,13 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     md.append(_section("涨停分档", [_block_tier_tiers(payload, prev_reviews or {})],
                        "按东财行业和前一交易日比，只看集中在哪、散在哪"))
     if evidence.strip():
-        md.append('<details class="post-detail"><summary>本次输入依据（机器扫描的原始片段）</summary>'
-                  '<div class="post-content">' + _text_to_md(strip_citations(evidence)) + "</div></details>")
+        # 依据附录单独成块：details 里放块级 div，正文段才不会被行内解析挤成一段
+        md.append('<details class="post-detail">' + chr(10)
+                  + '<summary>本次输入依据（机器扫描的原始片段）</summary>' + chr(10) + chr(10)
+                  + '<div class="post-content">' + chr(10) + chr(10)
+                  + _text_to_md(strip_citations(evidence))
+                  + chr(10) + chr(10) + '</div>' + chr(10) + chr(10)
+                  + '</details>' + chr(10) + chr(10))
     md.append(promotion_html())
     return "\n".join(fm + md).strip() + "\n"
 

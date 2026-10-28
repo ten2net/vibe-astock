@@ -76,7 +76,7 @@ class TestPost:
         md = bp.post_markdown(payload(), DATE)
         # 正文里的一级标题压到 h2 以下：页面已经有 h1
         assert "<h1>" not in md.split("<section", 1)[-1]
-        assert "<h2>盘面研判</h2>" in md
+        assert "<h3>盘面研判</h3>" in md
 
     def test_missing_readings_not_zero(self):
         md = bp.post_markdown(payload(market_facts={}, emotion_metrics={}), DATE)
@@ -414,8 +414,9 @@ class TestParagraphMarkup:
         seg = md[start:md.index("</section>", start)]
         assert seg.count("<p>") == 2      # 原 HTML 两段 → 两个 <p>
 
-    def test_h1_in_report_becomes_h2(self):
-        assert bp._text_to_md("# 盘面研判\n\n正文。").startswith("## 盘面研判")
+    def test_report_headings_become_h3(self):
+        # 汇总研判里的 # 与 ## 都当正文小标题：统一三级，不和分区 h2 抢
+        assert bp._text_to_md("# 盘面研判\n\n正文。").startswith("### 盘面研判")
         assert bp._text_to_md("## 二级\n\n正文。").startswith("### 二级")
 
     def test_inline_bold_and_code(self):
