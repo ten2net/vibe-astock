@@ -447,3 +447,24 @@ class TestRenderedBlocks:
         seg = md[md.index("题材结构与题材事件树"):]
         assert "&lt;p class" not in seg and "&lt;table" not in seg
         assert "<table class=\"va-table\">" in seg
+
+
+
+class TestLianbanTable:
+    def test_first_seal_is_formatted_as_time(self):
+        assert bp._hhmmss("093026") == "09:30:26"
+        assert bp._hhmmss("0930") == "09:30"
+        assert bp._hhmmss("") == "—" and bp._hhmmss(None) == "—"
+
+    def test_lianban_columns_aligned(self):
+        p = {"market_facts": {"theme_tree": {"themes": [{"tag": "T", "members": [
+            {"code": "1", "name": "AAA", "boards": 3, "first_seal": "093026", "broken_times": 2}]}]}}}
+        html_text = bp._block_lianban(p)
+        assert "09:30:26" in html_text and "093026" not in html_text
+        # 连板 / 首封 / 开板次数 居中，其余（个股、板位标签、题材）左对齐
+        assert html_text.count('class="va-al-center"') == 3
+        assert "va-al-left" not in html_text
+
+    def test_table_align_param(self):
+        html_text = bp._table(["a", "b"], [["x", "y"]], align={1: "right"})
+        assert '<th class="va-al-right">b</th>' in html_text

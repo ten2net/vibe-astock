@@ -271,3 +271,187 @@ article.post .post-body,.post-body p,.post-body li,.post-body td,
 .post-container .post-body *{color:#1a1d21!important;font-style:normal!important}
 .va-sec .va-sec-h h2,.va-sec-h h2,h2.va-sec-title{color:#111417!important}
 .va-sec .va-sec-h span{color:#4b5563!important}
+
+
+/* ============================================================
+   暗色模式：主题切到 dark 时，上面那套「高对比 = 深色字」必须整体翻过来
+   （用户手动切换用 [data-theme="dark"]，跟随系统用 prefers-color-scheme）
+   ============================================================ */
+
+/* ============================================================
+   暗色模式：浅色那套规则全是 !important 的深色字，
+   切到 dark 时必须同权重覆盖回来，否则就是近黑底 + 深色字。
+   触发条件有两个：手动切换 [data-theme="dark"]，或跟随系统（未手动选过 light）。
+   ============================================================ */
+[data-theme="dark"]{
+  --color-bg:#0f1319;
+  --color-text-main:#e6e8eb;
+  --color-text-secondary:#a9b1bb;
+  --color-text-muted:#a9b1bb;
+  --color-primary:#5ec8e5;
+  --color-primary-light:#5ec8e5;
+  --color-border:rgba(255,255,255,.14);
+  --color-border-light:rgba(255,255,255,.08);
+  --sidebar-text:#a9b1bb;
+  --sidebar-heading:#f2f4f6;
+  --navbar-text:#f2f4f6;
+}
+[data-theme="dark"] body{background:#0f1319;color:#e6e8eb}
+[data-theme="dark"] html{background:#0f1319}
+[data-theme="dark"] body,[data-theme="dark"] p,[data-theme="dark"] li,[data-theme="dark"] td,
+[data-theme="dark"] dd,[data-theme="dark"] dt,[data-theme="dark"] label,
+[data-theme="dark"] blockquote,[data-theme="dark"] figcaption,[data-theme="dark"] caption,
+[data-theme="dark"] article.post .post-body,[data-theme="dark"] .post-body p,
+[data-theme="dark"] .post-body li,[data-theme="dark"] .post-body td{color:#e6e8eb!important}
+[data-theme="dark"] h1,[data-theme="dark"] h2,[data-theme="dark"] h3,[data-theme="dark"] h4,
+[data-theme="dark"] h5,[data-theme="dark"] h6,[data-theme="dark"] .section-heading,
+[data-theme="dark"] .post-preview .post-title,[data-theme="dark"] .post-preview .post-title a,
+[data-theme="dark"] .va-sec-h h2,[data-theme="dark"] .sidebar-heading,[data-theme="dark"] .widget-title{
+  color:#f4f6f8!important
+}
+[data-theme="dark"] .post-preview .post-content-preview,
+[data-theme="dark"] .post-preview .post-content-preview *,[data-theme="dark"] .post-content-preview{
+  color:#c8ced6!important
+}
+[data-theme="dark"] .post-preview .post-meta,[data-theme="dark"] .post-preview .post-meta *,
+[data-theme="dark"] .post-meta,[data-theme="dark"] .post-meta a,[data-theme="dark"] .post-meta span,
+[data-theme="dark"] time{color:#a9b1bb!important}
+[data-theme="dark"] .intro-header::before{
+  background:linear-gradient(rgba(9,12,17,.55),rgba(9,12,17,.6))!important
+}
+[data-theme="dark"] .intro-header .site-heading h1,
+[data-theme="dark"] .intro-header .post-heading h1,
+[data-theme="dark"] .intro-header .page-heading h1{
+  color:#f7f9fb!important;text-shadow:0 1px 2px rgba(0,0,0,.55)
+}
+[data-theme="dark"] .intro-header .site-heading .subheading,
+[data-theme="dark"] .intro-header .post-heading .subheading,
+[data-theme="dark"] .intro-header .post-heading .meta{color:#d8dee6!important;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+[data-theme="dark"] blockquote{background:#161b23!important;border-left-color:#2c3440!important;color:#d3d9e1!important}
+[data-theme="dark"] blockquote p{color:#d3d9e1!important}
+[data-theme="dark"] a{color:#7ad3ea}
+[data-theme="dark"] .sidebar,[data-theme="dark"] .sidebar p,[data-theme="dark"] .sidebar a,
+[data-theme="dark"] .tag-cloud a,[data-theme="dark"] .tags a,
+[data-theme="dark"] .navbar-custom a,[data-theme="dark"] .nav li a,
+[data-theme="dark"] footer,[data-theme="dark"] footer a,[data-theme="dark"] footer p,
+[data-theme="dark"] .footer-copyright{color:#c8ced6!important}
+
+/* 复盘卡片在暗色下：面板比底色亮一档，边框半透明白 */
+[data-theme="dark"] .va-panel,[data-theme="dark"] .va-table-wrap,
+[data-theme="dark"] .va-table{background:#161b23!important;border-color:#2a3038!important}
+[data-theme="dark"] .va-stat{background:#1c222b!important;border-color:#2a3038!important}
+[data-theme="dark"] .va-stat-k{color:#a9b1bb!important}
+[data-theme="dark"] .va-stat-v{color:#f2f4f6!important}
+[data-theme="dark"] .va-stat-s,[data-theme="dark"] .va-mini,[data-theme="dark"] .va-table-note,
+[data-theme="dark"] .va-foot-note,[data-theme="dark"] .va-dist-row em,
+[data-theme="dark"] .va-spark-n,[data-theme="dark"] .va-col-x,[data-theme="dark"] .va-gap,
+[data-theme="dark"] .va-sec-h span{color:#a9b1bb!important}
+[data-theme="dark"] .va-sec-h,[data-theme="dark"] .va-sec-h h2,[data-theme="dark"] .va-table th{
+  border-color:#2a3038!important;color:#f4f6f8!important
+}
+[data-theme="dark"] .va-table th{background:#1c222b!important}
+[data-theme="dark"] .va-table td{color:#e6e8eb!important;border-bottom-color:#232a33!important}
+[data-theme="dark"] .va-table tbody tr:hover{background:#1c222b!important}
+[data-theme="dark"] .va-bar{background:#2a3038!important}
+[data-theme="dark"] .va-ladder,[data-theme="dark"] .post-detail,
+[data-theme="dark"] details.post-detail summary{border-color:#2a3038!important;color:#a9b1bb!important}
+[data-theme="dark"] .va-note{background:rgba(227,160,8,.14)!important;border-color:rgba(227,160,8,.45)!important;color:#f0c674!important}
+[data-theme="dark"] .va-spark.last{background:rgba(94,200,229,.12)!important}
+[data-theme="dark"] .up{color:#ff7a7d!important}
+[data-theme="dark"] .down{color:#43cc8a!important}
+[data-theme="dark"] .va-bar-up i{background:#ff7a7d!important}
+[data-theme="dark"] .va-bar-down i{background:#43cc8a!important}
+
+/* 跟随系统深色（用户没手动选过 light）：同一套覆盖 */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --color-bg:#0f1319;--color-text-main:#e6e8eb;--color-text-secondary:#a9b1bb;
+    --color-text-muted:#a9b1bb;--color-primary:#5ec8e5;
+    --sidebar-text:#a9b1bb;--sidebar-heading:#f2f4f6;--navbar-text:#f2f4f6;
+  }
+  :root:not([data-theme="light"]) body{background:#0f1319;color:#e6e8eb}
+  :root:not([data-theme="light"]) p,
+  :root:not([data-theme="light"]) li,
+  :root:not([data-theme="light"]) td,
+  :root:not([data-theme="light"]) blockquote,
+  :root:not([data-theme="light"]) .post-body p{color:#e6e8eb!important}
+  :root:not([data-theme="light"]) h1,
+  :root:not([data-theme="light"]) h2,
+  :root:not([data-theme="light"]) h3,
+  :root:not([data-theme="light"]) .va-sec-h h2,
+  :root:not([data-theme="light"]) .post-preview .post-title{color:#f4f6f8!important}
+  :root:not([data-theme="light"]) .post-content-preview,
+  :root:not([data-theme="light"]) .post-content-preview *{color:#c8ced6!important}
+  :root:not([data-theme="light"]) .post-meta,
+  :root:not([data-theme="light"]) .post-meta *{color:#a9b1bb!important}
+  :root:not([data-theme="light"]) .va-panel,
+  :root:not([data-theme="light"]) .va-table,
+  :root:not([data-theme="light"]) .va-stat{background:#161b23!important;border-color:#2a3038!important}
+  :root:not([data-theme="light"]) .va-table th{background:#1c222b!important;color:#f4f6f8!important}
+  :root:not([data-theme="light"]) .va-table td{color:#e6e8eb!important;border-bottom-color:#232a33!important}
+  :root:not([data-theme="light"]) .va-stat-k,
+  :root:not([data-theme="light"]) .va-mini,
+  :root:not([data-theme="light"]) .va-table-note,
+  :root:not([data-theme="light"]) .va-foot-note,
+  :root:not([data-theme="light"]) .va-sec-h span{color:#a9b1bb!important}
+  :root:not([data-theme="light"]) .va-stat-v{color:#f2f4f6!important}
+  :root:not([data-theme="light"]) .va-sec-h,
+  :root:not([data-theme="light"]) .va-sec-h h2{border-color:#2a3038!important}
+  :root:not([data-theme="light"]) .intro-header::before{
+    background:linear-gradient(rgba(9,12,17,.55),rgba(9,12,17,.6))!important
+  }
+  :root:not([data-theme="light"]) .intro-header .site-heading h1,
+  :root:not([data-theme="light"]) .intro-header .post-heading h1{color:#f7f9fb!important}
+  :root:not([data-theme="light"]) .up{color:#ff7a7d!important}
+  :root:not([data-theme="light"]) .down{color:#43cc8a!important}
+}
+
+
+/* ============================================================
+   文章页加宽：CleanWhite 默认是 8/12 栏 + 2/12 侧栏，表格挤成一团
+   正文放到 10/12（大屏），目录侧栏让位；表格允许列内换行、按内容对齐
+   ============================================================ */
+@media (min-width:1200px){
+  .post-container{width:83.3333%!important;margin-left:8.3333%!important;float:none;max-width:1040px}
+  .catalog-container{display:none!important}
+  /* 首页列表也放宽一点，别和正文宽度差太远 */
+  .post-preview{max-width:1040px;margin-left:auto;margin-right:auto}
+}
+@media (min-width:768px) and (max-width:1199px){
+  .post-container{width:91.6667%!important;margin-left:4.1667%!important;float:none}
+  .catalog-container{display:none!important}
+}
+
+/* 复盘卡片：表格不再强制单行，允许换行；非数字列左对齐 */
+.va-table{width:100%;table-layout:auto}
+.va-table th,.va-table td{white-space:normal;word-break:break-word}
+.va-table th{white-space:nowrap}
+.va-table td.va-num,.va-table td.va-cell,.va-table td.va-spark,
+.va-table th.va-num,.va-table th.va-cell,.va-table th.va-spark{white-space:nowrap}
+.va-table td.va-tier,.va-table th:first-child{text-align:left}
+.va-table td.va-num.mono,.va-table td.va-num{text-align:right}
+/* 「最近几天怎么走的」：日期列窄、首列宽，条形不撑破 */
+.va-table td.va-spark{min-width:56px;padding:8px 6px}
+.va-table td.va-spark .va-bar{width:100%;max-width:72px}
+.va-table-wrap{overflow-x:auto}
+
+
+/* 宽屏再放宽：正文容器吃满可用宽度（上限 1180px），表头与长文本列不吃亏 */
+@media (min-width:1200px){
+  .post-container{width:91.6667%!important;margin-left:4.1667%!important;max-width:1180px}
+  article>.container{max-width:1240px;margin-left:auto;margin-right:auto}
+}
+/* 首列（日期/指数/行业名）宽一点，数字列不缩，条形列足够宽 */
+.va-table th:first-child,.va-table td:first-child{min-width:118px}
+.va-table th:nth-child(2),.va-table td:nth-child(2){min-width:64px}
+
+
+/* ---- 表格按列对齐：_table(align=...) 生成的类 ---- */
+.va-table th.va-al-left,.va-table td.va-al-left{text-align:left}
+.va-table th.va-al-right,.va-table td.va-al-right{text-align:right}
+.va-table th.va-al-center,.va-table td.va-al-center{text-align:center}
+/* 文字列一律左对齐（个股、题材、行业、说明），别被数字列的右对齐带偏 */
+.va-table td:not(.va-num):not(.va-cell):not(.va-spark){text-align:left}
+.va-table td.va-num{text-align:right}
+/* 首封时间用等宽字体，时分秒对齐好看 */
+.va-table td.va-al-center{font-variant-numeric:tabular-nums}

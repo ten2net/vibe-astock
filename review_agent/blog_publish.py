@@ -262,8 +262,15 @@ def _stat_md(label: str, value: str, sub: str = "", tone: str = "flat") -> str:
             f'<p class="va-stat-s">{sub}</p></div>')
 
 
-def _table(head, rows, note: str = "") -> str:
-    head_html = "".join(f"<th>{html.escape(h)}</th>" for h in head)
+def _table(head, rows, note: str = "", align: dict | None = None) -> str:
+    """表格。`align` 按列下标给 left / right / center，没给就左对齐。"""
+    align = align or {}
+
+    def cls(i: int) -> str:
+        kind = align.get(i)
+        return f' class="va-al-{kind}"' if kind else ""
+
+    head_html = "".join(f"<th{cls(i)}>{html.escape(h)}</th>" for i, h in enumerate(head))
     cell = lambda c: c if c.lstrip().startswith("<td") else "<td>" + c + "</td>"
     body = "".join("<tr>" + "".join(cell(c) for c in r) + "</tr>" for r in rows)
     tip = f'<p class="va-table-note">{note}</p>' if note else ""
@@ -593,6 +600,16 @@ def _block_seal(payload: dict) -> str:
     return '<div class="va-grid va-grid-wide">' + "".join(cards) + "</div>"
 
 
+def _hhmmss(value) -> str:
+    """涨停池的封板时间是 HHMMSS 六位数字，公开页统一成 09:30:26。"""
+    text = str(value or "").strip()
+    if len(text) == 6 and text.isdigit():
+        return f"{text[:2]}:{text[2:4]}:{text[4:]}"
+    if len(text) == 4 and text.isdigit():
+        return f"{text[:2]}:{text[2:]}"
+    return text or "—"
+
+
 def _block_lianban(payload: dict) -> str:
     """连板股名单：v1「连板股」表（板位、首封、成交额、行业、题材）。"""
     mf = payload.get("market_facts") or {}
@@ -619,14 +636,16 @@ def _block_lianban(payload: dict) -> str:
         rows.append(['<span class="va-tier">' + html.escape(str(m.get("name") or "")) +
                      ' <span class="va-mono dim">' + html.escape(str(m.get("code") or "")) + "</span></span>",
                      '<span class="up">' + str(boards) + " 板</span>",
-                     html.escape(str(m.get("first_seal") or "—")),
+                     _hhmmss(m.get("first_seal")),
                      html.escape(str(m.get("label") or "")),
                      html.escape(str(m.get("tag") or "")),
                      str(m.get("broken_times") or 0)])
     if not rows:
         return '<p class="va-gap">该日连板样本未取到。</p>'
     note = (f"共 {len(members)} 只涨停样本里有 {len(picks)} 只连板；板与首封按当日涨停池，题材是同花顺市场叙事，不是核验过的因果。")
-    return _table(["个股", "连板", "首封", "板位标签", "所属题材", "开板次数"], rows, note)
+    # 个股 / 板位 / 题材是文字列，左对齐；首封时间与开板次数居中
+    return _table(["个股", "连板", "首封", "板位标签", "所属题材", "开板次数"], rows, note,
+                  align={1: "center", 2: "center", 5: "center"})
 
 # ---------------------------------------------------------------- 补齐 v1 剩余区块
 
