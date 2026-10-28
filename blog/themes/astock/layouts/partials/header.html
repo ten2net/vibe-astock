@@ -1,0 +1,11 @@
+{{ $on := .Section }}
+<header class="va-header">
+  <div class="va-brand">
+    <a href="{{ site.BaseURL }}">{{ site.Title }}</a>
+    <span>{{ site.Params.description }}</span>
+  </div>
+  <nav class="va-nav">
+    <a class="{{ if .IsHome }}on{{ end }}" href="{{ site.BaseURL }}">首页</a>
+    {{ range .Site.Menus.main }}<a href="{{ .URL }}">{{ .Name }}</a>{{ end }}
+  </nav>
+</header>

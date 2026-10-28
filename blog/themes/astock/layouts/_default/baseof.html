@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="HandheldFriendly" content="True">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+<meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+{{ if .IsPage }}<meta property="og:type" content="article">{{ end }}
+<meta property="og:title" content="{{ .Title }}">
+<meta property="og:url" content="{{ .Permalink }}">
+<meta name="theme-color" content="#f7f8fa">
+<link rel="canonical" href="{{ .Permalink }}">
+{{ with .OutputFormats.Get "rss" }}<link href="{{ .Permalink }}" rel="alternate" type="application/rss+xml" title="{{ site.Title }}">{{ end }}
+<link rel="icon" href="/favicon.png">
+{{ with resources.Get "css/astock.css" }}<link rel="stylesheet" href="{{ .RelPermalink }}">{{ end }}
+</head>
+<body>
+<main id="main-wrapper" class="container main_wrapper has-sidebar">
+{{ partial "header.html" . }}
+<div class="va-wrap">
+{{ block "main" . }}{{ end }}
+</div>
+{{ partial "footer.html" . }}
+</main>
+</body>
+</html>

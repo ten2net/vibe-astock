@@ -1,0 +1,11 @@
+{{ define "main" }}
+<section id="main-content" class="container main_content homepage">
+  <header class="container header">
+  <h1>全部复盘</h1>
+  <span>共 {{ len .RegularPages }} 篇</span>
+</header>
+  {{ $paginator := .Paginate .RegularPages.ByDate.Reverse }}
+  {{ range $paginator.Pages }}{{ partial "summary.html" . }}{{ end }}
+  {{ partial "pagination.html" . }}
+</section>
+{{ end }}

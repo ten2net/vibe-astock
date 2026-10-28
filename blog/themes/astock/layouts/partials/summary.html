@@ -1,0 +1,6 @@
+<article class="va-item">
+  <div class="va-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>{{ with .Params.phase }}<span>情绪档位 {{ . }}</span>{{ end }}</div>
+  <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+  <p>{{ with .Params.summary }}{{ . }}{{ else }}{{ .RawSummary }}{{ end }}</p>
+  <a class="va-more" href="{{ .RelPermalink }}">读全文 →</a>
+</article>

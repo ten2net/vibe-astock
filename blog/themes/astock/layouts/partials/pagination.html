@@ -1,0 +1,7 @@
+{{ $p := .Paginator }}{{ if gt $p.TotalPages 1 }}
+<div class="va-page">
+{{ if $p.HasPrev }}<a href="{{ $p.Prev.URL }}">← 上一页</a>{{ end }}
+{{ range $p.Pagers }}<a{{ if eq . $p }} class="on"{{ end }} href="{{ .URL }}">{{ .PageNumber }}</a>{{ end }}
+{{ if $p.HasNext }}<a href="{{ $p.Next.URL }}">下一页 →</a>{{ end }}
+</div>
+{{ end }}

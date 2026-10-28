@@ -1,0 +1,20 @@
+{{ define "main" }}
+<article>
+  <div class="va-sec-h" style="border:0;margin-bottom:4px"><span class="va-kicker">Daily Review</span></div>
+  <h1 class="va-title">{{ .Title }}</h1>
+  <div class="va-meta" style="margin-bottom:18px">
+    <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02 15:04" }}</time>
+    <span>阅读约 {{ .ReadingTime }} 分钟</span>
+    <span>{{ .WordCount }} 字</span>
+    {{ with .Params.tags }}{{ range . }}<a class="va-tag" href="{{ "/tags/" | relLangURL }}{{ . | urlize }}/">{{ . }}</a>{{ end }}{{ end }}
+    <a class="va-tag" href="{{ "/post/" | relLangURL }}">全部复盘</a>
+  </div>
+  <div class="post-content">
+  {{ .Content }}
+  </div>
+  <div class="va-page" style="justify-content:space-between;margin-top:28px">
+    <span>{{ with .PrevInSection }}<a href="{{ .RelPermalink }}">← 前一天：{{ .Date.Format "01-02" }}</a>{{ end }}</span>
+    <span>{{ with .NextInSection }}<a href="{{ .RelPermalink }}">后一天：{{ .Date.Format "01-02" }} →</a>{{ end }}</span>
+  </div>
+</article>
+{{ end }}

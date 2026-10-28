@@ -1,0 +1,22 @@
+{{ define "main" }}
+{{ $posts := where site.RegularPages "Section" "post" }}
+<div class="va-sec">
+  <div class="va-sec-h">
+    <h2>A 股每日复盘</h2>
+    <span>公开数据 + 程序计算 + 模型解读 · 共 {{ len $posts }} 篇</span>
+  </div>
+  {{ with $posts.ByDate.Reverse }}{{ with index . 0 }}
+  <div class="va-panel va-lead">
+    <div class="va-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time><span>最近一场</span>{{ with .Params.phase }}<span>情绪档位 {{ . }}</span>{{ end }}</div>
+    <h2 class="va-title"><a href="{{ .RelPermalink }}" style="color:inherit;text-decoration:none">{{ .Title }}</a></h2>
+    <p class="va-leadline">{{ with .Params.summary }}{{ . }}{{ else }}{{ .RawSummary }}{{ end }}</p>
+    <a class="va-more" href="{{ .RelPermalink }}">读这一天的完整复盘 →</a>
+  </div>
+  {{ end }}{{ end }}
+  {{ $paginator := .Paginate $posts.ByDate.Reverse }}
+  <div class="va-list">
+  {{ range $paginator.Pages }}{{ partial "summary.html" . }}{{ end }}
+  </div>
+  {{ partial "pagination.html" . }}
+</div>
+{{ end }}

@@ -216,6 +216,36 @@ v2.0.0 起和 [Vibe Research](https://github.com/simonlin1212/Vibe-Research) 用
 
 每块写着自己的数据日；涨跌分布、行业资金、成交额榜三个来源只给当天，看上一个交易日时标「此刻快照」。没取到的块直接说没取到和原因，不显示成 0。「偏强」「活跃」这类标签按写死的阈值算，规则写在标签上；全部是公开数据的整理，不预测涨跌。
 
+想把这些复盘公开，通过 Hugo 博客发布：仓库里的 `blog/` 是站点源（主题在 `blog/themes/astock`，复用原站 `/css/style.css`），一条命令写完文章、构建、同步到 Pages：
+
+```bash
+.venv/bin/python scripts/publish_review.py             # 全部复盘 → blog/content/post/*.md → hugo → 推送
+.venv/bin/python scripts/publish_review.py --date 2026-09-23
+.venv/bin/python scripts/publish_review.py --dry-run   # 只写 md，不构建不推
+.venv/bin/python scripts/publish_review.py --no-push   # 构建并提交到临时克隆，不推送
+```
+
+文章文件是 `blog/content/post/<日期>-每日复盘.md`（front matter + 正文），内容只有本机已落盘的部分：分项观察、汇总研判、当天几只客观读数、次日回看与依据附录；运行元数据（任务号、模型来源）不上网。发布前再跑一遍不荐股规则，命中的那天不写、并如实报错。构建用 `hugo`（PATH 里没有就放 `.local/bin/hugo`），产物同步进 Pages 仓库时只碰自己的页面（`post/`、`tags/`、首页、sitemap 与 RSS），站上原有文章与静态资源不动；`ASTOCK_PAGES_TOKEN` 可替代本机 `gh` 登录。
+
+本地预览：`cd blog && hugo server` → http://127.0.0.1:1313/
+
+每日自动发布用系统 cron（交易日 16:40，排在盘后复盘生成之后）：
+
+```cron
+# 揽宝投研：交易日 16:40 把每日复盘发布到 GitHub Pages
+40 16 * * 1-5 cd /data/wangf/agi_ws/vibe-astock && .venv/bin/python scripts/publish_review.py >> /data/wangf/agi_ws/vibe-astock/.local/publish-review.log 2>&1
+```
+
+复盘由 v1 容器生成、落在它的 docker 卷里，本机数据区 `~/.duanxian-agents/reviews` 是指向那个卷的软链：
+
+```bash
+ln -s /data/docker/volumes/vibe-astock_astock-duanxian/_data/reviews ~/.duanxian-agents/reviews
+```
+
+所以发布命令不用再带 `--reviews`。换了卷名或换了机器，重建这条软链即可。
+
+日志在 `.local/publish-review.log`；当天还没生成复盘时命令会正常退出、不推任何东西。
+
 涨停股按东财行业归类，和前两个交易日比，按只数分四档：**连续集中**（今天同一行业 ≥ 3 只涨停，前两个交易日每天也 ≥ 2 只）、**今天集中**（今天 ≥ 3 只，前两个交易日不是每天都 ≥ 2 只）、**零散**（2 只）、**单只**。每个行业列出涨停的股票、连板数、最高板（连板数最多、同样多时首封最早的那只）和梯队（各连板高度各几只），以及出现最多的同花顺题材标签。档位是按只数的固定规则，不代表能不能持续，也不是推荐；行业名是东财给的简称（最长 4 个字），题材标签是同花顺的市场叙事，不是核验过的因果。前两个交易日的涨停池没取到时写明分不出是不是连续，不当成 0。让 Agent 复盘时，板块部分按这四档的顺序写，小标题不超过 25 个字，不用渲染词。
 
 ### 产业研究

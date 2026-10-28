@@ -1,0 +1,33 @@
+# 复盘博客的 Hugo 站点配置（由 Vibe AStock 维护，见 scripts/publish_review.py）
+baseURL = "https://ten2net.github.io/"
+locale = "zh-cn"
+title = "A 股每日复盘"
+theme = "astock"
+paginate = 10
+paginatePath = "page"
+enableRobotsTXT = true
+summaryLength = 120
+
+[languages.zh-cn]
+  label = "简体中文"
+  weight = 1
+
+[markup.goldmark.renderer]
+  # 复盘正文里有 <details> 折叠依据，必须允许原始 HTML
+  unsafe = true
+  hardWraps = false
+
+[params]
+  description = "公开数据 + 程序计算 + 模型解读：每日 A 股复盘文章，每个数字都可回溯到落盘依据"
+  brandURL = "https://a.luckybrother.cc/"
+  brandTitle = "揽宝投研"
+  disclaimer = "揽宝投研 只客观呈现公开数据与榜单，不推荐个股、不预测涨跌、不构成投资建议。模型输出可能出错，请沿证据链自行核实并独立决策，风险自担。"
+
+[[menu.main]]
+  name = "复盘"
+  url = "/post/"
+  weight = 1
+[[menu.main]]
+  name = "标签"
+  url = "/tags/"
+  weight = 2

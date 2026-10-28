@@ -1,0 +1,3 @@
+name = "astock"
+license = "Apache-2.0"
+description = "复盘博客主题：复用原站 Hyde 版式（/css/style.css），首页按时间排文章。"
