@@ -138,26 +138,24 @@ body{margin:0;background:var(--va-bg);color:var(--va-fg);font-family:var(--va-sa
 }
 
 
-/* ---- 涨跌分布：竖向柱状图，跌绿在左、涨红在右 ---- */
-.va-hist{display:flex;align-items:flex-end;gap:3px;height:196px;padding:14px 0 0;
-  border-bottom:1px solid var(--va-border);margin:0 0 8px}
-.va-hist .va-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;
-  justify-content:flex-end;align-items:center;height:100%;gap:3px}
-.va-hist .va-col b{font-family:var(--va-mono);font-size:11.5px;font-weight:700;line-height:1;
-  color:var(--va-fg);font-variant-numeric:tabular-nums;white-space:nowrap}
-.va-hist .va-col-track{position:relative;display:flex;align-items:flex-end;width:100%;
-  flex:1;background:transparent;overflow:visible}
-.va-hist .va-col-fill{display:block;width:100%;border-radius:3px 3px 0 0;min-height:1px}
-.va-col-up .va-col-fill{background:var(--va-danger)}
-.va-col-down .va-col-fill{background:var(--va-success)}
-.va-hist .va-col:hover .va-col-fill{filter:brightness(1.12)}
-.va-hist-x{display:flex;gap:3px;justify-content:space-between;margin:0 0 12px}
-.va-hist-x span{flex:1 1 0;min-width:0;text-align:center;font-family:var(--va-mono);
-  font-size:11px;color:var(--va-muted-fg);line-height:1.3;word-break:break-all}
+/* ---- 涨跌分布：横向柱状图，档位标签在左当纵轴，跌绿在上涨红在下 ---- */
+.va-hist{display:flex;flex-direction:column;gap:2px;margin:0 0 10px}
+.va-hist-row{display:flex;align-items:center;gap:10px;line-height:1.5}
+.va-hist-row em{flex:0 0 74px;width:74px;text-align:right;font-style:normal;
+  font-family:var(--va-mono);font-size:12.5px;color:var(--va-muted-fg);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.va-hist-track{flex:1;min-width:0;height:13px;background:var(--va-muted);border-radius:3px;overflow:hidden}
+.va-hist-fill{display:block;height:100%;border-radius:3px;min-width:1px}
+.va-hist-up .va-hist-fill{background:var(--va-danger)}
+.va-hist-down .va-hist-fill{background:var(--va-success)}
+.va-hist-row:hover .va-hist-fill{filter:brightness(1.12)}
+.va-hist-row b{flex:0 0 52px;width:52px;text-align:right;font-family:var(--va-mono);
+  font-size:13px;font-weight:700;color:var(--va-fg);font-variant-numeric:tabular-nums}
 @media (max-width:640px){
-  .va-hist{height:150px;gap:2px}
-  .va-hist .va-col b{font-size:9.5px}
-  .va-hist-x{display:none}
+  .va-hist-row{gap:7px}
+  .va-hist-row em{flex-basis:62px;width:62px;font-size:11.5px}
+  .va-hist-row b{flex-basis:44px;width:44px;font-size:12px}
+  .va-hist-track{height:11px}
 }
 
 
@@ -190,7 +188,7 @@ body{margin:0;background:var(--va-bg);color:var(--va-fg);font-family:var(--va-sa
 .post-content p{margin:0 0 1.15em;text-indent:2em;text-align:justify}
 /* 段首不是「段」的元素不缩进：卡片、列表、引用、代码、表格、标题 */
 .post-content p:has(+ ul),.post-content p:has(+ ol){text-indent:2em}
-.post-content .va-grid p,.post-content .va-hist-x,.post-content .va-mini,
+.post-content .va-grid p,.post-content .va-hist-row em,.post-content .va-mini,
 .post-content .va-leadline,.post-content blockquote p,.post-content li p,
 .post-content .va-stat p,.post-content .va-note p,.post-content .va-promo p,
 .post-content .va-feat em,.post-content .va-feat b{text-indent:0}

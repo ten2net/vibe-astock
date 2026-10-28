@@ -732,22 +732,22 @@ POS_LABELS = ("平", "0~0.5", "0.5~1", "1~2", "2~3", "3~4", "4~5", "5~6", "6~7",
 
 
 def _block_distribution(dist: dict) -> str:
-    """涨跌分布 25 档：竖向柱状图，跌绿在左、涨红在右，柱高按峰值归一到同一标尺。"""
+    """涨跌分布 25 档：横向柱状图，档位标签在左做纵轴，跌绿在上、涨红在下；柱长按峰值归一到同一标尺。"""
     if not dist.get("available"):
         return '<p class="va-gap">涨跌分布未获取（' + html.escape(str(dist.get("reason") or "无数据")) + "）。</p>"
     peak = max(dist.get("counts") or [1]) or 1
-    bars = []
+    rows = []
     for label, count in zip(dist["labels"], dist["counts"]):
         tone = "up" if label in POS_LABELS else "down"
         ratio = max(0.0, min(1.0, count / peak))
-        bars.append('<span class="va-col va-col-' + tone + '" title="' + html.escape(label) + "：" + str(count) + ' 只">'
-                    + '<b>' + str(count) + "</b>"
-                    + '<i class="va-col-track"><i class="va-col-fill" style="height:'
+        rows.append('<span class="va-hist-row va-hist-' + tone + '" title="' + html.escape(label) + "：" + str(count) + ' 只">'
+                    + "<em>" + html.escape(label) + "</em>"
+                    + '<i class="va-hist-track"><i class="va-hist-fill" style="width:'
                     + (f"{ratio * 100:.1f}") + '%"></i></i>'
-                    + "<em>" + html.escape(label) + "</em></span>")
-    note = ("全市场 " + str(dist.get("total")) + " 只（含北交所）按涨跌幅分档，越靠右涨幅越大；"
-            + "来源 Tushare 当日日线，与盘面上东财口径可能差几只。")
-    return '<div class="va-hist">' + "".join(bars) + "</div>" + '<p class="va-mini">' + note + "</p>"
+                    + "<b>" + str(count) + "</b></span>")
+    note = ("全市场 " + str(dist.get("total")) + " 只（含北交所）按涨跌幅自上而下分档，越往下涨幅越大；"
+            + "柱长为该档家数，同一标尺可直接比对。来源 Tushare 当日日线，与盘面上东财口径可能差几只。")
+    return '<div class="va-hist">' + "".join(rows) + "</div>" + '<p class="va-mini">' + note + "</p>"
 
 
 def _index_cards(rows: list, *, with_session: bool) -> str:

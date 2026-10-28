@@ -272,13 +272,14 @@ class TestV1Parity:
 
 
 class TestExternalBlocks:
-    def test_distribution_renders_vertical_bars(self):
+    def test_distribution_renders_horizontal_bars(self):
         dist = {"available": True, "labels": ["跌停", "平", "涨停"], "counts": [10, 100, 30], "total": 140, "reason": ""}
         html_text = bp._block_distribution(dist)
         assert 'class="va-hist"' in html_text and "140" in html_text
-        assert "va-col-down" in html_text and "va-col-up" in html_text
-        # 柱高按峰值归一：最大值 100 撑满 100%，其余按比例
-        assert "height:100.0%" in html_text and "height:10.0%" in html_text and "height:30.0%" in html_text
+        assert "va-hist-down" in html_text and "va-hist-up" in html_text
+        # 档位标签在左当纵轴，柱长按峰值归一：最大值 100 撑满 100%，其余按比例
+        assert "<em>跌停</em>" in html_text and "width:100.0%" in html_text
+        assert "width:10.0%" in html_text and "width:30.0%" in html_text
 
     def test_distribution_unavailable_says_reason(self):
         assert "未获取" in bp._block_distribution({"available": False, "reason": "没有 TUSHARE_TOKEN"})

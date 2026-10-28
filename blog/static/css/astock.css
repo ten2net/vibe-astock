@@ -117,16 +117,15 @@
 .va-col.gap .va-col-bar{background:repeating-linear-gradient(45deg,#eee,#eee 4px,transparent 4px,transparent 8px)}
 .va-col-n{font-family:monospace;font-weight:700;font-size:16px}
 .va-col-x{font-size:12px;color:#888;padding-bottom:6px}
-.va-hist{display:flex;align-items:flex-end;gap:3px;height:190px;padding:12px 0 0;border-bottom:1px solid #eee;margin-bottom:8px}
-.va-hist .va-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:3px}
-.va-hist .va-col b{font-family:monospace;font-size:11.5px;font-weight:700;line-height:1;white-space:nowrap}
-.va-hist .va-col-track{position:relative;display:flex;align-items:flex-end;width:100%;flex:1}
-.va-hist .va-col-fill{display:block;width:100%;border-radius:3px 3px 0 0;min-height:1px}
-.va-col-up .va-col-fill{background:#d9373b}
-.va-col-down .va-col-fill{background:#16a06a}
-.va-hist-x{display:flex;gap:3px;justify-content:space-between;margin-bottom:12px}
-.va-hist-x span{flex:1 1 0;min-width:0;text-align:center;font-family:monospace;font-size:11px;color:#888;word-break:break-all}
-@media (max-width:640px){.va-hist{height:150px}.va-hist .va-col b{font-size:9.5px}.va-hist-x{display:none}}
+.va-hist{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.va-hist-row{display:flex;align-items:center;gap:10px;line-height:1.5}
+.va-hist-row em{flex:0 0 74px;width:74px;text-align:right;font-style:normal;font-family:monospace;font-size:12.5px;color:#888}
+.va-hist-track{flex:1;min-width:0;height:13px;background:#eee;border-radius:3px;overflow:hidden}
+.va-hist-fill{display:block;height:100%;border-radius:3px;min-width:1px}
+.va-hist-up .va-hist-fill{background:#d9373b}
+.va-hist-down .va-hist-fill{background:#16a06a}
+.va-hist-row b{flex:0 0 52px;width:52px;text-align:right;font-family:monospace;font-size:13px;font-weight:700}
+@media (max-width:640px){.va-hist-row{gap:7px}.va-hist-row em{flex-basis:62px;width:62px;font-size:11.5px}.va-hist-row b{flex-basis:44px;width:44px;font-size:12px}.va-hist-track{height:11px}}
 .va-spark{text-align:center;min-width:48px}
 .va-spark .va-bar{width:100%;height:5px;margin-bottom:3px}
 .va-spark-n{font-family:monospace;font-size:12.5px;color:#888;display:block}
@@ -243,7 +242,7 @@ blockquote{color:#2b3035!important;font-style:normal!important;font-weight:400;
   border-left:3px solid #d0d4d8;background:#fafbfc;padding:8px 14px}
 blockquote p{color:#2b3035!important}
 /* 表格与卡片文字 */
-.va-stat-s,.va-mini,.va-table-note,.va-foot-note,.va-hist-x span,.va-spark-n,.va-col-x,.va-gap{
+.va-stat-s,.va-mini,.va-table-note,.va-foot-note,.va-hist-row em,.va-spark-n,.va-col-x,.va-gap{
   color:#4b5563!important
 }
 .va-stat-k{color:#3f474d!important}
@@ -344,7 +343,7 @@ article.post .post-body,.post-body p,.post-body li,.post-body td,
 [data-theme="dark"] .va-stat-k{color:#a9b1bb!important}
 [data-theme="dark"] .va-stat-v{color:#f2f4f6!important}
 [data-theme="dark"] .va-stat-s,[data-theme="dark"] .va-mini,[data-theme="dark"] .va-table-note,
-[data-theme="dark"] .va-foot-note,[data-theme="dark"] .va-hist-x span,
+[data-theme="dark"] .va-foot-note,[data-theme="dark"] .va-hist-row em,
 [data-theme="dark"] .va-spark-n,[data-theme="dark"] .va-col-x,[data-theme="dark"] .va-gap,
 [data-theme="dark"] .va-sec-h span{color:#a9b1bb!important}
 [data-theme="dark"] .va-sec-h,[data-theme="dark"] .va-sec-h h2,[data-theme="dark"] .va-table th{
