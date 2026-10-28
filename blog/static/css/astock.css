@@ -518,3 +518,60 @@ article>.container{max-width:1240px;margin:0 auto}
     position:static;padding:0!important;
   }
 }
+
+
+/* ============================================================
+   1) 文章底部功能卡片：换主题时这段样式丢了，页面只剩裸链接
+   ============================================================ */
+.va-promo{margin:42px 0 8px;padding-top:24px;border-top:1px solid #e5e7eb}
+.va-promo-head h2{font-size:20px!important;margin:0 0 6px;color:#111417!important}
+.va-promo-head p{margin:0 0 18px;color:#4b5563;font-size:14px}
+.va-promo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.va-promo-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;
+  box-shadow:0 1px 3px rgba(16,20,28,.06);display:flex;flex-direction:column}
+.va-promo-card h3{font-size:17px!important;margin:0 0 6px;color:#111417!important}
+.va-promo-desc{margin:0 0 12px;color:#4b5563;font-size:13.5px;line-height:1.7}
+.va-feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0}
+.va-feat{position:relative;display:block;padding:11px 12px 24px;border:1px solid #e5e7eb;
+  border-radius:8px;background:#fafbfc;text-decoration:none!important;
+  transition:border-color .15s,background .15s,transform .15s}
+.va-feat:hover{border-color:var(--color-primary,#0a6c82);background:rgba(10,108,130,.05);transform:translateY(-1px)}
+.va-feat-icon{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:7px;background:var(--color-primary,#0a6c82);color:#fff;font-size:14px;line-height:1;
+  font-weight:600;margin-bottom:7px}
+.va-feat-body{display:block}
+.va-feat-body b{display:block;color:#111417;font-size:14px;font-weight:700;line-height:1.35;margin-bottom:3px}
+.va-feat-body em{display:block;color:#4b5563;font-size:12.5px;font-style:normal;line-height:1.6}
+.va-feat-go{position:absolute;right:11px;bottom:7px;color:var(--color-primary,#0a6c82);
+  font-size:11.5px;font-weight:600;opacity:0;transition:opacity .15s}
+.va-feat:hover .va-feat-go{opacity:1}
+.va-promo-foot{margin:16px 0 0;color:#4b5563;font-size:12px;line-height:1.7}
+@media (max-width:900px){.va-promo-grid{grid-template-columns:1fr}}
+@media (max-width:560px){.va-feat-grid{grid-template-columns:1fr}.va-feat-go{opacity:1}}
+[data-theme="dark"] .va-promo{border-top-color:#2a3038}
+[data-theme="dark"] .va-promo-card{background:#161b23;border-color:#2a3038;box-shadow:none}
+[data-theme="dark"] .va-promo-head h2,[data-theme="dark"] .va-promo-card h3{color:#f4f6f8!important}
+[data-theme="dark"] .va-feat{background:#1c222b;border-color:#2a3038}
+[data-theme="dark"] .va-feat-body b{color:#f2f4f6}
+[data-theme="dark"] .va-feat-body em,[data-theme="dark"] .va-promo-desc,
+[data-theme="dark"] .va-promo-head p,[data-theme="dark"] .va-promo-foot{color:#a9b1bb}
+
+/* ============================================================
+   2) 汇总研判内部标题缩小：那是报告正文的段落标题，不该和分区标题一样大
+   ============================================================ */
+.va-panel .post-content h2,.va-panel .post-content h3,.va-panel .post-content h4{
+  font-size:15.5px!important;line-height:1.5;margin:1.1em 0 .5em;padding:0;border:0;
+  color:#1a1d21!important;font-weight:700
+}
+.va-panel .post-content h2:first-child,.va-panel .post-content h3:first-child{margin-top:0}
+[data-theme="dark"] .va-panel .post-content h2,
+[data-theme="dark"] .va-panel .post-content h3{color:#f2f4f6!important}
+
+/* ============================================================
+   3) 分区标题留白：「最近几天怎么走的」这类标题上方要透气
+   ============================================================ */
+.va-sec{margin:44px 0 20px}
+.va-sec:first-of-type{margin-top:16px}
+.va-sec-h{padding-bottom:10px;margin-bottom:16px}
+.va-sec-h h2{font-size:19px!important;line-height:1.4}
+.va-sec-h span{display:inline-block;margin-top:3px}
