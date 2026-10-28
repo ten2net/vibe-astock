@@ -152,7 +152,8 @@ class TestBuild:
         post = next((site / "public" / "post").glob("*/index.html")).read_text(encoding="utf-8")
         assert "2026-09-23 每日复盘" in post and "<details" in post and "va-stat" in post
         home = (site / "public" / "index.html").read_text(encoding="utf-8")
-        assert "va-item" in home and "va-panel" in home
+        # 首页文章列表由主题渲染，类名随主题变化；断言「文章出现在首页」即可
+        assert "2026-09-23 每日复盘" in home
 
 
 
