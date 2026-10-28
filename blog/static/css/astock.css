@@ -488,3 +488,33 @@ article>.container{max-width:1240px;margin:0 auto}
     position:static;padding:0!important;
   }
 }
+
+
+/* ============================================================
+   首页列表同样两栏：正文 74% + 右栏 26%
+   （首页的 .post-container 也是 col-lg-8，之前被通用宽度规则拉宽后侧栏掉下去）
+   ============================================================ */
+@media (min-width:1200px){
+  .homepage .container>.row,div.container>.row{display:flex;align-items:flex-start;flex-wrap:wrap}
+  .container>.row>.post-container{
+    float:none!important;flex:0 0 74%;max-width:74%;width:74%!important;
+    margin:0!important;padding-right:34px!important;
+  }
+  .container>.row>.sidebar-container{
+    float:none!important;flex:0 0 26%;max-width:26%;width:26%!important;
+    margin:0!important;padding:0 0 0 6px!important;
+    position:sticky;top:84px;align-self:flex-start;
+  }
+  /* 首页摘要卡片不要重复限宽，交给 74% 那栏 */
+  .post-preview{max-width:none;margin-left:0;margin-right:0}
+}
+@media (max-width:1199px){
+  .container>.row>.post-container{
+    float:none!important;width:91.6667%!important;max-width:none;margin:0 0 0 4.1667%!important;
+    padding-right:0!important;
+  }
+  .container>.row>.sidebar-container{
+    float:none!important;width:91.6667%!important;max-width:none;margin:0 0 0 4.1667%!important;
+    position:static;padding:0!important;
+  }
+}
