@@ -126,7 +126,7 @@ class TestSync:
         pub, repo = self._tree(tmp_path)
         changed, removed = bp.sync_public(pub, repo)
         assert "index.html" in changed and "post/2026-09-23/index.html" in changed
-        assert "css/x.css" not in changed                     # 不是我们的产物
+        assert "css/x.css" in changed                         # 主题样式要跟着发，否则线上裸 HTML
         assert (repo / "2016" / "old.html").exists()          # 站上原有文件不动
         assert not (repo / "post" / "stale" / "index.html").exists()   # 旧的自有页面清掉
         assert bp.sync_public(pub, repo) == ([], [])          # 幂等

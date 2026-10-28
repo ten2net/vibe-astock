@@ -1346,7 +1346,8 @@ def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], No
 
 
 # 站上这些路径归本工具所有：同步时删掉仓库里有、本次构建没有的页面
-OWNED_DIRS = ("post", "tags", "page")
+# 主题自带的样式、脚本、字体与图片一起同步：少了它们，线上页面就是裸 HTML
+OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts", "reward", "search")
 OWNED_FILES = ("index.html", "index.xml", "sitemap.xml", "404.html", "robots.txt")
 # 上一版「静态页补丁」留下的自有路径：发布时清掉，站上原有文件不在其中
 LEGACY_PATHS = ("reviews", "year", "month", "date", "astock", "astock-feed.xml", "deploy.json")
@@ -1366,7 +1367,7 @@ def auth_mode() -> str:
 
 
 # 自有样式：站上没有同名文件，放 /css/ 下也不覆盖任何东西
-OWNED_ASSETS = ("css/astock.css",)
+OWNED_ASSETS = ("css/astock.css", "favicon.ico", "favicon.png", "search.png")
 
 
 def _owned(path: Path) -> bool:
