@@ -207,16 +207,25 @@ class TestVisualBlocks:
         html_text = bp._block_ladder(p)
         assert "va-ladder" in html_text and "va-col gap" in html_text and "板位缺档" in html_text
 
-    def test_trend_marks_last_day(self):
+    def test_trend_renders_one_chart_per_metric(self):
         p = {"market_facts": {"trend": {
             "days": ["2026-10-26", "2026-10-27"],
             "metrics": [
-                {"key": "limit_up", "label": "涨停家数", "kind": "count", "higher_is_hotter": True, "values": [55, 41]},
-                {"key": "broken_rate", "label": "炸板率", "kind": "rate", "higher_is_hotter": False, "values": [0.29, 0.41]},
+                {"key": "limit_up", "label": "涨停家数", "kind": "count", "higher_is_hotter": True,
+                 "unit": "家", "values": [55, 41]},
+                {"key": "broken_rate", "label": "炸板率", "kind": "rate", "higher_is_hotter": False,
+                 "values": [0.29, 0.41]},
             ],
         }}}
         html_text = bp._block_trend(p)
-        assert html_text.count("last") >= 2 and "va-spark" in html_text and "越低越热" in html_text
+        # 每个指标一张卡，日期轴在左、最新日期在上
+        assert html_text.count('class="va-hb-card"') == 2
+        assert "涨停家数" in html_text and "越低越热" in html_text and "单位 家" in html_text
+        assert html_text.index(">10-27<") < html_text.index(">10-26<")
+        # 柱长按本指标峰值缩放：55 撑满、41 按比例
+        assert "width:100.0%" in html_text and "width:74.5%" in html_text
+        # 只有最新一天高亮
+        assert html_text.count("va-hb-row last") == 2
     def test_post_contains_all_sections(self):
         md = bp.post_markdown(payload(), DATE)
         for title in ("较前一交易日", "昨日强势股反馈", "赚钱效应与亏钱效应", "晋级率", "梯队结构",

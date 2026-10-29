@@ -461,40 +461,60 @@ def _block_themes(payload: dict) -> str:
     return "".join(out) if out else '<p class="va-gap">该日题材结构未取到。</p>'
 
 
+def _trend_text(kind: str, v) -> str:
+    if kind == "rate":
+        return _pct(v)
+    if kind == "pct":
+        return _sign(v)
+    return f"{v:g}" if isinstance(v, (int, float)) else "—"
+
+
+def _trend_bars(days: list, values: list, metric: dict) -> str:
+    """单指标横向柱状：日期标签在左当纵轴（最新在上），柱长按本指标自身峰值缩放。"""
+    nums = [v for v in values if isinstance(v, (int, float))]
+    scale = max([abs(v) for v in nums] or [1]) or 1
+    kind = str(metric.get("kind") or "count")
+    # 颜色按「越热越红」定：higher_is_hotter 为假时，数值低才是红
+    hot = "up" if metric.get("higher_is_hotter") is not False else "down"
+    last_idx = len(values) - 1
+    rows = []
+    for i, v in enumerate(values):
+        try:
+            pct = max(0.0, min(100.0, abs(float(v)) / scale * 100))
+        except (TypeError, ValueError):
+            pct = 0.0
+        rows.append('<span class="va-hb-row' + (" last" if i == last_idx else "") + '">'
+                    + "<em>" + html.escape(days[i][5:] if i < len(days) and days[i] else "") + "</em>"
+                    + '<i class="va-hb-track"><i class="va-hb-fill va-hb-' + hot
+                    + '" style="width:' + f"{pct:.1f}" + '%"></i></i>'
+                    + '<b class="va-hb-n">' + html.escape(_trend_text(kind, v)) + "</b></span>")
+    return "".join(rows)
+
+
 def _block_trend(payload: dict) -> str:
-    """最近几天怎么走的：六项指标逐日数值 + 迷你条形，最后一天高亮。"""
+    """最近几天怎么走的：六个指标各自一张横向柱状图，日期轴在左、最新日期在上。"""
     mf = payload.get("market_facts") or {}
     trend = mf.get("trend") or {}
-    days = trend.get("days") or []
+    days = list(trend.get("days") or [])
     metrics = trend.get("metrics") or []
     if not days or not metrics:
         return '<p class="va-gap">该日趋势数据未取到。</p>'
-    rows = []
+    days.reverse()          # 最新在上、最早在下
+    charts = []
     for m in metrics:
-        vals = m.get("values") or []
-        nums = [v for v in vals if isinstance(v, (int, float))]
-        scale = max([abs(v) for v in nums] or [1]) or 1
-        cells = []
-        for i, v in enumerate(vals):
-            if m.get("kind") == "rate":
-                txt = _pct(v)
-            elif m.get("kind") == "pct":
-                txt = _sign(v)
-            else:
-                txt = f"{v:g}" if isinstance(v, (int, float)) else "—"
-            last = " last" if i == len(vals) - 1 else ""
-            tone = _cls(v) if m.get("kind") == "pct" else "flat"
-            bar_tone = "down" if m.get("higher_is_hotter") is False else "up"
-            num = v if isinstance(v, (int, float)) else 0
-            cells.append(f'<td class="va-spark{tone and " " + tone}{last}">'
-                         f'{_bar(num, scale, bar_tone)}<span class="va-spark-n">{html.escape(txt)}</span></td>')
+        vals = list(m.get("values") or [])[::-1]
         label = str(m.get("label") or m.get("key"))
         if m.get("kind") == "rate" and m.get("higher_is_hotter") is False:
             label += "（越低越热）"
-        rows.append([f'<td class="va-tier">{html.escape(label)}</td>'] + cells)
-    head = [""] + [d[5:] for d in days]
-    note = f"最近 {len(days)} 个交易日，最后一天为复盘日；条形按各行自身量级缩放，只比同行走势。"
-    return _table(head, rows, note)
+        unit = str(m.get("unit") or "")
+        hint = ("单位 " + unit) if unit else ("比例" if m.get("kind") == "rate" else "")
+        charts.append('<div class="va-hb-card"><p class="va-hb-h"><b>' + html.escape(label) + "</b>"
+                      + ("<span>" + html.escape(hint) + "</span>" if hint else "")
+                      + '</p><div class="va-hb">' + _trend_bars(days, vals, m) + "</div></div>")
+    note = (f"最近 {len(days)} 个交易日，最上面一行是复盘日；每张图的柱长只在同一指标内缩放，"
+            + "看的是这项指标自己这几天处在高位还是低位。")
+    return ('<div class="va-hb-grid">' + "".join(charts) + "</div>"
+            + '<p class="va-mini">' + note + "</p>")
 
 
 def _block_diff(payload: dict) -> str:

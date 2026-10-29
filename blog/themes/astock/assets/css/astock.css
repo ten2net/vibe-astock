@@ -119,7 +119,34 @@ body{margin:0;background:var(--va-bg);color:var(--va-fg);font-family:var(--va-sa
 .va-col.gap .va-col-n{color:var(--va-muted-fg)}
 .va-col-x{font-size:12.5px;color:var(--va-muted-fg);padding-bottom:6px}
 
-/* ---- 走势：迷你条 + 数值，最后一天高亮 ---- */
+/* ---- 走势：六指标各自一张横向柱状图，日期在左当纵轴，最新在上 ---- */
+.va-hb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin:0 0 10px}
+.va-hb-card{background:var(--va-muted);border:1px solid var(--va-border);border-radius:var(--va-radius);
+  padding:10px 12px 8px}
+.va-hb-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 7px!important;
+  text-indent:0;line-height:1.4}
+.va-hb-h b{font-size:14px;color:var(--va-fg)}
+.va-hb-h span{font-size:11.5px;color:var(--va-muted-fg);font-family:var(--va-mono);white-space:nowrap}
+.va-hb{display:flex;flex-direction:column;gap:2px}
+.va-hb-row{display:flex;align-items:center;gap:8px;line-height:1.45}
+.va-hb-row em{flex:0 0 48px;width:48px;text-align:right;font-style:normal;
+  font-family:var(--va-mono);font-size:11.5px;color:var(--va-muted-fg)}
+.va-hb-track{flex:1;min-width:0;height:11px;background:var(--va-card);border-radius:3px;overflow:hidden}
+.va-hb-fill{display:block;height:100%;border-radius:3px;min-width:1px}
+.va-hb-fill.va-hb-up{background:var(--va-danger)}
+.va-hb-fill.va-hb-down{background:var(--va-success)}
+.va-hb-n{flex:0 0 52px;width:52px;text-align:right;font-family:var(--va-mono);font-size:12px;
+  font-weight:600;color:var(--va-fg);font-variant-numeric:tabular-nums;white-space:nowrap}
+.va-hb-row.last em{color:var(--va-fg);font-weight:700}
+.va-hb-row.last{background:rgba(194,65,12,.06);border-radius:4px}
+.va-hb-row.last .va-hb-n{font-weight:700}
+@media (max-width:640px){
+  .va-hb-grid{grid-template-columns:1fr}
+  .va-hb-row em{flex-basis:42px;width:42px;font-size:11px}
+  .va-hb-n{flex-basis:46px;width:46px;font-size:11.5px}
+}
+
+/* ---- 走势：迷你条 + 数值，最后一天高亮（旧表格式，保留给其它区块） ---- */
 .va-spark{text-align:center;min-width:52px}
 .va-spark .va-bar{width:100%;height:6px;margin-bottom:4px}
 .va-spark-n{font-family:var(--va-mono);font-size:13.5px;color:var(--va-muted-fg);display:block}
