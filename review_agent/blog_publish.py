@@ -906,8 +906,6 @@ def _block_margin_net(m: dict) -> str:
 # 输入归档里的文本行格式：`  名称 今75.39亿/5日缺 涨1.34% 领涨某某`
 _CAP_IN = re.compile(r"^\s*(?P<name>[^\s]+)\s+今(?P<net>-?[\d.]+)亿.*?涨(?P<pct>-?[\d.]+)%(?:\s+领涨(?P<leader>\S+))?")
 _CAP_OUT = re.compile(r"^\s*(?P<name>[^\s]+)\s+今(?P<net>-?[\d.]+)亿")
-_TURNOVER = re.compile(r"^\s*(?P<name>[^\s]+)\s+(?P<amt>[\d.]+)亿\s+涨(?P<pct>-?[\d.]+)%")
-_DRAGON = re.compile(r"^\s*(?P<name>[^\s]+)\s+净买(?P<net>[+-]?[\d.]+)亿\s*\[(?P<why>[^\]]*)\]")
 
 
 def _section_lines(text: str, header: str) -> list[str]:
@@ -927,12 +925,11 @@ def _section_lines(text: str, header: str) -> list[str]:
     return out
 
 
-def _block_capital(capital_text: str, dragon_text: str) -> str:
-    """资金段落：行业净流入/流出、成交额前 20、龙虎榜净买额榜。"""
+def _block_capital(capital_text: str) -> str:
+    """资金段落：只看行业主力净流入/流出（成交额榜、龙虎榜不入正文）。"""
     out = []
     inflow = _section_lines(capital_text, "行业主力净流入")
     outflow = _section_lines(capital_text, "行业主力净流出")
-    turnover = _section_lines(capital_text, "全市场成交额")
     if inflow or outflow:
         cards = []
         for line in inflow[:6]:
@@ -952,33 +949,7 @@ def _block_capital(capital_text: str, dragon_text: str) -> str:
             cards.append(_stat_md(m.group("name") + " · 净流出",
                                   '<span class="down">' + f"{net:.2f}" + " 亿</span>", "行业主力资金"))
         out.append('<div class="va-grid va-grid-wide">' + "".join(cards) + "</div>")
-    if turnover:
-        rows = []
-        for line in turnover[:20]:
-            m = _TURNOVER.match(line)
-            if not m:
-                continue
-            pct = float(m.group("pct"))
-            rows.append(['<span class="va-tier">' + html.escape(m.group("name")) + "</span>",
-                         f"{float(m.group('amt')):.2f} 亿",
-                         '<span class="' + _cls(pct) + '">' + _sign(pct, 2, "%") + "</span>"])
-        out.append('<p class="va-mini" style="margin-top:14px">全市场成交额居前 20</p>')
-        out.append(_table(["个股", "成交额", "当日涨跌"], rows))
-    if dragon_text:
-        rows = []
-        for line in dragon_text.splitlines():
-            m = _DRAGON.match(line)
-            if not m:
-                continue
-            net = float(m.group("net"))
-            rows.append(['<span class="va-tier">' + html.escape(m.group("name")) + "</span>",
-                         '<span class="' + _cls(net) + '">' + _sign(net, 2, " 亿") + "</span>",
-                         html.escape(m.group("why") or "—")])
-        if rows:
-            out.append('<p class="va-mini" style="margin-top:14px">龙虎榜净买额榜（负 = 净卖）</p>')
-            out.append(_table(["个股", "净买额", "上榜原因"], rows,
-                              "只列净买额与上榜原因，不含席位明细；净买入不等于主力看好。"))
-    return "".join(out) or '<p class="va-gap">该日资金与龙虎榜未归档。</p>'
+    return "".join(out) or '<p class="va-gap">该日行业资金未归档。</p>'
 
 
 TIER_RULES = (
@@ -1121,16 +1092,12 @@ def archive_texts(date: str) -> dict:
             if found:
                 base = found
                 break
-    out = {}
-    for key, name in (("capital", "get_capital_data"), ("dragon", "get_dragon_tiger_data")):
-        try:
-            row = json.loads((base / f"{name}.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            out[key] = ""
-            continue
-        value = row.get("value")
-        out[key] = value if isinstance(value, str) else ""
-    return out
+    try:
+        row = json.loads((base / "get_capital_data.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"capital": ""}
+    value = row.get("value")
+    return {"capital": value if isinstance(value, str) else ""}
 
 
 def _external(date: str, log: Callable[[str], None] = lambda _m: None) -> dict:
@@ -1379,8 +1346,8 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
         md.append(_section("两融余额", [_block_margin(ext["dist"])],
                            "Tushare 日度汇总：当日读数 + 近 20 个交易日走势"))
     arch = ext.get("archive") or {}
-    md.append(_section("资金去了哪", [_block_capital(arch.get("capital", ""), arch.get("dragon", "")),],
-                       "行业净流入/流出、成交额前 20、龙虎榜净买额榜"))
+    md.append(_section("资金去了哪", [_block_capital(arch.get("capital", ""))],
+                       "只列行业主力净流入/流出，不做成交额榜与龙虎榜的解读"))
     md.append(_section("涨停分档", [_block_tier_tiers(payload, prev_reviews or {})],
                        "按东财行业和前一交易日比，只看集中在哪、散在哪"))
     if evidence.strip():

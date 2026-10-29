@@ -339,12 +339,12 @@ class TestExternalBlocks:
             "  中际旭创 140.11亿 涨-2.94%",
             "（口径提示：取数前后参考行情均对应 2026-10-27 收盘）",
         ])
-        dragon = "  大洋电机 净买+3.01亿 [日涨幅偏离值达到7%的前5只证券]"
-        html_text = bp._block_capital(capital, dragon)
+        html_text = bp._block_capital(capital)
         assert "银行 · 净流入" in html_text and "+75.39 亿" in html_text
         assert "半导体 · 净流出" in html_text and "-93.77 亿" in html_text
-        assert "中际旭创" in html_text and "大洋电机" in html_text
         assert "口径提示" not in html_text      # 口径行不该被当成数据
+        # 成交额榜不进正文
+        assert "中际旭创" not in html_text and "成交额" not in html_text
 
     def test_margin_block(self):
         html_text = bp._block_margin({"margin": {"balance": 16000.5, "date": "2026-10-27"}})
@@ -371,7 +371,7 @@ class TestExternalBlocks:
 
     def test_archive_texts_missing_dir_is_empty(self, tmp_path, monkeypatch):
         monkeypatch.setenv("ASTOCK_ARCHIVE_DIR", str(tmp_path / "nope"))
-        assert bp.archive_texts("2026-10-27") == {"capital": "", "dragon": ""}
+        assert bp.archive_texts("2026-10-27") == {"capital": ""}
 
 
 
