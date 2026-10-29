@@ -232,6 +232,21 @@ class TestVisualBlocks:
                       "题材结构与题材事件树", "最近几天怎么走的", "汇总研判"):
             assert title in md, title
 
+    def test_margin_renders_20_day_bars(self):
+        days = [f"2026-09-{d:02d}" for d in range(1, 21)]
+        values = [25000.0 + i * 20 for i in range(20)]
+        dist = {"margin": {"date": "2026-09-20", "days": days, "values": values, "balance": values[-1]}}
+        html_text = bp._block_margin(dist)
+        assert html_text.count("va-hb-row") == 20
+        assert "近 20 个交易日两融余额" in html_text and "25,380" in html_text
+        # 日期轴在左、最新在上
+        assert html_text.index(">09-20<") < html_text.index(">09-01<")
+        # 余额升降用颜色标：最高一天在最上面（无上一日）用 flat，往下逐日递减都是 down
+        assert "va-hb-flat" in html_text and html_text.count("va-hb-down") >= 18
+
+    def test_margin_unavailable_says_reason(self):
+        assert "未获取" in bp._block_margin({})
+
     def test_missing_blocks_say_so(self):
         assert "未取到" in bp._block_feedback({})
         assert "未取到" in bp._block_ladder({"emotion_metrics": {}})

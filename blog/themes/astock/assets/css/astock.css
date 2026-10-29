@@ -135,6 +135,8 @@ body{margin:0;background:var(--va-bg);color:var(--va-fg);font-family:var(--va-sa
 .va-hb-fill{display:block;height:100%;border-radius:3px;min-width:1px}
 .va-hb-fill.va-hb-up{background:var(--va-danger)}
 .va-hb-fill.va-hb-down{background:var(--va-success)}
+.va-hb-fill.va-hb-flat{background:var(--va-muted-fg);opacity:.55}
+.va-hb-grid-1{grid-template-columns:1fr;max-width:560px}
 .va-hb-n{flex:0 0 52px;width:52px;text-align:right;font-family:var(--va-mono);font-size:12px;
   font-weight:600;color:var(--va-fg);font-variant-numeric:tabular-nums;white-space:nowrap}
 .va-hb-row.last em{color:var(--va-fg);font-weight:700}

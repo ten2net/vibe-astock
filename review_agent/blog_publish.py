@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import html
 import json
 import os
@@ -737,15 +738,34 @@ def tushare_distribution(date: str) -> dict:
             if edges[i] <= v < edges[i + 1]:
                 counts[i] += 1
                 break
-    margin = None
-    try:
-        m = pro.margin(trade_date=date.replace("-", ""))
-        if m is not None and len(m):
-            margin = {"balance": float(m["rzrqye"].sum()) / 1e8, "date": date}
-    except Exception:  # noqa: BLE001
-        margin = None
+    margin = margin_history(pro, date)
     return {"available": True, "date": date, "labels": labels, "counts": counts,
             "total": int(len(pct)), "margin": margin, "reason": ""}
+
+
+MARGIN_DAYS = 20
+
+
+def margin_history(pro, date: str, days: int = MARGIN_DAYS) -> dict | None:
+    """近 N 个交易日两市融资融券余额（沪深京合计，单位亿），最近一天是复盘日。
+
+    Tushare 的 margin 按交易所分列，同一交易日多行，必须先按日期求和再看趋势。
+    """
+    day = date.replace("-", "")
+    start = (datetime.date.fromisoformat(date) - datetime.timedelta(days=days * 3 + 10))
+    try:
+        df = pro.margin(start_date=start.strftime("%Y%m%d"), end_date=day)
+        if df is None or len(df) == 0:
+            return None
+        series = df.groupby("trade_date")["rzrqye"].sum().sort_index()
+        series = series[series.index <= day].tail(days)
+        if series.empty:
+            return None
+        return {"date": date, "days": [str(i) for i in series.index],
+                "values": [round(float(v) / 1e8, 1) for v in series.tolist()],
+                "balance": round(float(series.iloc[-1]) / 1e8, 1), "window": days}
+    except Exception:  # noqa: BLE001
+        return None
 
 
 POS_LABELS = ("平", "0~0.5", "0.5~1", "1~2", "2~3", "3~4", "4~5", "5~6", "6~7", "7~8", "8~9", ">9%", "涨停")
@@ -801,15 +821,49 @@ def _block_index(idx: dict, overseas: dict) -> str:
     return "".join(out) or '<p class="va-gap">指数与外围均未获取。</p>'
 
 
+def _md_day(day: str) -> str:
+    """日期显示成 MM-DD：Tushare 给 20261028，复盘里也可能是 2026-10-28。"""
+    digits = re.sub(r"\D", "", str(day))
+    return digits[4:6] + "-" + digits[6:8] if len(digits) == 8 else str(day)
+
+
 def _block_margin(dist: dict) -> str:
+    """两融余额：当日读数 + 近 20 个交易日的横向柱状图（日期在左，最新在上）。"""
     m = (dist or {}).get("margin")
     if not m:
         return '<p class="va-gap">两融余额未获取（Tushare 该日无汇总或无权限）。</p>'
     bal = m.get("balance")
     val = f"{bal:,.0f} 亿" if isinstance(bal, (int, float)) else "—"
-    return ('<div class="va-grid va-grid-wide">'
-            + _stat_md("两融余额", val, "融资融券余额合计 · " + html.escape(str(m.get("date") or "")))
-            + "</div>")
+    cards = _stat_md("两融余额", val, "融资融券余额合计 · " + html.escape(str(m.get("date") or "")))
+    days = list(m.get("days") or [])
+    values = list(m.get("values") or [])
+    if len(days) < 2 or len(days) != len(values):
+        return '<div class="va-grid va-grid-wide">' + cards + "</div>"
+    days.reverse()
+    values.reverse()
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1.0
+    prev = None
+    rows = []
+    for i, (d, v) in enumerate(zip(days, values)):
+        # 余额变化只有几个百分点，按区间铺满柱长才能看出拐点；同比上一日的升降用颜色标
+        pct = max(4.0, min(100.0, (v - lo) / span * 100))
+        tone = "flat" if prev is None else ("up" if v > prev else ("down" if v < prev else "flat"))
+        prev = v
+        rows.append('<span class="va-hb-row' + (" last" if i == 0 else "") + '">'
+                    + "<em>" + html.escape(_md_day(d)) + "</em>"
+                    + '<i class="va-hb-track"><i class="va-hb-fill va-hb-' + tone
+                    + '" style="width:' + f"{pct:.1f}" + '%"></i></i>'
+                    + '<b class="va-hb-n">' + f"{v:,.0f}" + "</b></span>")
+    chart = ('<div class="va-hb-card"><p class="va-hb-h"><b>近 ' + str(len(days))
+             + ' 个交易日两融余额</b><span>单位 亿元</span></p><div class="va-hb">'
+             + "".join(rows) + "</div></div>")
+    note = ("余额按沪深京合计，最上面一行是复盘日；柱长按这 " + str(len(days))
+            + f" 天的区间（{lo:,.0f} ~ {hi:,.0f} 亿）铺满，柱子颜色是较上一交易日的升降。"
+            + "来源 Tushare 融资融券汇总。")
+    return ('<div class="va-grid va-grid-wide">' + cards + "</div>"
+            + '<div class="va-hb-grid va-hb-grid-1" style="margin-top:12px">' + chart + "</div>"
+            + '<p class="va-mini">' + note + "</p>")
 
 
 # 输入归档里的文本行格式：`  名称 今75.39亿/5日缺 涨1.34% 领涨某某`
@@ -1285,7 +1339,8 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
         md.append(_section("主要指数与隔夜外围", [_block_index(ext.get("index") or {}, ext.get("overseas") or {})],
                            "当日快照 + 外围各自交易日；历史区间这一路没取"))
     if ext.get("dist"):
-        md.append(_section("两融余额", [_block_margin(ext["dist"])], "Tushare 当日市场汇总"))
+        md.append(_section("两融余额", [_block_margin(ext["dist"])],
+                           "Tushare 日度汇总：当日读数 + 近 20 个交易日走势"))
     arch = ext.get("archive") or {}
     md.append(_section("资金去了哪", [_block_capital(arch.get("capital", ""), arch.get("dragon", "")),],
                        "行业净流入/流出、成交额前 20、龙虎榜净买额榜"))
