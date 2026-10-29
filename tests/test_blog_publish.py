@@ -131,6 +131,20 @@ class TestSync:
         assert not (repo / "post" / "stale" / "index.html").exists()   # 旧的自有页面清掉
         assert bp.sync_public(pub, repo) == ([], [])          # 幂等
 
+    def test_keep_missing_protects_history_on_incremental_publish(self, tmp_path):
+        pub, repo = self._tree(tmp_path)
+        bp.sync_public(pub, repo)                         # 先同步一次，清单里有 stale 吗？不，stale 会被删
+        (repo / "post" / "2026-08-01").mkdir(parents=True)
+        (repo / "post" / "2026-08-01" / "index.html").write_text("old post", encoding="utf-8")
+        (repo / bp.MANIFEST).write_text(json.dumps({"files": ["index.html", "post/2026-08-01/index.html"]}),
+                                       encoding="utf-8")
+        changed, removed = bp.sync_public(pub, repo, keep_missing=True)
+        assert (repo / "post" / "2026-08-01" / "index.html").exists()
+        assert "post/2026-08-01/index.html" not in removed
+        # 清单取并集：下次仍记得这篇旧文章
+        known = json.loads((repo / bp.MANIFEST).read_text(encoding="utf-8"))["files"]
+        assert "post/2026-08-01/index.html" in known
+
     def test_refuses_unsafe_manifest_paths(self, tmp_path):
         pub, repo = self._tree(tmp_path)
         (repo / bp.MANIFEST).write_text(json.dumps({"files": ["../escape.html"]}), encoding="utf-8")

@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -1527,11 +1528,15 @@ def _owned(path: Path) -> bool:
 
 
 def sync_public(public_dir: Path | str, target_dir: Path | str,
-                log: Callable[[str], None] = lambda _m: None) -> tuple[list[str], list[str]]:
+                log: Callable[[str], None] = lambda _m: None,
+                keep_missing: bool = False) -> tuple[list[str], list[str]]:
     """把 public/ 同步进 Pages 仓库：只碰自己的产物与清单记过的旧页面。
 
     站上原有文件（2016 年的老文章、css、字体、图片、about…）按字节比较，不同才写，
     所以骨架文件不会被反复重写；不在构建产物里的自有旧页面会删掉。
+
+    keep_missing=True（增量发布）：构建产物里没有的自有文件一律保留，清单取并集，
+    否则一次只发最近几篇会把站上其余历史文章删掉。
     """
     src, dst = Path(public_dir), Path(target_dir)
     changed, removed = [], []
@@ -1558,6 +1563,8 @@ def sync_public(public_dir: Path | str, target_dir: Path | str,
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
         changed.append(rel.as_posix())
+    if keep_missing:
+        produced |= {rel for rel in known if (dst / rel).is_file()}
     for rel in known:
         if rel in produced or rel == MANIFEST or not _owned(Path(rel)):
             continue
@@ -1656,14 +1663,19 @@ def publish(
                 _run(["gh", "repo", "clone", repo, str(tmp), "--", "--branch", branch, "--depth", "1"])
         else:
             token = os.environ["ASTOCK_PAGES_TOKEN"].strip()
-            url = f"https://x-access-token:{token}@{repo}.git"
+            # 令牌里常带 "github_pat_" 下划线等特殊字符，git 解析 URL 时会把它们当分段，
+            # 所以只把令牌本身做 percent-encode，其余部分保持原样。
+            enc = urllib.parse.quote(token, safe="")
+            # host 必须写全名：只写 owner/repo 时 git 会把 owner 当成主机名
+            url = f"https://x-access-token:{enc}@github.com/{repo}.git"
             if reuse:
                 _run(["git", "remote", "set-url", "origin", url], cwd=tmp)
                 _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=tmp)
                 _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)
             else:
                 _run(["git", "clone", "--depth", "1", "--branch", branch, url, str(tmp)])
-        changed, removed = sync_public(Path(site_dir) / "public", tmp, log)
+        changed, removed = sync_public(Path(site_dir) / "public", tmp, log,
+                                       keep_missing=date is None and min_days > 0)
         removed += remove_legacy_dirs(tmp, log)      # 上一版静态页补丁的遗留
         result.written, result.removed = changed, removed
         if not changed and not removed:
