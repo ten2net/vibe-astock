@@ -178,12 +178,13 @@ services:
       HUGO_BIN: /app/docker/bin/hugo
       # GitHub Pages 仓库写权限令牌；没配就在这里由 .env 提供，配错了发布直接失败并打印原因
       ASTOCK_PAGES_TOKEN: ${ASTOCK_PAGES_TOKEN:-}
-      # 不设代理：容器里走 192.168.200.24:7890 连 GitHub 会在 TLS 握手阶段被掐断
-      # （gnutls_handshake failed），直连 github.com 反而通。Tushare 也是直连。
-      http_proxy: ""
-      https_proxy: ""
-      HTTP_PROXY: ""
-      HTTPS_PROXY: ""
+      # 容器里直连 github.com:443 会被拦（连接超时），必须走代理；git 认的是小写
+      # https_proxy，所以这里按 compose 的默认展开规则取宿主环境里的代理地址。
+      # 部署机代理不同时改这两行即可。
+      https_proxy: ${https_proxy:-http://192.168.200.24:7890}
+      HTTPS_PROXY: ${https_proxy:-http://192.168.200.24:7890}
+      http_proxy: ${http_proxy:-http://192.168.200.24:7890}
+      HTTP_PROXY: ${http_proxy:-http://192.168.200.24:7890}
     volumes:
       # 只读挂业务数据：发布只读复盘 JSON 与归档，不写
       - astock-duanxian:/data/duanxian:ro
