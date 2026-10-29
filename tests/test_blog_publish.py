@@ -329,22 +329,22 @@ class TestExternalBlocks:
         assert "纳斯达克" in html_text and "交易日 2026-10-27" in html_text
         assert "中长期位置" in html_text      # 指回上面那块历史区间
 
-    def test_capital_parses_archive_text(self):
-        capital = "\n".join([
-            "行业主力净流入 TOP：",
-            "  银行 今75.39亿/5日缺 涨1.34% 领涨沪农商行",
-            "行业主力净流出 TOP：",
-            "  半导体 今-93.77亿",
-            "全市场成交额 TOP：",
-            "  中际旭创 140.11亿 涨-2.94%",
-            "（口径提示：取数前后参考行情均对应 2026-10-27 收盘）",
-        ])
-        html_text = bp._block_capital(capital)
-        assert "银行 · 净流入" in html_text and "+75.39 亿" in html_text
-        assert "半导体 · 净流出" in html_text and "-93.77 亿" in html_text
-        assert "口径提示" not in html_text      # 口径行不该被当成数据
-        # 成交额榜不进正文
-        assert "中际旭创" not in html_text and "成交额" not in html_text
+    def test_capital_renders_sw2_flows(self):
+        rows = [{"name": f"行业{i}", "net": 100.0 - i * 10, "change_pct": 1.0, "stocks": 30}
+                for i in range(12)]
+        rows += [{"name": f"流出{i}", "net": -5.0 - i, "change_pct": -1.2, "stocks": 20}
+                 for i in range(8)]
+        rows.sort(key=lambda r: r["net"], reverse=True)
+        html_text = bp._block_capital({"available": True, "rows": rows, "total": len(rows), "top": 10})
+        assert html_text.count("va-hb-card") == 2
+        assert "净流入前 10" in html_text and "净流出前 5" in html_text
+        assert "行业0" in html_text and "申万 2021 二级行业" in html_text
+        assert "+100.00" in html_text and "va-hb-up" in html_text and "va-hb-down" in html_text
+        # 成交额榜、龙虎榜不出现
+        assert "成交额" not in html_text and "龙虎榜" not in html_text
+
+    def test_capital_unavailable_says_reason(self):
+        assert "未取到" in bp._block_capital({"available": False, "reason": "没有 TUSHARE_TOKEN"})
 
     def test_margin_block(self):
         html_text = bp._block_margin({"margin": {"balance": 16000.5, "date": "2026-10-27"}})
@@ -369,9 +369,6 @@ class TestExternalBlocks:
         assert "零散" in html_text and "单只" in html_text
         assert "2026-10-26" in html_text
 
-    def test_archive_texts_missing_dir_is_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("ASTOCK_ARCHIVE_DIR", str(tmp_path / "nope"))
-        assert bp.archive_texts("2026-10-27") == {"capital": ""}
 
 
 

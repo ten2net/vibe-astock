@@ -830,6 +830,69 @@ def _md_day(day: str) -> str:
     return digits[4:6] + "-" + digits[6:8] if len(digits) == 8 else str(day)
 
 
+SW2_CACHE: dict = {}
+
+
+def sw2_members(pro) -> dict:
+    """申万二级行业成分：{行业名: {ts_code}}，按日缓存。取不到就返回空，由调用方降级。"""
+    today = datetime.date.today().isoformat()
+    if SW2_CACHE.get("day") == today:
+        return SW2_CACHE.get("map") or {}
+    try:
+        lv2 = pro.index_classify(level="L2", src="SW2021")
+        members: dict = {}
+        for code, name in zip(lv2["index_code"].tolist(), lv2["industry_name"].tolist()):
+            m = pro.index_member(index_code=code)
+            if m is None or len(m) == 0:
+                continue
+            # 同一股票可能有多段成分记录，只留仍在指数里的
+            out = m["out_date"]
+            alive = m[out.isna() | (out.astype(str).str.strip().isin(("", "nan", "None")))]
+            members[str(name)] = set(alive["con_code"].astype(str))
+    except Exception:  # noqa: BLE001
+        return {}
+    SW2_CACHE.update(day=today, map=members)
+    return members
+
+
+def tushare_industry_flow(date: str, top: int = 10) -> dict:
+    """申万二级行业主力资金：Tushare moneyflow 逐股净额按 SW2021 二级行业汇总。
+
+    口径：个股净额单位万元 → 亿元；行业涨跌幅取成分股等权均值，不是行业指数涨跌幅。
+    """
+    pro = _tushare_pro()
+    if pro is None:
+        return {"available": False, "reason": "没有 TUSHARE_TOKEN 或未安装 tushare", "rows": []}
+    members = sw2_members(pro)
+    if not members:
+        return {"available": False, "reason": "申万二级行业成分取不到", "rows": []}
+    code2ind = {}
+    for name, codes in members.items():
+        for c in codes:
+            code2ind[c] = name
+    d = date.replace("-", "")
+    try:
+        mf = pro.moneyflow(trade_date=d, fields="ts_code,net_mf_amount")
+        daily = pro.daily(trade_date=d, fields="ts_code,pct_chg")
+    except Exception as exc:  # noqa: BLE001
+        return {"available": False, "reason": f"Tushare 取数失败：{type(exc).__name__}", "rows": []}
+    if mf is None or len(mf) == 0:
+        return {"available": False, "reason": "Tushare 该日无资金流", "rows": []}
+    df = mf.merge(daily, on="ts_code", how="left") if daily is not None else mf
+    df = df.assign(industry=df["ts_code"].astype(str).map(code2ind)).dropna(subset=["industry"])
+    if df.empty:
+        return {"available": False, "reason": "该日个股未匹配到申万二级行业", "rows": []}
+    agg = df.groupby("industry").agg(
+        net=("net_mf_amount", "sum"), pct=("pct_chg", "mean"), n=("ts_code", "size"))
+    rows = [{"name": str(ind), "net": round(float(r["net"]) / 1e4, 2),
+             "change_pct": None if r["pct"] != r["pct"] else round(float(r["pct"]), 2),
+             "stocks": int(r["n"])}
+            for ind, r in agg.iterrows()]
+    rows.sort(key=lambda x: x["net"], reverse=True)
+    return {"available": True, "date": date, "rows": rows,
+            "total": len(rows), "top": top, "reason": ""}
+
+
 def _block_margin(dist: dict) -> str:
     """两融余额：当日读数 + 近 20 个交易日的横向柱状图（日期在左，最新在上）。"""
     m = (dist or {}).get("margin")
@@ -903,53 +966,42 @@ def _block_margin_net(m: dict) -> str:
             + '<p class="va-mini">' + note + "</p>")
 
 
-# 输入归档里的文本行格式：`  名称 今75.39亿/5日缺 涨1.34% 领涨某某`
-_CAP_IN = re.compile(r"^\s*(?P<name>[^\s]+)\s+今(?P<net>-?[\d.]+)亿.*?涨(?P<pct>-?[\d.]+)%(?:\s+领涨(?P<leader>\S+))?")
-_CAP_OUT = re.compile(r"^\s*(?P<name>[^\s]+)\s+今(?P<net>-?[\d.]+)亿")
-
-
-def _section_lines(text: str, header: str) -> list[str]:
-    """把归档文本按小节切开，取 `header` 之后到下一个空 `TOP：` 小节之间的行。"""
-    lines = (text or "").splitlines()
-    out: list[str] = []
-    inside = False
-    for ln in lines:
-        s = ln.strip()
-        if s.startswith(header):
-            inside = True
-            continue
-        if inside and (s.endswith("TOP：") or s.startswith("（口径提示")):
-            break
-        if inside and s:
-            out.append(s)
-    return out
-
-
-def _block_capital(capital_text: str) -> str:
-    """资金段落：只看行业主力净流入/流出（成交额榜、龙虎榜不入正文）。"""
+def _block_capital(flow: dict) -> str:
+    """资金段落：申万二级行业主力净流入前 10 / 净流出前 5，横向柱状（成交额榜、龙虎榜不入正文）。"""
+    if not flow.get("available"):
+        return ('<p class="va-gap">行业资金未取到（'
+                + html.escape(str(flow.get("reason") or "无数据")) + "）。</p>")
+    rows = flow.get("rows") or []
+    top = int(flow.get("top") or 10)
+    inflow = [r for r in rows if (r.get("net") or 0) > 0][:top]
+    outflow = [r for r in rows if (r.get("net") or 0) < 0][-5:][::-1]
+    if not inflow and not outflow:
+        return '<p class="va-gap">该日申万二级行业没有可用资金流。</p>'
+    scale = max([abs(float(r.get("net") or 0)) for r in inflow + outflow] or [1]) or 1
     out = []
-    inflow = _section_lines(capital_text, "行业主力净流入")
-    outflow = _section_lines(capital_text, "行业主力净流出")
-    if inflow or outflow:
-        cards = []
-        for line in inflow[:6]:
-            m = _CAP_IN.match(line)
-            if not m:
-                continue
-            net = float(m.group("net"))
-            pct = float(m.group("pct"))
-            cards.append(_stat_md(m.group("name") + " · 净流入",
-                                  '<span class="up">+' + f"{net:.2f}" + " 亿</span>",
-                                  "板块涨 " + _sign(pct, 2, "%") + (" · 领涨 " + m.group("leader") if m.group("leader") else "")))
-        for line in outflow[:6]:
-            m = _CAP_OUT.match(line)
-            if not m:
-                continue
-            net = float(m.group("net"))
-            cards.append(_stat_md(m.group("name") + " · 净流出",
-                                  '<span class="down">' + f"{net:.2f}" + " 亿</span>", "行业主力资金"))
-        out.append('<div class="va-grid va-grid-wide">' + "".join(cards) + "</div>")
-    return "".join(out) or '<p class="va-gap">该日行业资金未归档。</p>'
+    for title, group, hint in (("净流入前 " + str(len(inflow)), inflow, "单位 亿元"),
+                               ("净流出前 " + str(len(outflow)), outflow, "单位 亿元")):
+        if not group:
+            continue
+        bars = []
+        for r in group:
+            net = float(r.get("net") or 0)
+            pct = abs(net) / scale * 100
+            pctv = r.get("change_pct")
+            sub = ("涨 " + _sign(pctv, 2, "%")) if isinstance(pctv, (int, float)) else ""
+            bars.append('<span class="va-hb-row">'
+                        + '<em class="va-hb-name">' + html.escape(str(r.get("name") or "")) + "</em>"
+                        + '<i class="va-hb-track"><i class="va-hb-fill va-hb-' + _cls(net)
+                        + '" style="width:' + f"{pct:.1f}" + '%"></i></i>'
+                        + '<b class="va-hb-n">' + _sign(net, 2) + "</b>"
+                        + '<span class="va-hb-sub">' + sub + "</span></span>")
+        out.append('<div class="va-hb-card"><p class="va-hb-h"><b>' + title + "</b><span>"
+                   + hint + '</span></p><div class="va-hb">' + "".join(bars) + "</div></div>")
+    note = ("申万 2021 二级行业，共 " + str(flow.get("total") or len(rows))
+            + " 个行业有资金流；净额 = 成分股当日主力净额合计（Tushare moneyflow），"
+            + "涨跌幅为成分股等权均值，不是行业指数涨跌。柱长按两类合起来的最大绝对值缩放。")
+    return ('<div class="va-hb-grid">' + "".join(out) + "</div>"
+            + '<p class="va-mini">' + note + "</p>")
 
 
 TIER_RULES = (
@@ -1063,50 +1115,16 @@ def _section(title: str, body_md: str, hint: str = "") -> str:
     return (f'<section class="va-sec"><div class="va-sec-h"><h2>{html.escape(title)}</h2>{sub}</div>'
             f'<div class="va-panel post-content">{body}</div></section>')
 
-def _archive_dir() -> Path:
-    """复盘输入的原始归档（资金 / 龙虎榜原文）。默认本机数据区 archive/。"""
-    return Path(os.environ.get("ASTOCK_ARCHIVE_DIR") or (Path.home() / ".duanxian-agents" / "archive"))
-
-
-def archive_texts(date: str) -> dict:
-    """读某日输入归档里的资金、龙虎榜原文。没有归档就返回空串。"""
-    base = _archive_dir() / date
-    if not base.is_dir():
-        # 复盘任务目录：本机默认 ~/.vibe-astock-agent/daily，容器版在它的卷里
-        roots = [Path.home() / ".vibe-astock-agent" / "daily"]
-        if os.environ.get("ASTOCK_AGENT_HOME"):
-            roots.insert(0, Path(os.environ["ASTOCK_AGENT_HOME"]) / "daily")
-        for job_root in roots:
-            found = None
-            for meta in sorted(job_root.glob("*.json")) if job_root.is_dir() else []:
-                job_dir = meta.with_suffix("")
-                if not (job_dir / "get_capital_data.json").exists():
-                    continue
-                try:
-                    row = json.loads(meta.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    continue
-                if row.get("date") == date:
-                    found = job_dir
-                    break
-            if found:
-                base = found
-                break
-    try:
-        row = json.loads((base / "get_capital_data.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"capital": ""}
-    value = row.get("value")
-    return {"capital": value if isinstance(value, str) else ""}
-
-
 def _external(date: str, log: Callable[[str], None] = lambda _m: None) -> dict:
-    """发布时现取的外部数据：指数快照、外围、涨跌分布与两融、资金归档。"""
+    """发布时现取的外部数据：指数快照、外围、涨跌分布与两融、申万二级行业资金。"""
     dist = tushare_distribution(date)
     if not dist.get("available"):
         log(f"{date}：涨跌分布未取到（{dist.get('reason')}）")
+    flow = tushare_industry_flow(date)
+    if not flow.get("available"):
+        log(f"{date}：申万二级行业资金未取到（{flow.get('reason')}）")
     return {"index": index_snapshot(date), "overseas": overseas_snapshot(), "hist": index_history(date),
-            "dist": dist, "archive": archive_texts(date)}
+            "dist": dist, "capital": flow}
 
 INDEX_CODES = (
     ("000001.SH", "上证指数"), ("399001.SZ", "深证成指"),
@@ -1345,9 +1363,9 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     if ext.get("dist"):
         md.append(_section("两融余额", [_block_margin(ext["dist"])],
                            "Tushare 日度汇总：当日读数 + 近 20 个交易日走势"))
-    arch = ext.get("archive") or {}
-    md.append(_section("资金去了哪", [_block_capital(arch.get("capital", ""))],
-                       "只列行业主力净流入/流出，不做成交额榜与龙虎榜的解读"))
+    md.append(_section("资金去了哪",
+                       [_block_capital(ext.get("capital") or {"available": False, "reason": "未取数"})],
+                       "申万二级行业主力净流入前 10 / 净流出前 5，按成分股资金流汇总"))
     md.append(_section("涨停分档", [_block_tier_tiers(payload, prev_reviews or {})],
                        "按东财行业和前一交易日比，只看集中在哪、散在哪"))
     if evidence.strip():

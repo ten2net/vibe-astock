@@ -140,6 +140,8 @@
 .va-hb-fill.va-hb-down{background:#16a06a}
 .va-hb-fill.va-hb-flat{background:#9aa3ad;opacity:.55}
 .va-hb-grid-1{grid-template-columns:1fr;max-width:560px}
+.va-hb-row .va-hb-name{flex:0 0 84px;width:84px;font-family:inherit;font-size:12.5px}
+.va-hb-row .va-hb-sub{flex:0 0 62px;width:62px;text-align:right;font-family:monospace;font-size:11.5px;color:#888}
 .va-hb-n{flex:0 0 52px;width:52px;text-align:right;font-family:monospace;font-size:12px;font-weight:600}
 .va-hb-row.last{background:rgba(194,65,12,.06);border-radius:4px}
 .va-hb-row.last em{font-weight:700}
