@@ -18,6 +18,7 @@ import datetime
 import html
 import json
 import os
+import time
 import re
 import shutil
 import subprocess
@@ -833,23 +834,43 @@ def _md_day(day: str) -> str:
 SW2_CACHE: dict = {}
 
 
+MEMBER_RATE_PER_MIN = 200      # Tushare index_member 的限频
+
+
 def sw2_members(pro) -> dict:
-    """申万二级行业成分：{行业名: {ts_code}}，按日缓存。取不到就返回空，由调用方降级。"""
+    """申万二级行业成分：{行业名: {ts_code}}，按日缓存。取不到就返回空，由调用方降级。
+
+    申万一级没有 index_member 数据，只能逐个二级行业（134 个）查；index_member 限
+    200 次/分钟，所以按 0.4 秒间隔匀速取，一次约 55 秒，结果按日缓存。
+    """
     today = datetime.date.today().isoformat()
     if SW2_CACHE.get("day") == today:
         return SW2_CACHE.get("map") or {}
     try:
         lv2 = pro.index_classify(level="L2", src="SW2021")
-        members: dict = {}
-        for code, name in zip(lv2["index_code"].tolist(), lv2["industry_name"].tolist()):
-            m = pro.index_member(index_code=code)
-            if m is None or len(m) == 0:
-                continue
-            # 同一股票可能有多段成分记录，只留仍在指数里的
+        pairs = list(zip(lv2["index_code"].astype(str).tolist(),
+                         lv2["industry_name"].astype(str).tolist()))
+    except Exception:  # noqa: BLE001
+        return {}
+    gap = 60.0 / MEMBER_RATE_PER_MIN + 0.05
+    members: dict = {}
+    ok = 0
+    for i, (code, name) in enumerate(pairs):
+        for attempt in range(3):
+            try:
+                m = pro.index_member(index_code=code)
+                break
+            except Exception:  # noqa: BLE001  限频或抖动，等一拍再试
+                time.sleep(gap * (attempt + 2))
+                m = None
+        if m is not None and len(m):
             out = m["out_date"]
             alive = m[out.isna() | (out.astype(str).str.strip().isin(("", "nan", "None")))]
-            members[str(name)] = set(alive["con_code"].astype(str))
-    except Exception:  # noqa: BLE001
+            members[name] = set(alive["con_code"].astype(str))
+            ok += 1
+        if i < len(pairs) - 1:
+            time.sleep(gap)
+    if not ok:
         return {}
     SW2_CACHE.update(day=today, map=members)
     return members
