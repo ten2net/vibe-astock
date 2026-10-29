@@ -1446,9 +1446,12 @@ def _run(cmd: list[str], cwd: Path | str | None = None) -> str:
 
 
 def find_hugo(explicit: str | None = None) -> str:
-    """hugo 可执行：显式指定 → PATH → 仓库 .local/bin/hugo（免安装包下载的那份）。"""
+    """hugo 可执行：显式指定 → HUGO_BIN → PATH → 仓库 .local/bin/hugo（免安装包下载的那份）。"""
     if explicit:
         return explicit
+    env_bin = os.environ.get("HUGO_BIN", "").strip()
+    if env_bin and Path(env_bin).exists():
+        return env_bin
     found = shutil.which("hugo")
     if found:
         return found
@@ -1583,9 +1586,13 @@ def publish(
     dry_run: bool = False,
     push: bool = True,
     workdir: Path | str | None = None,
+    min_days: int = 0,
     log: Callable[[str], None] = lambda _m: None,
 ) -> PublishResult:
     """写 md → hugo 构建 → 同步到 Pages 仓库。date=None 时刷新全部。
+
+    min_days>0 时（定时任务用）只取库里最新的这么多天，这样盘后跑不会因为
+    当天复盘还没生成而整批失败。
 
     发布是幂等的：内容没变的文件不重写，所以定时重跑不会制造噪声提交。
     """
@@ -1594,6 +1601,12 @@ def publish(
     if date:
         load_review(reviews, date)              # 指定日期不可用就直接失败，不静默
         dates = sorted(set(dates) | {date}, reverse=True)
+    elif min_days:
+        # 定时任务用：库里还没有到期的复盘就只刷新已有文章，不让 cron 报错刷日志
+        latest = dates[0] if dates else ""
+        if not latest or latest < datetime.date.today().isoformat():
+            log(f"库里最新复盘是 {latest or '（空）'}；只刷新最近的 {len(dates[:min_days])} 篇")
+        dates = dates[:min_days]
     if not dates:
         raise PublishError(f"{reviews} 里没有可发布的复盘")
 
@@ -1606,15 +1619,28 @@ def publish(
         return result
 
     result.built = build(site_dir, hugo, log)
-    tmp = Path(workdir) if workdir else Path(tempfile.mkdtemp(prefix="astock-pages-"))
-    owned = workdir is None
+    # 容器里没有 gh 时用令牌拼 URL；克隆目录可以固定下来复用（ASTOCK_PAGES_WORKDIR），
+    # 每次只 fetch 最新一次提交，省掉整仓 clone。
+    persistent = workdir or os.environ.get("ASTOCK_PAGES_WORKDIR")
+    tmp = Path(persistent) if persistent else Path(tempfile.mkdtemp(prefix="astock-pages-"))
+    owned = not persistent
     try:
+        reuse = (tmp / ".git").is_dir()
         if auth_mode() == "gh":
-            _run(["gh", "repo", "clone", repo, str(tmp), "--", "--branch", branch, "--depth", "1"])
+            if reuse:
+                _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=tmp)
+                _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)
+            else:
+                _run(["gh", "repo", "clone", repo, str(tmp), "--", "--branch", branch, "--depth", "1"])
         else:
             token = os.environ["ASTOCK_PAGES_TOKEN"].strip()
-            _run(["git", "clone", "--depth", "1", "--branch", branch,
-                  f"https://x-access-token:{token}@{repo}.git", str(tmp)])
+            url = f"https://x-access-token:{token}@{repo}.git"
+            if reuse:
+                _run(["git", "remote", "set-url", "origin", url], cwd=tmp)
+                _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=tmp)
+                _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)
+            else:
+                _run(["git", "clone", "--depth", "1", "--branch", branch, url, str(tmp)])
         changed, removed = sync_public(Path(site_dir) / "public", tmp, log)
         removed += remove_legacy_dirs(tmp, log)      # 上一版静态页补丁的遗留
         result.written, result.removed = changed, removed

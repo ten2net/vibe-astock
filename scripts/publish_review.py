@@ -37,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo", default="ten2net/ten2net.github.io")
     ap.add_argument("--branch", default="master")
     ap.add_argument("--limit", type=int, default=366, help="最多发布多少份")
+    ap.add_argument("--recent", type=int, default=0,
+                    help="只发布库里最新的 N 篇（定时任务用，默认 0 = 全部）")
     ap.add_argument("--dry-run", action="store_true", help="只写 md，不构建、不碰远程")
     ap.add_argument("--no-push", action="store_true", help="构建并提交到临时克隆，但不推送")
     args = ap.parse_args(argv)
@@ -47,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         result = blog_publish.publish(
             args.site, Path(args.reviews), date=args.date, repo=args.repo, branch=args.branch,
             max_pages=args.limit, hugo=args.hugo, dry_run=args.dry_run,
-            push=not args.no_push, log=log,
+            push=not args.no_push, min_days=args.recent, log=log,
         )
     except blog_publish.PublishError as exc:
         print(f"未发布：{exc}", file=sys.stderr)

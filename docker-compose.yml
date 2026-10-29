@@ -32,6 +32,11 @@ services:
       VR_DATA_DIR: /data/market
       # 容器内必须监听全部网卡，只绑 127.0.0.1 的话宿主机的端口映射连不进来
       VIBE_HOST: 0.0.0.0
+      # 博客发布只看 /data/duanxian/reviews（源码在 /app/blog，随镜像更新；Pages 仓库克隆
+      # 每次都是新的临时目录）。hugo 用镜像自带的固定版本 docker/bin/hugo。
+      #   docker compose exec vibe-astock python scripts/publish_review.py --recent 3
+      # 定时任务由宿主 cron 触发同一条命令（见下方 publish 一次性服务）。
+      HUGO_BIN: /app/docker/bin/hugo
       # 代理：境外数据源（事件概率用 Kalshi / Polymarket）走它。
       # 刻意**不写进 .env** —— .env 会被 duanxian/fetchers.py 读进 os.environ，而
       # 测试会检查代码有没有擅自改 NO_PROXY，写了会被误判。部署参数放这里更合适。
@@ -157,6 +162,35 @@ services:
       vibe-astock-v2:
         condition: service_healthy
     restart: unless-stopped
+
+  # 一次性发布容器：跑完就退，不常驻。由宿主 cron 每天盘后拉起：
+  #   docker compose run --rm publish --recent 3
+  # gh 没有登录态，凭据走 .env 里的 ASTOCK_PAGES_TOKEN（Pages 仓库写权限）。
+  publish:
+    image: vibe-astock:local
+    profiles: ["publish"]
+    env_file:
+      - .env
+    environment:
+      ASTOCK_AGENT_HOME: /data/agent
+      ASTOCK_DATA_HOME: /data/duanxian
+      VR_DATA_DIR: /data/market
+      HUGO_BIN: /app/docker/bin/hugo
+      # GitHub Pages 仓库写权限令牌；没配就在这里由 .env 提供，配错了发布直接失败并打印原因
+      ASTOCK_PAGES_TOKEN: ${ASTOCK_PAGES_TOKEN:-}
+      # 与网页容器同一套代理口径（Tushare 直连，其余境外源走代理）
+      http_proxy: http://192.168.200.24:7890
+      https_proxy: http://192.168.200.24:7890
+      HTTP_PROXY: http://192.168.200.24:7890
+      HTTPS_PROXY: http://192.168.200.24:7890
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+    volumes:
+      # 只读挂业务数据：发布只读复盘 JSON 与归档，不写
+      - astock-duanxian:/data/duanxian:ro
+      - astock-agent:/data/agent:ro
+    entrypoint: ["python", "scripts/publish_review.py"]
+    command: ["--recent", "3"]
 
 volumes:
   astock-agent:
