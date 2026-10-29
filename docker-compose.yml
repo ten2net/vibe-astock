@@ -14,6 +14,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 构建期下载 hugo 要过 GitHub，本网络直连被拦，走代理
+        BUILD_PROXY: ${https_proxy:-http://192.168.200.24:7890}
     image: vibe-astock:local
     container_name: vibe-astock
     restart: unless-stopped
@@ -33,10 +36,9 @@ services:
       # 容器内必须监听全部网卡，只绑 127.0.0.1 的话宿主机的端口映射连不进来
       VIBE_HOST: 0.0.0.0
       # 博客发布只看 /data/duanxian/reviews（源码在 /app/blog，随镜像更新；Pages 仓库克隆
-      # 每次都是新的临时目录）。hugo 用镜像自带的固定版本 docker/bin/hugo。
+      # 每次都是新的临时目录）。hugo 在镜像构建时按 HUGO_VERSION 下载到 /usr/local/bin。
       #   docker compose exec vibe-astock python scripts/publish_review.py --recent 3
       # 定时任务由宿主 cron 触发同一条命令（见下方 publish 一次性服务）。
-      HUGO_BIN: /app/docker/bin/hugo
       # 代理：境外数据源（事件概率用 Kalshi / Polymarket）走它。
       # 刻意**不写进 .env** —— .env 会被 duanxian/fetchers.py 读进 os.environ，而
       # 测试会检查代码有没有擅自改 NO_PROXY，写了会被误判。部署参数放这里更合适。
@@ -175,7 +177,6 @@ services:
       ASTOCK_AGENT_HOME: /data/agent
       ASTOCK_DATA_HOME: /data/duanxian
       VR_DATA_DIR: /data/market
-      HUGO_BIN: /app/docker/bin/hugo
       # GitHub Pages 仓库写权限令牌；没配就在这里由 .env 提供，配错了发布直接失败并打印原因
       ASTOCK_PAGES_TOKEN: ${ASTOCK_PAGES_TOKEN:-}
       # 容器里直连 github.com:443 会被拦（连接超时），必须走代理；git 认的是小写

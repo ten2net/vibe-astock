@@ -31,15 +31,28 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 
 # 运行期仍需要 node：AI 引擎由 runtime/bridge 拉起，不是构建完就不用了。
-# git 供博客发布（blog_publish 要 clone Pages 仓库再 push）；hugo 用仓库自带的
-# 固定版本 docker/bin/hugo（COPY . . 已带进来），不在容器里下载安装包。
+# git 供博客发布（blog_publish 要 clone Pages 仓库再 push）。
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl xz-utils ca-certificates git \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1 \
  && node --version && npm --version \
- && apt-get purge -y --auto-remove curl xz-utils \
  && rm -rf /var/lib/apt/lists/*
+
+# hugo（extended，博客发布用）：构建时按固定版本号下载，不把 60M 二进制塞进仓库。
+# 版本与已发布文章的一致，升级时只改 HUGO_VERSION 这一个 ARG。
+# 走代理（构建环境直连 GitHub 会被拦），成功后把 hugo 挪到 /usr/local/bin。
+ARG HUGO_VERSION=0.169.0
+# 构建期代理：本网络直连 github.com 会被拦，必须显式给。默认与部署机一致。
+ARG BUILD_PROXY=http://192.168.200.24:7890
+RUN https_proxy="$BUILD_PROXY" http_proxy="$BUILD_PROXY" \
+    curl -fsSL --retry 3 --connect-timeout 20 \
+      "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin hugo \
+ && chmod +x /usr/local/bin/hugo && hugo version \
+ && apt-get purge -y --auto-remove xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+# curl 保留：容器内排查外部数据源（Tushare / GitHub）时要用
 
 WORKDIR /app
 COPY requirements.txt ./
