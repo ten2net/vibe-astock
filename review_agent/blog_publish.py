@@ -1613,7 +1613,8 @@ def publish(
     written, skipped = write_sources(site_dir, reviews, dates, log)
     if not list((Path(site_dir) / "content" / "post").glob("*-每日复盘.md")):
         raise PublishError("没有任何一份复盘能发布（都未通过公开检查）")
-    result = PublishResult(written=written, removed=skipped,
+    # skipped 是没重写的旧 md（内容没变），不是被删的；除了当天，其余旧文章本就在站上
+    result = PublishResult(written=written, removed=skipped if date is None else [],
                            url=f"https://{repo.split('/')[0]}.github.io/post/")
     if dry_run:
         return result
