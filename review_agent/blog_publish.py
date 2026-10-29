@@ -1459,8 +1459,15 @@ def write_sources(site_dir: Path | str, reviews_dir: Path | str, dates: list[str
     return written, skipped
 
 
-def _run(cmd: list[str], cwd: Path | str | None = None) -> str:
-    proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True, text=True)
+def _run(cmd: list[str], cwd: Path | str | None = None, timeout: float | None = None) -> str:
+    env = dict(os.environ)
+    # git 网络操作限时：容器里不通时默认会挂两分钟以上，定时任务应快速失败
+    if cmd and cmd[0] == "git":
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
+        env.setdefault("GIT_HTTP_LOW_SPEED_LIMIT", "1000")
+        env.setdefault("GIT_HTTP_LOW_SPEED_TIME", "20")
+    proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True,
+                          text=True, timeout=timeout, env=env)
     if proc.returncode != 0:
         tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-5:]
         raise PublishError(f"{cmd[0]} 执行失败：{' '.join(tail)}")
