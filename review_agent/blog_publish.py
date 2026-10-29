@@ -757,13 +757,16 @@ def margin_history(pro, date: str, days: int = MARGIN_DAYS) -> dict | None:
         df = pro.margin(start_date=start.strftime("%Y%m%d"), end_date=day)
         if df is None or len(df) == 0:
             return None
-        series = df.groupby("trade_date")["rzrqye"].sum().sort_index()
-        series = series[series.index <= day].tail(days)
-        if series.empty:
+        grouped = df.groupby("trade_date")[["rzrqye", "rzmre", "rzche"]].sum().sort_index()
+        grouped = grouped[grouped.index <= day].tail(days)
+        if grouped.empty:
             return None
-        return {"date": date, "days": [str(i) for i in series.index],
-                "values": [round(float(v) / 1e8, 1) for v in series.tolist()],
-                "balance": round(float(series.iloc[-1]) / 1e8, 1), "window": days}
+        # 融资净买入 = 当日融资买入额 − 融资偿还额，正数说明当天融资加仓
+        net = (grouped["rzmre"] - grouped["rzche"]) / 1e8
+        return {"date": date, "days": [str(i) for i in grouped.index],
+                "values": [round(float(v), 1) for v in grouped["rzrqye"].div(1e8).tolist()],
+                "net_values": [round(float(v), 1) for v in net.tolist()],
+                "balance": round(float(grouped["rzrqye"].iloc[-1]) / 1e8, 1), "window": days}
     except Exception:  # noqa: BLE001
         return None
 
@@ -861,8 +864,42 @@ def _block_margin(dist: dict) -> str:
     note = ("余额按沪深京合计，最上面一行是复盘日；柱长按这 " + str(len(days))
             + f" 天的区间（{lo:,.0f} ~ {hi:,.0f} 亿）铺满，柱子颜色是较上一交易日的升降。"
             + "来源 Tushare 融资融券汇总。")
-    return ('<div class="va-grid va-grid-wide">' + cards + "</div>"
-            + '<div class="va-hb-grid va-hb-grid-1" style="margin-top:12px">' + chart + "</div>"
+    out = ('<div class="va-grid va-grid-wide">' + cards + "</div>"
+           + '<div class="va-hb-grid va-hb-grid-1" style="margin-top:12px">' + chart + "</div>"
+           + '<p class="va-mini">' + note + "</p>")
+    out += _block_margin_net(m)
+    return out
+
+
+def _block_margin_net(m: dict) -> str:
+    """近 20 日融资净买入：正数（融资加仓）红、负数（融资减仓）绿，柱长按最大绝对值缩放。"""
+    days = list(m.get("days") or [])
+    nets = list(m.get("net_values") or [])
+    if len(days) < 2 or len(days) != len(nets):
+        return ""
+    days.reverse()
+    nets.reverse()
+    scale = max([abs(v) for v in nets] or [0]) or 1.0
+    rows = []
+    for i, (d, v) in enumerate(zip(days, nets)):
+        pct = max(1.5, min(100.0, abs(v) / scale * 100))
+        tone = "up" if v > 0 else ("down" if v < 0 else "flat")
+        rows.append('<span class="va-hb-row' + (" last" if i == 0 else "") + '">'
+                    + "<em>" + html.escape(_md_day(d)) + "</em>"
+                    + '<i class="va-hb-track"><i class="va-hb-fill va-hb-' + tone
+                    + '" style="width:' + f"{pct:.1f}" + '%"></i></i>'
+                    + '<b class="va-hb-n">' + f"{v:+,.0f}" + "</b></span>")
+    positives = sum(1 for v in nets if v > 0)
+    total = sum(nets)
+    hint = f"{len(days)} 日合计 {total:+,.0f} 亿"
+    chart = ('<div class="va-hb-card"><p class="va-hb-h"><b>近 ' + str(len(days))
+             + ' 个交易日融资净买入</b><span>' + html.escape(hint) + '</span></p>'
+             + '<div class="va-hb">' + "".join(rows) + "</div></div>")
+    note = (f"融资净买入 = 当日融资买入额 − 融资偿还额，按沪深京合计，单位亿元；"
+            + f"这 {len(days)} 天里有 {positives} 天净买入为正。"
+            + f"柱长按最大绝对值（{scale:,.0f} 亿）缩放，红为净买入、绿为净卖出。"
+            + "来源 Tushare 融资融券汇总。")
+    return ('<div class="va-hb-grid va-hb-grid-1" style="margin-top:12px">' + chart + "</div>"
             + '<p class="va-mini">' + note + "</p>")
 
 

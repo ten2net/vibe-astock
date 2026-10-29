@@ -244,6 +244,19 @@ class TestVisualBlocks:
         # 余额升降用颜色标：最高一天在最上面（无上一日）用 flat，往下逐日递减都是 down
         assert "va-hb-flat" in html_text and html_text.count("va-hb-down") >= 18
 
+    def test_margin_net_renders_20_day_bars(self):
+        days = [f"2026-09-{d:02d}" for d in range(1, 21)]
+        nets = [100.0, -50.0, 0.0] + [10.0] * 17
+        html_text = bp._block_margin({"margin": {
+            "date": "2026-09-20", "days": days, "values": [25000.0] * 20,
+            "net_values": nets, "balance": 25000.0}})
+        assert "近 20 个交易日融资净买入" in html_text
+        assert html_text.count("va-hb-card") == 2 and html_text.count("va-hb-row") == 40
+        # 正数红（up）、负数绿（down），带符号显示
+        assert "+100" in html_text and "-50" in html_text
+        assert "va-hb-up" in html_text and "va-hb-down" in html_text
+        assert "20 日合计" in html_text
+
     def test_margin_unavailable_says_reason(self):
         assert "未获取" in bp._block_margin({})
 
