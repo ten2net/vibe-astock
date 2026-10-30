@@ -165,6 +165,39 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # 一次性「生成当日复盘」容器：跑完就退，不常驻。由宿主 cron 每天收盘后拉起：
+  #   docker compose run --rm review
+  # 它向常驻的 vibe-astock 后端提交 /api/review-agent/daily 并等任务跑完；
+  # 日期取「最近已收盘交易日」，周末/节假日/没收盘时只会落到上一场。
+  review:
+    image: vibe-astock:local
+    profiles: ["review"]
+    # 只要后端在线，不跟着它的健康检查一起被卡住/重启
+    depends_on: []
+    env_file:
+      - .env
+    environment:
+      ASTOCK_AGENT_HOME: /data/agent
+      ASTOCK_DATA_HOME: /data/duanxian
+      VR_DATA_DIR: /data/market
+      # 与网页容器同一套代理口径（Tushare 直连，其余境外源走代理）
+      http_proxy: ${http_proxy:-http://192.168.200.24:7890}
+      https_proxy: ${https_proxy:-http://192.168.200.24:7890}
+      HTTP_PROXY: ${http_proxy:-http://192.168.200.24:7890}
+      HTTPS_PROXY: ${https_proxy:-http://192.168.200.24:7890}
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      # 要跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
+      REVIEW_BASE: http://127.0.0.1:8910
+    # 复用网页容器的网络（服务在它里面监听 8910），但不共享它的进程与数据卷
+    network_mode: "service:vibe-astock"
+    volumes:
+      - astock-duanxian:/data/duanxian
+      - astock-agent:/data/agent
+      - astock-market:/data/market
+    entrypoint: ["python", "scripts/review_daily.py"]
+    command: ["--wait", "5400", "--poll", "20"]
+
   # 一次性发布容器：跑完就退，不常驻。由宿主 cron 每天盘后拉起：
   #   docker compose run --rm publish --recent 3
   # gh 没有登录态，凭据走 .env 里的 ASTOCK_PAGES_TOKEN（Pages 仓库写权限）。
