@@ -196,7 +196,9 @@ services:
       - astock-agent:/data/agent
       - astock-market:/data/market
     entrypoint: ["python", "scripts/review_daily.py"]
-    command: ["--wait", "5400", "--poll", "20"]
+    # 跑完当天复盘后立刻发布（--publish），不再另起一条固定时刻的发布任务；
+    # 失败会自动换模型重试（REVIEW_FALLBACK_MODELS）。
+    command: ["--wait", "5400", "--poll", "20", "--publish"]
 
   # 一次性发布容器：跑完就退，不常驻。由宿主 cron 每天盘后拉起：
   #   docker compose run --rm publish --recent 3
