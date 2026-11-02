@@ -253,7 +253,12 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const b = body as { error?: string; message?: string } | null;
     const code = b?.error ?? String(res.status);
     const raw = b?.message ?? b?.error ?? `HTTP ${res.status}`;
-    const message = agentPath ? friendlyAgentError(new ApiError(raw, res.status, code)) : raw;
+    // 网关/隧道层错误(Cloudflare 521/522/530、Nginx 502/504 之类)返回的是 HTML 或空体,
+    // 用户只看到「HTTP 530」无从下手:补一句这是什么,以及该怎么办。
+    const gateway = res.status >= 500 && !b?.message
+      ? `。临时故障(多由公网隧道/网关短暂断开引起),稍等几秒重试即可;连续几次都这样再联系部署者`
+      : "";
+    const message = agentPath ? friendlyAgentError(new ApiError(raw, res.status, code)) : raw + gateway;
     throw new ApiError(message, res.status, code === "turn_failed" && AGENT_AUTH_ERROR.test(raw) ? "agent_not_ready" : code);
   }
   return body as T;
