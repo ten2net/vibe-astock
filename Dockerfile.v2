@@ -36,9 +36,11 @@ ENV https_proxy=$https_proxy http_proxy=$http_proxy \
     VRA_UI_PORT=5940 \
     VRA_API_PORT=8770
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl xz-utils ca-certificates procps \
- && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+# apt 直连:构建期 https_proxy 指向的内网代理对 deb.debian.org 回 502,
+# 而 debian 源本就不需要代理;下面下载 node 时才用代理。
+RUN https_proxy= http_proxy= apt-get update \
+ && https_proxy= http_proxy= apt-get install -y --no-install-recommends curl xz-utils ca-certificates procps \
+ && https_proxy="$https_proxy" http_proxy="$http_proxy" curl -fsSL --retry 3 --connect-timeout 20 "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1 \
  && node --version && npm --version \
  && apt-get purge -y --auto-remove curl xz-utils \

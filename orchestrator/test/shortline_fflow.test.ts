@@ -94,6 +94,15 @@ function tmpCtx(): ServiceContext {
   return { repoRoot: REPO, dataRoot: fs.mkdtempSync(path.join(os.tmpdir(), "vra-fflow-")), python: "python3", node: process.execPath };
 }
 
+/** sw_industry 端点的证据形状:只关心 sw_l2_code,名称由本地名表反查 */
+const swEnv = (l2: string) => ({
+  evidence: [
+    { field: "sw_industry_code", value: l2 + "xx" },
+    { field: "sw_l1_code", value: l2.slice(0, 2) + "0000" },
+    { field: "sw_l2_code", value: l2 },
+  ],
+});
+
 const rankEnv = (codes: string[]) => ({
   // 新浪榜 schema:不给 float_cap(分母回落到当日成交额),带 amount
   extra: {
@@ -116,6 +125,7 @@ test("视图:取榜→逐只识别→按 score 取前 20,结果带通道标注�
       calls.push(`${req.consistency?.mode ?? "cached"}:${req.endpoint}${req.symbol ? `:${req.symbol}` : ""}`);
       if (req.endpoint === "sina_market_money_rank") return { envelope: rankEnv(codes) };
       if (req.endpoint === "em_market_main_net_rank") throw new Error("push2 blocked in this test");
+      if (req.endpoint === "sw_industry") return { envelope: swEnv(req.symbol === "600000" ? "270100" : "730200") };
       const idx = codes.indexOf(String(req.symbol));
       // 前 3 只横盘→拉升(score 递减),其余从开盘一路拉升(斜率比拒掉)
       const series = idx >= 0 && idx < 3
@@ -134,6 +144,11 @@ test("视图:取榜→逐只识别→按 score 取前 20,结果带通道标注�
     assert.ok(!calls.some((c) => c.includes("em_fund_flow_minute")), "主通道可用时不该碰东财分钟");
     assert.equal(v1.stocks[0]!.flat_minutes % 5, 0, "5 分钟桶换算成分钟");
     assert.equal(v1.stocks[0]!.pct, 1.5, "榜单源是小数比率(0.015),视图统一输出百分数单位(1.5)");
+    // 申万二级行业:只对最终上榜的股票取,按名表把 L2 代码翻译成名称
+    assert.equal(v1.stocks[0]!.sw2, "半导体", "270100 → 半导体");
+    assert.equal(v1.stocks[1]!.sw2, "通信设备", "730200 → 通信设备");
+    const swCalls = calls.filter((c) => c.includes("sw_industry"));
+    assert.equal(swCalls.length, 3, "只对命中的 3 只取行业,不是对 25 只候选各取一次");
     const callsAfterFirst = calls.length;
     const v2 = await shortlineFflow(ctx, {}, new AbortController().signal, { fetch: fetch as never, now: () => now + 10_000 }) as FflowView;
     assert.equal(calls.length, callsAfterFirst, "45s 内必须走缓存,不再取数");

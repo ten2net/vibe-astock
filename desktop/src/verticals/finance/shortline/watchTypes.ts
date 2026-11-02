@@ -74,6 +74,8 @@ export interface CaptureResult { slot: string; ok: boolean; already: boolean; re
 /** 分时资金「横盘→稳步拉升」榜(shortline_fflow 视图) */
 export interface FflowCandidate {
   code: string; name: string;
+  /** 申万 2021 二级行业名;取不到为 null */
+  sw2: string | null;
   price: number | null; pct: number | null;
   /** 主力净流入当日累计(元) */
   main_net: number | null;

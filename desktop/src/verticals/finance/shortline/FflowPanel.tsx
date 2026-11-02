@@ -40,7 +40,7 @@ function Sparkline({ series }: { series: number[] }) {
 
 /** 给 AI 的页面上下文(客观读数,不带买卖倾向) */
 export function fflowSummary(v: FflowView): string {
-  const row = (s: FflowCandidate) => `${s.name}(${s.code}) ${finite(s.pct) === null ? "涨幅没取到" : signed(s.pct)} 主力净流入${wan(s.main_net)} 横盘${s.flat_minutes}分→拉升${s.rise_minutes}分 拉升${s.rise_bp}bp 稳步度${(s.up_ratio * 100).toFixed(0)}%`;
+  const row = (s: FflowCandidate) => `${s.name}(${s.code})${s.sw2 ? `[${s.sw2}]` : ""} ${finite(s.pct) === null ? "涨幅没取到" : signed(s.pct)} 主力净流入${wan(s.main_net)} 横盘${s.flat_minutes}分→拉升${s.rise_minutes}分 拉升${s.rise_bp}bp 稳步度${(s.up_ratio * 100).toFixed(0)}%`;
   const out = [`分时资金横盘→拉升榜(${v.day ?? "日期未知"},数据截至 ${v.as_of ?? "—"}):扫描 ${v.total_scanned} 只,有分钟数据 ${v.with_data} 只,命中 ${v.matched} 只。`];
   out.push(v.stocks.length ? v.stocks.map(row).join(";") : "没有命中形态的股票。");
   if (v.notes.length) out.push(`说明:${v.notes.join(";")}`);
@@ -75,6 +75,7 @@ export function FflowPanelView({ v }: { v: FflowView }) {
               <tr>
                 <th className="px-2 py-1 font-medium">#</th>
                 <th className="px-2 py-1 font-medium">名称</th>
+                <th className="px-2 py-1 font-medium">申万二级</th>
                 <th className="px-2 py-1 text-right font-medium">现价</th>
                 <th className="px-2 py-1 text-right font-medium">今日</th>
                 <th className="px-2 py-1 text-right font-medium">主力净流入</th>
@@ -92,6 +93,9 @@ export function FflowPanelView({ v }: { v: FflowView }) {
                     <StockName code={s.code} name={s.name} className="font-medium" />
                     <WatchToggle code={s.code} inWatch={watchCodes.includes(s.code)} onToggle={onToggle} busy={busy === s.code} />{" "}
                     <span className="font-mono text-[11px] text-muted-foreground">{s.code}</span>
+                  </td>
+                  <td className={cn("whitespace-nowrap px-2 py-1", s.sw2 ? "text-foreground" : "text-muted-foreground")}>
+                    {s.sw2 ?? "—"}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">{s.price ?? "—"}</td>
                   <td className={cn("whitespace-nowrap px-2 py-1 text-right font-mono font-semibold tabular-nums", pctColor(s.pct))}>{signed(s.pct)}</td>

@@ -16,12 +16,16 @@
  * 数据约束:盘中分钟曲线随时间变长,**早盘点数不够时不硬算**(最少 MIN_POINTS 个分钟点),
  * 页面相应提示;收盘后为全天形态。结果进程内缓存 RESULT_TTL_MS,不每轮打上游。
  */
+import fs from "node:fs";
+import path from "node:path";
 import { fetchEndpoint, type FetchResult, type ServiceContext } from "../../service.ts";
 import { pool } from "../schedule.ts";
 
 export interface FflowPoint { time: string; main: number | null }
 export interface FflowCandidate {
   code: string; name: string; price: number | null; pct: number | null;
+  /** 申万 2021 二级行业名(取不到为 null,前端显示「—」并注明未取到) */
+  sw2: string | null;
   main_net: number | null; float_cap: number | null;
   points: number;
   flat_minutes: number; rise_minutes: number;
@@ -76,7 +80,7 @@ export const FLAT_MIN_BARS = 3;          // 横盘至少 3 桶
 export const RISE_MIN_BARS = 3;          // 拉升至少 3 桶
 
 export function detectSidewaysRise(series: readonly FflowPoint[], denomYuan: number | null, barMinutes = 1):
-  Omit<FflowCandidate, "code" | "name" | "price" | "pct" | "main_net" | "float_cap"> | null {
+  Omit<FflowCandidate, "code" | "name" | "price" | "pct" | "sw2" | "main_net" | "float_cap"> | null {
   const denom = denomYuan;
   if (!denom || !(denom > 0)) return null;
   const curve: number[] = [];
@@ -138,6 +142,33 @@ interface RankRow {
    *  榜单源(新浪/东财)给小数比率,这里统一换算。 */
   pct: number | null;
   main_net: number | null; float_cap: number | null;
+}
+
+/**
+ * 申万二级行业名表(L2 代码 → 名称)。申万名表只在 Tushare 侧能拿到(申万站点只发成分表,
+ * 不带名称),所以单独存成 datasources/sw2021_l2_names.json,由 sw_industry 端点返回的
+ * l2_code 反查。文件缺失 → 空表,全部显示「未取到」,不编造。
+ */
+let sw2Names: Record<string, string> | null = null;
+function sw2Table(repoRoot: string): Record<string, string> {
+  if (sw2Names) return sw2Names;
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(repoRoot, "datasources", "sw2021_l2_names.json"), "utf8")) as { l2?: Record<string, string> };
+    sw2Names = raw.l2 && typeof raw.l2 === "object" ? raw.l2 : {};
+  } catch {
+    sw2Names = {};
+  }
+  return sw2Names;
+}
+
+/** sw_industry 端点的 evidence → 当前申万二级行业名(取不到返回 null) */
+function sw2Of(env: unknown, repoRoot: string): string | null {
+  const evs = (env as { evidence?: unknown } | null)?.evidence;
+  if (!Array.isArray(evs)) return null;
+  const l2 = evs.find((e) => (e as { field?: unknown })?.field === "sw_l2_code");
+  const code = str((l2 as { value?: unknown } | undefined)?.value).trim();
+  if (!code) return null;
+  return sw2Table(repoRoot)[code] ?? null;
 }
 
 const extraOf = (env: unknown): Record<string, unknown> => {
@@ -232,11 +263,22 @@ export async function shortlineFflow(ctx: ServiceContext, _query: Record<string,
 
   const withData = scanned.filter((s): s is NonNullable<typeof s> => s !== null);
   const hits = withData.flatMap((s) => (s.pat ? [{ ...s.row, ...s.pat }] : []));
-  const stocks = hits.sort((a, b) => b.score - a.score).slice(0, TOP_N);
+  const top = hits.sort((a, b) => b.score - a.score).slice(0, TOP_N);
+  // 申万二级行业:只对最终上榜的这几只逐只取(端点要下全表分类,几十只一起取会叠成分钟级等待)
+  const industries = await pool(top, 4, async (row) => {
+    try {
+      const env = await fetch(ctx, { endpoint: "sw_industry", symbol: row.code, signal });
+      return sw2Of(env.envelope, ctx.repoRoot);
+    } catch {
+      return null;
+    }
+  });
+  const stocks = top.map((row, i) => ({ ...row, sw2: industries[i] ?? null }));
   const asOf = withData.map((s) => s.fetchedAt).sort().at(-1) ?? null;
   const day = asOf ? asOf.slice(0, 10) : null;
   notes.push(`名单:资金流榜(主力/大单净额)前 ${universe.length} 只;通道 ${channel.label};有分钟数据 ${withData.length} 只,命中形态 ${hits.length} 只,取前 ${TOP_N}`);
   if (!hits.length) notes.push(`分钟数据不够 ${MIN_BARS} 桶或形态未出现 —— 早盘数据短时常见,盘中稍后再看`);
+  if (stocks.length && stocks.every((s) => !s.sw2)) notes.push("申万二级行业这一轮没取到(分类端点失败),行业列显示未取到");
 
   const result: FflowView = {
     day, as_of: asOf, source_label: channel.label, poll_ms: 60_000,
