@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { api } from "../src/verticals/finance/lib/api.ts";
 import { backend, type FetchResult } from "../src/verticals/finance/lib/backend.ts";
-import { mergePolledQuotes, quoteFailure, quoteSnapshotTime } from "../src/verticals/finance/lib/quoteSnapshot.ts";
+import { mergePolledQuotes, missingQuotes, noQuotesBack, quoteFailure, quoteSnapshotTime } from "../src/verticals/finance/lib/quoteSnapshot.ts";
 
 test("轮询合并：这一轮问了却没返回的股票不留上一轮的旧价；没问的（休市市场）保留（审计 C5）", () => {
   const full = { A: { price: 10 }, B: { price: 20 }, HK1: { price: 300 } };
@@ -49,6 +49,16 @@ test("混合市场显示最早快照；空值与缺时间不伪造新时间", ()
   assert.equal(quoteSnapshotTime({ empty: { price: null, fetched_at: fresh.fetched_at } }), null);
   assert.equal(quoteSnapshotTime({ old, unknown: { price: 30 } }), null);
   assert.equal(quoteSnapshotTime({ bad: { price: 30, fetched_at: "bad" } }), null);
+});
+
+test("200 但一只都没回来算失败，不能当成成功把表刷成空", () => {
+  // 接口返回空表时，旧逻辑算「成功」→ 整体替换成 {} → 每行显示「—」、无提示、刷新无感
+  assert.equal(noQuotesBack(["600519", "300308"], {}), true);
+  assert.equal(noQuotesBack(["600519"], { "600519": { price: 1 } }), false, "有数据就是成功");
+  assert.equal(noQuotesBack([], {}), false, "没有要问的代码不算失败");
+  assert.deepEqual(missingQuotes(["600519", "300308"], { "600519": {} }), ["300308"], "部分缺失要点名");
+  const hook = readFileSync(new URL("../src/verticals/finance/hooks/useLiveQuotes.ts", import.meta.url), "utf8");
+  assert.match(hook, /if \(noQuotesBack\(.*\)\) throw new Error\("empty_quotes"\)/, "空结果必须走失败分支");
 });
 
 test("取数失败不把旧价留着当现价：手动刷新失败马上撤价并提示，轮询连续失败才撤（第四轮审计 C1）", () => {

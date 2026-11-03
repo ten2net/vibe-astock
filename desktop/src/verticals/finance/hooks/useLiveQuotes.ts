@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Quote } from "@/lib/api";
 import { isAnyMarketTrading, tradingMarketSymbols } from "@/lib/marketSymbol";
 import { startPollLoop } from "@/lib/pollLoop";
-import { mergePolledQuotes, quoteFailure, quoteSnapshotTime } from "@/lib/quoteSnapshot";
+import { mergePolledQuotes, missingQuotes, noQuotesBack, quoteFailure, quoteSnapshotTime } from "@/lib/quoteSnapshot";
 
 export const LIVE_INTERVAL_MS = 3000;
 const MAX_BACKOFF_MS = 30_000;
@@ -73,9 +73,15 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
     setLoading(true);
     try {
       const data = await api.quote(requested, true);
+      // 200 但一只都没回来（上游空表、代码全部对不上）不能当成「成功」：以前这里把空表整体替换上去，
+      // 页面每行显示「—」又不报错，点刷新还是空。按失败处理，让提示和撤价逻辑照常生效。
+      const asked = onlyCodes ?? cs;
+      if (noQuotesBack(asked.map((c) => c.trim()), data)) throw new Error("empty_quotes");
       // 自动轮询只拉开盘市场，必须与休市市场已有快照合并（这一轮问了却没返回的不留旧价）；首次 / 手动刷新才整体替换。
       setQuotes((prev) => mergePolledQuotes(prev, data, onlyCodes));
-      setError(null);
+      // 部分没回来（比如某只被上游拒了）要单独说，别让用户对着「—」猜
+      const miss = missingQuotes(asked.map((c) => c.trim()), data);
+      setError(miss.length ? `这 ${miss.length} 只没取到行情：${miss.slice(0, 6).join("、")}${miss.length > 6 ? " 等" : ""}` : null);
       failuresRef.current = 0;
       return true;
     } catch {
