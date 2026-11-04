@@ -88,3 +88,7 @@ summaryLength = 60
   [[params.additional_menus]]
   title = "揽宝投研v2"
   href = "https://a2.luckybrother.cc/watch"
+
+  [[params.additional_menus]]
+  title = "我是谁"
+  href = "/about/"
