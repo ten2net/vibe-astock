@@ -62,6 +62,18 @@ summaryLength = 60
   github = "https://github.com/ten2net/vibe-astock"
 
   [[params.additional_menus]]
+  title = "市场热力图"
+  href = "https://www.luckybrother.cc/"
+
+  [[params.additional_menus]]
+  title = "ETF热力图"
+  href = "https://etf.luckybrother.cc/"
+
+  [[params.additional_menus]]
+  title = "LGBM量化"
+  href = "https://q.luckybrother.cc/"
+
+  [[params.additional_menus]]
   title = "复盘"
   href = "/post/"
 
@@ -70,9 +82,9 @@ summaryLength = 60
   href = "/tags/"
 
   [[params.additional_menus]]
-  title = "V1 版"
+  title = "揽宝投研v1"
   href = "https://a.luckybrother.cc/first-board"
 
   [[params.additional_menus]]
-  title = "V2 版"
+  title = "揽宝投研v2"
   href = "https://a2.luckybrother.cc/watch"
