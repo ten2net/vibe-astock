@@ -652,3 +652,20 @@ article>.container{max-width:1240px;margin:0 auto}
     -webkit-background-clip:text;background-clip:text;
   }
 }
+
+/* ---- 风险提示横幅 ---- */
+.va-risk{
+  display:flex;align-items:flex-start;gap:8px;
+  background:#fff7ed;border:1px solid rgba(194,65,12,.35);
+  border-left:4px solid #c2410c;border-radius:0 0 var(--va-radius) var(--va-radius);
+  padding:10px 16px;margin:0 0 -1px;
+  color:#9a3412;font-size:13.5px;line-height:1.7;
+}
+.va-risk-badge{
+  flex:0 0 auto;font-weight:700;color:#fff;background:#c2410c;
+  border-radius:4px;padding:1px 8px;font-size:12px;margin-top:2px;letter-spacing:.05em;
+}
+[data-theme="dark"] .va-risk{
+  background:rgba(194,65,12,.12);border-color:rgba(251,146,60,.4);
+  color:#fdba74;
+}
