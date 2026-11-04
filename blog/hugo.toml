@@ -1,6 +1,6 @@
 # 复盘博客 · Hugo 站点配置（主题：Clean White）
 baseurl = "https://ten2net.github.io"
-title = "A 股每日复盘"
+title = "揽宝.复盘"
 theme = "cleanwhite"
 languageCode = "zh-cn"
 hasCJKLanguage = true
@@ -37,7 +37,7 @@ summaryLength = 60
 [params]
   header_image = "img/home-bg.jpg"
   image_404 = "img/home-bg.jpg"
-  SEOTitle = "A 股每日复盘 | 揽宝投研"
+  SEOTitle = "揽宝.复盘 | 揽宝投研"
   description = "公开数据 + 程序计算 + 模型解读：每日 A 股复盘，每个数字都可回溯到落盘依据。"
   keyword = "A股,每日复盘,涨停,连板,情绪周期,复盘报告,揽宝投研"
   slogan = "公开数据与程序计算，复盘每一个交易日"

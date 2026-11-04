@@ -31,7 +31,7 @@ from typing import Any, Callable
 from .product_policy import has_trade_recommendation
 
 PRODUCT_NAME = "揽宝投研"
-SITE_TITLE = "A 股每日复盘"
+SITE_TITLE = "揽宝.复盘"
 BRAND_SITE = "https://phoenixtree.ai/"
 # 站点自己的清单：只清理这个文件里记过的、我们自己生成的页面
 MANIFEST = "astock-deploy.json"
@@ -1490,14 +1490,24 @@ def find_hugo(explicit: str | None = None) -> str:
     raise PublishError("找不到 hugo：装一个（https://gohugo.io/installation/）或放到 .local/bin/hugo")
 
 
-def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], None] = lambda _m: None) -> int:
-    """跑 hugo 生成 public/；返回生成的 html 页数。"""
+def _site_baseurl(site_dir: Path) -> str:
+    for line in (Path(site_dir) / "hugo.toml").read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("baseurl") and chr(34) in line:
+            return line.split(chr(34))[1]
+    raise PublishError("hugo.toml 里没有 baseurl")
+
+
+def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], None] = lambda _m: None,
+          dest_dir: Path | str | None = None) -> int:
     site = Path(site_dir)
     binary = find_hugo(hugo)
-    _run([binary, "--cleanDestinationDir", "--quiet"], cwd=site)
-    public = site / "public"
+    baseurl = _site_baseurl(site)
+    public = Path(dest_dir) if dest_dir else site / "public"
+    public.mkdir(parents=True, exist_ok=True)
+    _run([binary, "--cleanDestinationDir", "--quiet",
+          "--baseURL", baseurl, "--destination", str(public)], cwd=site)
     if not public.is_dir():
-        raise PublishError("hugo 没有产出 public/，检查站点配置")
+        raise PublishError("hugo 没有产出目标目录，检查站点配置")
     pages = sum(1 for _ in public.rglob("*.html"))
     log(f"hugo 构建完成：{pages} 个页面")
     return pages
@@ -1654,7 +1664,8 @@ def publish(
     if dry_run:
         return result
 
-    result.built = build(site_dir, hugo, log)
+    dist = Path(tempfile.mkdtemp(prefix="astock-hugo-"))
+    result.built = build(site_dir, hugo, log, dest_dir=dist)
     # 容器里没有 gh 时用令牌拼 URL；克隆目录可以固定下来复用（ASTOCK_PAGES_WORKDIR），
     # 每次只 fetch 最新一次提交，省掉整仓 clone。
     persistent = workdir or os.environ.get("ASTOCK_PAGES_WORKDIR")
@@ -1681,7 +1692,7 @@ def publish(
                 _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)
             else:
                 _run(["git", "clone", "--depth", "1", "--branch", branch, url, str(tmp)])
-        changed, removed = sync_public(Path(site_dir) / "public", tmp, log,
+        changed, removed = sync_public(dist, tmp, log,
                                        keep_missing=date is None and min_days > 0)
         removed += remove_legacy_dirs(tmp, log)      # 上一版静态页补丁的遗留
         result.written, result.removed = changed, removed

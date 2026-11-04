@@ -613,3 +613,42 @@ article>.container{max-width:1240px;margin:0 auto}
 .va-feat-body{width:calc(100% - 36px)}
 .va-feat-body em{white-space:normal}
 .va-feat-go{position:absolute!important}
+
+/* ---- 站点品牌字：「揽宝.复盘」艺术化 ---- */
+/* 兜底：不支持 background-clip:text 的浏览器显示品牌橙实色，不会透明消失 */
+.brand-mark{
+  color:#c2410c!important;-webkit-text-fill-color:#c2410c;
+  text-shadow:none;font-weight:800;letter-spacing:.03em;
+}
+.brand-mark .brand-dot{
+  color:#e11d48!important;-webkit-text-fill-color:#e11d48;
+  font-style:normal;font-weight:800;position:relative;top:-.06em;
+  padding:0 .02em;text-shadow:none;
+}
+[data-theme="dark"] .brand-mark{
+  color:#fb923c!important;-webkit-text-fill-color:#fb923c;
+}
+[data-theme="dark"] .brand-mark .brand-dot{
+  color:#fb7185!important;-webkit-text-fill-color:#fb7185;
+}
+/* 渐变增强：仅在支持 background-clip:text 的浏览器启用 */
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .brand-mark{
+    background:linear-gradient(115deg,#c2410c 0%,#e11d48 55%,#a86f00 100%);
+    -webkit-background-clip:text;background-clip:text;
+    color:transparent!important;-webkit-text-fill-color:transparent;
+  }
+  .brand-mark .brand-dot{
+    background:linear-gradient(180deg,#e11d48,#c2410c);
+    -webkit-background-clip:text;background-clip:text;
+    color:transparent!important;-webkit-text-fill-color:transparent;
+  }
+  [data-theme="dark"] .brand-mark{
+    background:linear-gradient(115deg,#fb923c 0%,#fb7185 55%,#fbbf24 100%);
+    -webkit-background-clip:text;background-clip:text;
+  }
+  [data-theme="dark"] .brand-mark .brand-dot{
+    background:linear-gradient(180deg,#fb7185,#fb923c);
+    -webkit-background-clip:text;background-clip:text;
+  }
+}
