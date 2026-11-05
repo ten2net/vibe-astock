@@ -119,13 +119,16 @@ def _publish(log, date: str) -> int:
     if proc.returncode != 0:
         log(f"发布失败（{proc.returncode}）：{(proc.stderr or '').strip()[:300]}")
         return proc.returncode
-    log("写入微信公众号草稿箱…")
+    log("写入微信公众号…")
     try:
         from review_agent import wechat_publish as wp
         from duanxian.paths import data_path
-        wp.publish_review(data_path("reviews"), date, draft_only=True, log=log)
-    except Exception as exc:  # noqa: BLE001  草稿失败不翻盘已完成的博客发布
-        log(f"微信草稿失败（博客已发布，可稍后补：scripts/wechat_daily.py --date {date}）：{exc}")
+        # 默认只进草稿箱人工群发；WECHAT_AUTOPUBLISH=1 的部署跳过人工直接群发
+        auto = os.environ.get("WECHAT_AUTOPUBLISH", "").strip() not in ("", "0", "false")
+        log("  模式：" + ("自动群发" if auto else "草稿箱（后台人工点群发）"))
+        wp.publish_review(data_path("reviews"), date, draft_only=not auto, log=log)
+    except Exception as exc:  # noqa: BLE001  微信失败不翻盘已完成的博客发布
+        log(f"微信失败（博客已发布，可稍后补：scripts/wechat_daily.py --date {date}）：{exc}")
     return 0
 
 
