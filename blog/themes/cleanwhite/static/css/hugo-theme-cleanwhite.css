@@ -819,7 +819,10 @@ body{
     margin-top:2px;
     margin-right:2px;
     margin-bottom:2px;
-    border-radius:50%
+    border-radius:50%;
+    /* 浅色页头（文章页）下透明的按钮看不见边界：垫一层半透明深色底，
+       金色图标在白底和深色页头（首页大图）上都醒目 */
+    background-color:rgba(16,21,25,.55)
 }
 .navbar-default .navbar-toggle .icon-bar{
     width:18px;
