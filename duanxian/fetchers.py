@@ -118,6 +118,88 @@ def _direct_get(url, **kw):
         s.trust_env = _TRUST_ENV
         return s.get(url, **kw)
 
+
+
+_LHB_TS_CACHE: dict = {}
+
+
+def _lhb_tushare(date: str, top: int = 15) -> list[dict]:
+    """龙虎榜降级源：Tushare top_list（日线榜单，含净买额与上榜原因）。
+
+    口径与东财 stock_lhb_detail_em 基本一致（同一交易所披露），原始净买额单位
+    为元，这里同样折算成亿。目标日无数据返回 []（盘后发布时点未到属正常）。
+    """
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        return []
+    if _LHB_TS_CACHE.get("date") == date:
+        return _LHB_TS_CACHE.get("rows", [])
+    rows: list[dict] = []
+    try:
+        import tushare as ts
+        pro = ts.pro_api(token)
+        df = pro.top_list(trade_date=date)
+        if df is not None and len(df):
+            # 日期核实：接口按 trade_date 过滤，仍防御性核对一遍
+            days = df["trade_date"].map(lambda v: str(v)[:8])
+            if not days.eq(date).all():
+                return [{"error": "Tushare 龙虎榜返回日期与目标日不符"}]
+            df = df.sort_values("net_amount", ascending=False)
+            for _, r in df.head(top).iterrows():
+                na = r.get("net_amount")
+                rows.append({
+                    "code": str(r.get("ts_code", "")),
+                    "name": str(r.get("name", "")),
+                    "net_buy": round(float(na) / YI, 2) if na is not None and na == na else None,
+                    "reason": str(r.get("reason", ""))[:40],
+                    "inst_net": None,
+                })
+    except Exception:  # noqa: BLE001
+        return []
+    _LHB_TS_CACHE.update(date=date, rows=rows)
+    return rows
+
+
+def fetch_lhb_seats(date: str, top_stocks: int = 10, seats_per_side: int = 3) -> dict:
+    """龙虎榜席位明细（Tushare top_inst）：每只上榜股票的买卖席位营业部。
+
+    返回 {code: {"name": str, "buy": [{seat, net_buy}, ...], "sell": [...]}}，
+    买入侧按 net_buy 降序、卖出侧升序各取前 seats_per_side 个；金额单位为亿。
+    未配置 TUSHARE_TOKEN / 无数据 / 报错 → {}；席位段取不到就不展示，不影响主榜。
+    """
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        return {}
+    try:
+        import tushare as ts
+        pro = ts.pro_api(token)
+        df = pro.top_inst(trade_date=date)
+        if df is None or not len(df):
+            return {}
+        names = {r.get("code", ""): r.get("name", "") for r in _lhb_tushare(date, 30)}
+        out: dict = {}
+        def _seat_rows(gg):
+            rows = []
+            for _, r in gg.iterrows():
+                nb = r.get("net_buy")
+                rows.append({
+                    "seat": str(r.get("exalter", ""))[:30],
+                    "net_buy": round(float(nb) / YI, 2) if nb is not None and nb == nb else None,
+                })
+            return [x for x in rows if x["net_buy"] is not None]
+
+        for code, g in df.groupby("ts_code"):
+            # side: 0=买入榜席位, 1=卖出榜席位（同一营业部两侧各算一次）
+            buys = sorted(_seat_rows(g[g["side"] == 0]),
+                          key=lambda x: x["net_buy"], reverse=True)[:seats_per_side]
+            sells = sorted(_seat_rows(g[g["side"] == 1]),
+                           key=lambda x: x["net_buy"])[:seats_per_side]
+            out[str(code)] = {"name": names.get(str(code), ""), "buy": buys, "sell": sells}
+            if len(out) >= top_stocks:
+                break
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
 # ----------------------------------------------------------------------------
 # 常量
 # ----------------------------------------------------------------------------
@@ -442,7 +524,15 @@ def fetch_lhb(date, top=15):
                     "inst_net": None,  # 该接口不直接提供机构净买额
                 })
     except Exception as e:
-        return [{"error": f"{type(e).__name__}: {str(e)[:100]}"}]
+        # 东财龙虎榜在本机常被掐（datacenter SSL EOF）→ Tushare 降级
+        rows = _lhb_tushare(date, top)
+        if rows:
+            return rows
+        # Tushare 也无数据：多为该日龙虎榜尚未发布（一般盘后 17:00+ 披露）
+        return [{"error": f"东财不可达({type(e).__name__})，Tushare 降级源暂无该日数据"}]
+    if not rows:
+        # 东财接口通了但没数据（发布时点未到等）→ 也试 Tushare
+        rows = _lhb_tushare(date, top)
     return rows
 
 

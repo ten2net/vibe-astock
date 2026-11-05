@@ -308,16 +308,49 @@ def get_theme_reasons(date: str) -> str:
 # ============ ④ 龙虎榜游资 ============
 def get_dragon_tiger_data(date: str) -> str:
     try:
-        rows = dr.fetch_lhb(_ymd(date), top=15)
+        ymd = _ymd(date)
+        rows = dr.fetch_lhb(ymd, top=15)
         if rows and isinstance(rows[0], dict) and rows[0].get("error"):
             return _degrade_msg("龙虎榜", date, rows[0]["error"])
         if not rows:
             return f"{date} 无龙虎榜数据"
         lines = ["龙虎榜净买额榜（亿，负=净卖）："]
+        seen: set = set()
+        uniq = []
         for r in rows:
+            code6 = str(r.get("code", "")).split(".")[0][-6:]
+            if code6 and code6 in seen:
+                continue  # 同一股票因多条上榜原因重复出现，只保留净买额最高的一条
+            if code6:
+                seen.add(code6)
+            uniq.append(r)
+        for r in uniq:
             nb = r.get("net_buy")
             nb_s = f"{nb:+.2f}" if nb is not None else "—"
             lines.append(f"  {r['name']} 净买{nb_s}亿 [{r.get('reason', '')}]")
+        # 席位明细：Tushare top_inst，按 6 位代码对齐（EM 榜 000525 ↔ TS 000525.SZ）
+        try:
+            seats = dr.fetch_lhb_seats(ymd)
+        except Exception:  # noqa: BLE001
+            seats = {}
+        if seats:
+            by6 = {code.split(".")[0]: v for code, v in seats.items()}
+            lines.append("席位明细（每只净买/净卖前3营业部，亿）：")
+            shown = 0
+            for r in uniq:
+                v = by6.get(str(r.get("code", "")).split(".")[0][-6:])
+                if not v or (not v.get("buy") and not v.get("sell")):
+                    continue
+                shown += 1
+                lines.append(f"  {r['name']}：")
+                for s in v.get("buy", []):
+                    lines.append(f"    买 {s['seat']} 净{s['net_buy']:+.2f}")
+                for s in v.get("sell", []):
+                    lines.append(f"    卖 {s['seat']} 净{s['net_buy']:+.2f}")
+                if shown >= 8:
+                    break
+            if not shown:
+                lines.pop()
         return "\n".join(lines)
     except Exception as exc:  # noqa: BLE001
         return _degrade("龙虎榜游资", date, exc)
