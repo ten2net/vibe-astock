@@ -1423,8 +1423,14 @@ class PublishResult:
 
 
 def write_sources(site_dir: Path | str, reviews_dir: Path | str, dates: list[str],
-                  log: Callable[[str], None] = lambda _m: None) -> tuple[list[str], list[str]]:
-    """把复盘写进 content/post/。返回 (写入的文件, 被跳过/删除的日期)。"""
+                  log: Callable[[str], None] = lambda _m: None,
+                  keep_others: bool = False) -> tuple[list[str], list[str]]:
+    """把复盘写进 content/post/。返回 (写入的文件, 被跳过/删除的日期)。
+
+    keep_others=True（--recent / --date 增量发布）：不碰这次不刷新的旧文章源文件，
+    让 hugo 照常把它们编进首页与 RSS；删除只发生在全量发布时（比如某篇被判不合规，
+    要把它从源里撤掉）。
+    """
     post_dir = Path(site_dir) / "content" / "post"
     post_dir.mkdir(parents=True, exist_ok=True)
     written, skipped = [], []
@@ -1450,12 +1456,14 @@ def write_sources(site_dir: Path | str, reviews_dir: Path | str, dates: list[str
         if not path.exists() or path.read_text(encoding="utf-8") != text:
             path.write_text(text, encoding="utf-8")
             written.append(path.name)
-    # 本工具写过、但这次不再发布的文章（比如被判不合规）不留在源里
-    for path in post_dir.glob("*-每日复盘.md"):
-        d = path.name[:10]
-        if DATE_RE.fullmatch(d) and d not in wanted:
-            path.unlink()
-            skipped.append(d)
+    # 本工具写过、但这次不再发布的文章（比如被判不合规）不留在源里；
+    # 增量发布（keep_others）要保住首页/RSS 的完整列表，不能删
+    if not keep_others:
+        for path in post_dir.glob("*-每日复盘.md"):
+            d = path.name[:10]
+            if DATE_RE.fullmatch(d) and d not in wanted:
+                path.unlink()
+                skipped.append(d)
     return written, skipped
 
 
@@ -1655,7 +1663,8 @@ def publish(
     if not dates:
         raise PublishError(f"{reviews} 里没有可发布的复盘")
 
-    written, skipped = write_sources(site_dir, reviews, dates, log)
+    written, skipped = write_sources(site_dir, reviews, dates, log,
+                                     keep_others=bool(date) or min_days > 0)
     if not list((Path(site_dir) / "content" / "post").glob("*-每日复盘.md")):
         raise PublishError("没有任何一份复盘能发布（都未通过公开检查）")
     # skipped 是内容没变、没重写的旧 md；只有全部刷新时才可能与站上页面不一致

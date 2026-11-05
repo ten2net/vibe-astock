@@ -108,6 +108,16 @@ class TestWriteSources:
         written, skipped = bp.write_sources(site, reviews, [])
         assert not (site / "content" / "post" / "2026-09-23-每日复盘.md").exists()
 
+    def test_incremental_publish_keeps_other_posts(self, tmp_path):
+        """--recent / --date 增量发布：不刷新的旧文章源文件要保留，首页才列得出全部。"""
+        site, reviews = site_dir(tmp_path), lib(tmp_path, (DATE, payload()))
+        bp.write_sources(site, reviews, [DATE])
+        other = site / "content" / "post" / "2026-09-22-每日复盘.md"
+        other.write_text("old post", encoding="utf-8")
+        written, skipped = bp.write_sources(site, reviews, [DATE], keep_others=True)
+        assert other.exists()
+        assert skipped == []
+
 
 class TestSync:
     def _tree(self, tmp_path):
