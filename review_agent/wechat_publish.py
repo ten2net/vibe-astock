@@ -25,6 +25,10 @@ PRODUCT_NAME = "揽宝投研"
 # 全部复盘文章共用的封面（仓库里的硬币徽章）；None=不上封面（草稿接口里 thumb_media_id 必填，必须给）
 DEFAULT_COVER = Path(__file__).resolve().parents[1] / "blog" / "static" / "img" / "avatar.png"
 
+# 微信 IP 白名单按调用方出口 IP 校验：必须直连，绝不能走环境变量里的代理
+# （容器部署里 http_proxy 会把请求发到代理出口，微信看到的 IP 就不在白名单里）。
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class WechatError(PublishError):
     """可预期的失败：凭据缺失、接口报错、发布状态失败。"""
@@ -47,7 +51,7 @@ def _credentials(env_file: Path | None = None) -> tuple[str, str]:
 
 def _get_json(url: str, timeout: float = 15.0) -> dict:
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
+        with _OPENER.open(url, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError) as exc:
         raise WechatError(f"微信接口请求失败：{type(exc).__name__}") from exc
@@ -58,7 +62,7 @@ def _post_json(path: str, payload: dict, token: str, timeout: float = 20.0) -> d
     url = f"{API}{path}?access_token={urllib.parse.quote(token)}"
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json; charset=utf-8")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _OPENER.open(req, timeout=timeout) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     if data.get("errcode"):
         raise WechatError(f"微信接口报错 {data.get('errcode')}: {data.get('errmsg')}")
@@ -119,7 +123,7 @@ def upload_cover(token: str, image: Path | None = None) -> str:
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with _OPENER.open(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError) as exc:
         raise WechatError(f"封面上传失败：{type(exc).__name__}") from exc

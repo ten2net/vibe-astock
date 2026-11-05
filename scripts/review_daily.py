@@ -99,8 +99,13 @@ def _run_once(base: str, date: str, provider: str, model: str, force: bool,
     return _wait(base, wait, poll, log)
 
 
-def _publish(log) -> int:
-    """生成成功后立刻发布：只刷最近几篇，历史文章保留。"""
+def _publish(log, date: str) -> int:
+    """生成成功后立刻发布：博客（最近几篇增量）+ 微信公众号草稿箱。
+
+    微信侧失败不阻塞、不改变博客发布的结果：博客已上线，草稿次日可补
+    （scripts/wechat_daily.py --date <日期>）。凭据走 env_file 注入的
+    WECHAT_APPID / WECHAT_SECRET；未配置就跳过这一步。
+    """
     import subprocess
     env = dict(os.environ)
     # 发布只是读写本地文件 + git，不该被数据源的 no_proxy 口径连带影响
@@ -113,7 +118,15 @@ def _publish(log) -> int:
         log("  " + line)
     if proc.returncode != 0:
         log(f"发布失败（{proc.returncode}）：{(proc.stderr or '').strip()[:300]}")
-    return proc.returncode
+        return proc.returncode
+    log("写入微信公众号草稿箱…")
+    try:
+        from review_agent import wechat_publish as wp
+        from duanxian.paths import data_path
+        wp.publish_review(data_path("reviews"), date, draft_only=True, log=log)
+    except Exception as exc:  # noqa: BLE001  草稿失败不翻盘已完成的博客发布
+        log(f"微信草稿失败（博客已发布，可稍后补：scripts/wechat_daily.py --date {date}）：{exc}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -166,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         if status == "complete":
             log(f"复盘完成（{args.provider}/{model}）")
             if args.publish:
-                return _publish(log)
+                return _publish(log, date)
             return 0
         if status == "rejected":
             # 400/409 这类是服务端明确拒绝（比如正在跑别的任务），换模型也没用
