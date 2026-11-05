@@ -71,7 +71,11 @@ def call_bridge(runtime, agent: str, request: dict, cancel: threading.Event, pro
                                 'agent_cli_too_old':'所选订阅 CLI 版本缺少隔离能力，请升级；未复制旧版凭据',
                                 'agent_quota':'所选订阅额度或频率受限，请稍后重试',
                                 'agent_timeout':'所选订阅响应超时，已停止'}
-                    raise EvidenceError(messages.get(code, '所选订阅执行失败，请检查登录、模型或兼容性'))
+                    message = event.get('message')
+                    detail = messages.get(code, '所选订阅执行失败，请检查登录、模型或兼容性')
+                    if isinstance(message, str) and message.strip():
+                        detail = f'{detail}（{message.strip()[:200]}）'
+                    raise EvidenceError(detail)
                 if event.get('type') == 'bridge_exit':
                     exit_code = event.get('code')
                 elif event.get('type') == 'started':

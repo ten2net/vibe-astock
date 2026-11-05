@@ -32,7 +32,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-DEFAULT_FALLBACK = "gpt-5.6-luna,gpt-5.6-sol"
+# WorkBuddy 网关按账号下发可用模型清单，旧 ID 会被上游 400 拒绝
+# （「model is only available for authorized users」）。以下 ID 来自本机
+# CLI 当前 catalog（codebuddy 日志 InitializeHandler 的 cliModelIds），
+# 换账号/大版本升级后如果重试全部 400，先核对这份清单再改这里。
+DEFAULT_FALLBACK = "kimi-k3.1-pro,deepseek-v4-pro,glm-5.3"
 
 
 def _api(base: str, path: str, body: dict | None = None, timeout: float = 30) -> dict:

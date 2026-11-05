@@ -48,8 +48,8 @@ services:
       HTTP_PROXY: http://192.168.200.24:7890
       HTTPS_PROXY: http://192.168.200.24:7890
       # 国内源不走代理，否则绕远且可能失败
-      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
-      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
 
     volumes:
       - astock-agent:/data/agent        # Agent 会话、任务、证据账本、产品登录
@@ -105,8 +105,8 @@ services:
       https_proxy: http://192.168.200.24:7890
       HTTP_PROXY: http://192.168.200.24:7890
       HTTPS_PROXY: http://192.168.200.24:7890
-      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
-      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
 
     volumes:
       # 新版私有层：配置、运行产物、对话、台账、知识层档案、访问口令；容器重建不丢
@@ -140,6 +140,9 @@ services:
     volumes:
       - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
       - /root/.cloudflared/3c5b1ac7-34dd-44ce-85e8-8473d54c66c5.json:/etc/cloudflared/creds.json:ro
+    # 共享主容器网络命名空间（按容器 ID 绑定）。重建主容器后必须一起重建本服务：
+    #   docker compose up -d --force-recreate vibe-astock cloudflared
+    # 否则它绑定的旧 netns 已消失，隧道连不上边缘节点，公网报「unable to resolve」。
     network_mode: service:vibe-astock
     depends_on:
       vibe-astock:
@@ -185,10 +188,15 @@ services:
       https_proxy: ${https_proxy:-http://192.168.200.24:7890}
       HTTP_PROXY: ${http_proxy:-http://192.168.200.24:7890}
       HTTPS_PROXY: ${https_proxy:-http://192.168.200.24:7890}
-      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
-      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com
+      no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
+      NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
       # 要跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
       REVIEW_BASE: http://127.0.0.1:8910
+      # 重试用模型清单。镜像里 scripts/review_daily.py 的默认清单会过期
+      # （WorkBuddy 网关按账号下发模型，失效 ID 会被 400 拒），这里显式覆盖，
+      # 改模型只动 compose 不用重build镜像。ID 以本机 CLI 日志 InitializeHandler
+      # 的 cliModelIds 为准。
+      REVIEW_FALLBACK_MODELS: "kimi-k3.1-pro,deepseek-v4-pro,glm-5.3"
     # 复用网页容器的网络（服务在它里面监听 8910），但不共享它的进程与数据卷
     network_mode: "service:vibe-astock"
     volumes:
