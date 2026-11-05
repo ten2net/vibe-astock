@@ -1,0 +1,6 @@
+.tip { padding: 20rpx 24rpx; font-size: 24rpx; }
+.name { font-size: 30rpx; font-weight: 600; }
+.code { font-size: 22rpx; margin-top: 6rpx; }
+.price { font-size: 32rpx; font-weight: 700; margin-right: 24rpx; font-variant-numeric: tabular-nums; }
+.pct { font-size: 26rpx; width: 110rpx; text-align: right; font-variant-numeric: tabular-nums; }
+.remove { color: #8a90a6; font-size: 24rpx; padding: 8rpx 16rpx; border: 1rpx solid #3a4160; border-radius: 8rpx; margin-left: 20rpx; }

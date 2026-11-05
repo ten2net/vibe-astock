@@ -1,0 +1,16 @@
+<view class="tip muted">示例快照数据 · 仅用于功能演示</view>
+<view wx:if="{{loading}}" class="muted tip">加载中…</view>
+<view wx:elif="{{error}}" class="tip up">{{error}}</view>
+<scroll-view scroll-y enhanced show-scrollbar="{{false}}" refresher-enabled refresher-triggered="{{loading}}" bindrefresherrefresh="onPullDownRefresh">
+  <view class="card row between" wx:for="{{list}}" wx:key="code">
+    <view>
+      <view class="name">{{item.name}}</view>
+      <view class="muted code">{{item.code}}</view>
+    </view>
+    <view class="right row">
+      <view class="price" class="up">{{item.price}}</view>
+      <view class="pct {{item.change_pct >= 0 ? 'up' : 'down'}}">{{item.change_pct}}%</view>
+      <view class="star" bindtap="onToggleWatch" data-code="{{item.code}}" data-watched="{{item.watched}}">{{item.watched ? '★' : '☆'}}</view>
+    </view>
+  </view>
+</scroll-view>

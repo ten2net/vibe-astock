@@ -1,0 +1,33 @@
+<view class="tip muted">A 股规则:买入数量为 100 股整数倍,T+1 当日买入次日才可卖出。日志只存在你自己的云端账号下。</view>
+
+<view class="add-btn" bindtap="onToggleForm">{{showForm ? '收起' : '+ 记一笔'}}</view>
+
+<view wx:if="{{showForm}}" class="card form">
+  <input placeholder="代码,如 600519" data-field="code" bindinput="onInput" value="{{form.code}}" />
+  <input placeholder="名称" data-field="name" bindinput="onInput" value="{{form.name}}" />
+  <radio-group bindchange="onSideChange" class="row">
+    <radio value="BUY" checked="{{form.side === 'BUY'}}" color="#ff5b5b">买入</radio>
+    <radio value="SELL" checked="{{form.side === 'SELL'}}" color="#2ecc8f">卖出</radio>
+  </radio-group>
+  <input placeholder="价格" type="digit" data-field="price" bindinput="onInput" value="{{form.price}}" />
+  <input placeholder="数量(股,100 的整数倍)" type="number" data-field="volume" bindinput="onInput" value="{{form.volume}}" />
+  <input placeholder="备注(可选)" data-field="note" bindinput="onInput" value="{{form.note}}" />
+  <button class="submit" bindtap="onSubmit">保存</button>
+</view>
+
+<view wx:if="{{loading}}" class="muted tip">加载中…</view>
+<view wx:elif="{{error}}" class="tip up">{{error}}</view>
+<view wx:elif="{{!list.length && !showForm}}" class="muted tip">还没有交易记录</view>
+
+<view class="card" wx:for="{{list}}" wx:key="id">
+  <view class="row between">
+    <view>
+      <text class="side {{item.side === 'BUY' ? 'up' : 'down'}}">{{item.side === 'BUY' ? '买入' : '卖出'}}</text>
+      <text class="name"> {{item.name}}</text>
+      <text class="muted"> {{item.code}}</text>
+    </view>
+    <view class="muted time">{{item.trade_time}}</view>
+  </view>
+  <view class="detail muted">{{item.price}} 元 × {{item.volume}} 股 · 费用 {{item.fee}} 元</view>
+  <view wx:if="{{item.note}}" class="note">{{item.note}}</view>
+</view>

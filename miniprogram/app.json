@@ -1,0 +1,26 @@
+{
+  "pages": [
+    "pages/quotes/quotes",
+    "pages/watchlist/watchlist",
+    "pages/review/review",
+    "pages/journal/journal"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#151a2d",
+    "navigationBarTitleText": "Vibe AStock",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0f1322"
+  },
+  "tabBar": {
+    "color": "#8a90a6",
+    "selectedColor": "#4f7cff",
+    "backgroundColor": "#151a2d",
+    "list": [
+      { "pagePath": "pages/quotes/quotes", "text": "行情" },
+      { "pagePath": "pages/watchlist/watchlist", "text": "自选" },
+      { "pagePath": "pages/review/review", "text": "复盘" },
+      { "pagePath": "pages/journal/journal", "text": "日志" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

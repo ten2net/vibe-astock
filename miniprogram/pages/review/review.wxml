@@ -1,0 +1,14 @@
+<view wx:if="{{loading}}" class="muted tip">加载中…</view>
+<view wx:elif="{{error}}" class="tip up">{{error}}</view>
+<view class="card" wx:for="{{list}}" wx:key="trade_date">
+  <view class="row between">
+    <view class="date">{{item.trade_date}}</view>
+    <view class="level lv-{{item.emotion_level}}">{{item.level_label}}</view>
+  </view>
+  <view class="stats row">
+    <text class="up">涨停 {{item.limit_up}}</text>
+    <text class="down">跌停 {{item.limit_down}}</text>
+    <text class="muted" wx:if="{{item.promotion_rate !== null}}">晋级率 {{item.promotion_rate}}%</text>
+  </view>
+  <view class="summary">{{item.summary}}</view>
+</view>

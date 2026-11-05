@@ -1,0 +1,9 @@
+.tip { padding: 20rpx 24rpx; font-size: 24rpx; }
+.date { font-size: 30rpx; font-weight: 600; }
+.level { font-size: 24rpx; padding: 6rpx 20rpx; border-radius: 20rpx; background: #2a3152; }
+.lv-hot { color: #ff5b5b; }
+.lv-warm { color: #ff9f43; }
+.lv-neutral { color: #4f7cff; }
+.lv-cool, .lv-cold { color: #2ecc8f; }
+.stats { gap: 32rpx; margin: 16rpx 0; font-size: 24rpx; }
+.summary { color: #c3c8db; font-size: 26rpx; line-height: 1.7; }

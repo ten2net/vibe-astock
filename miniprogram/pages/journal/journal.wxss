@@ -1,0 +1,10 @@
+.tip { padding: 20rpx 24rpx; font-size: 24rpx; line-height: 1.6; }
+.add-btn { margin: 0 24rpx 10rpx; text-align: center; padding: 20rpx; background: #2a3152; border-radius: 12rpx; color: #4f7cff; font-weight: 600; }
+.form input { background: #0f1322; border-radius: 10rpx; padding: 18rpx 24rpx; margin-bottom: 18rpx; color: #e8eaf2; }
+.form radio { margin-right: 40rpx; font-size: 26rpx; }
+.submit { background: #4f7cff; color: #fff; border-radius: 12rpx; margin-top: 8rpx; }
+.side { font-weight: 700; }
+.name { font-size: 30rpx; font-weight: 600; }
+.time { font-size: 22rpx; }
+.detail { margin-top: 12rpx; font-size: 24rpx; font-variant-numeric: tabular-nums; }
+.note { margin-top: 10rpx; color: #c3c8db; font-size: 24rpx; }

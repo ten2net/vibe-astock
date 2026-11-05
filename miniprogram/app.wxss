@@ -1,0 +1,19 @@
+page {
+  background: #0f1322;
+  color: #e8eaf2;
+  font-size: 28rpx;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.card {
+  margin: 20rpx 24rpx;
+  padding: 24rpx;
+  background: #1a2036;
+  border-radius: 16rpx;
+}
+
+.up { color: #ff5b5b; }
+.down { color: #2ecc8f; }
+.muted { color: #8a90a6; }
+.row { display: flex; align-items: center; }
+.between { justify-content: space-between; }

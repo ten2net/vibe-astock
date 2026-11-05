@@ -1,0 +1,15 @@
+<view class="tip muted">自选仅保存在云端你自己的账号下</view>
+<view wx:if="{{loading}}" class="muted tip">加载中…</view>
+<view wx:elif="{{error}}" class="tip up">{{error}}</view>
+<view wx:elif="{{!list.length}}" class="muted tip">还没有自选,去「行情」页点 ☆ 添加</view>
+<view class="card row between" wx:for="{{list}}" wx:key="code">
+  <view>
+    <view class="name">{{item.name}}</view>
+    <view class="muted code">{{item.code}}</view>
+  </view>
+  <view class="row">
+    <view class="price up">{{item.price}}</view>
+    <view class="pct {{item.change_pct >= 0 ? 'up' : 'down'}}">{{item.change_pct}}%</view>
+    <view class="remove" bindtap="onRemove" data-code="{{item.code}}">移除</view>
+  </view>
+</view>

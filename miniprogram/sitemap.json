@@ -1,0 +1,4 @@
+{
+  "desc": "Vibe AStock 小程序索引配置",
+  "rules": [{ "action": "allow", "page": "*" }]
+}
