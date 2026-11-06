@@ -1,7 +1,7 @@
 {
   "miniprogramRoot": "./",
   "cloudfunctionRoot": "cloudfunctions/",
-  "appid": "touristappid",
+  "appid": "wxc02c3bcfcdd5bada",
   "compileType": "miniprogram",
   "libVersion": "3.8.12",
   "projectname": "vibe-astock-miniprogram",
