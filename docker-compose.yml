@@ -192,8 +192,8 @@ services:
       NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
       # 要跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
       REVIEW_BASE: http://127.0.0.1:8910
-      # 本部署微信直接群发；去掉这行回到「只进草稿箱、后台人工点群发」的安全默认
-      WECHAT_AUTOPUBLISH: "1"
+      # 微信只进草稿箱、后台人工点群发:本账号群发接口被微信拒(48001 api unauthorized),
+      # 不要设 WECHAT_AUTOPUBLISH=1(设了每天会在群发这步报错,草稿其实已写好)。
       # 重试用模型清单。镜像里 scripts/review_daily.py 的默认清单会过期
       # （WorkBuddy 网关按账号下发模型，失效 ID 会被 400 拒），这里显式覆盖，
       # 改模型只动 compose 不用重build镜像。ID 以本机 CLI 日志 InitializeHandler
@@ -209,7 +209,7 @@ services:
     # 跑完当天复盘后立刻发布（--publish）：博客（最近 3 篇增量）+ 微信公众号，
     # 不再另起固定时刻的发布任务；失败自动换模型重试（REVIEW_FALLBACK_MODELS）。
     # 微信凭据走 env_file 注入的 WECHAT_APPID / WECHAT_SECRET，未配置则跳过微信步骤。
-    # 本部署 WECHAT_AUTOPUBLISH=1 直接群发；去掉这行回到「草稿箱人工点群发」的安全默认。
+    # 微信只进草稿箱、后台人工点群发（本账号无群发 API 权限，48001）。
     command: ["--wait", "5400", "--poll", "20", "--publish"]
 
   # 一次性发布容器：跑完就退，不常驻。由宿主 cron 每天盘后拉起：
