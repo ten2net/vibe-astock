@@ -5,8 +5,9 @@
  *  - 名单 = 全市场资金流榜(主力/大单净额)前 150(新浪榜,东财不通时自动切);
  *  - 资金曲线 = 当日分钟累计主动净买入(DDX 近似:分钟涨记流入、跌记流出;
  *    东财分钟大单口径可用时自动切换);
- *  - 识别:横盘段(带宽 ≤10/25bp、≥15 分钟)接拉升段(≥12/40bp、上涨分钟 ≥60%、
- *    最后一分钟仍向上),按 拉升 − 0.5×横盘带宽 取前 20。
+ *  - 识别:横盘段(≥15 分钟、带宽 ≤ 绝对上限/全日振幅×30%,无市值通道绝对上限放宽)
+ *    接拉升段(日内主要涨幅在后段、上涨分钟 ≥60%、末桶仍向上、斜率明显切换),
+ *    按 拉升 − 0.5×横盘带宽(+横盘时长小幅加成)取前 20。
  * 后端见 orchestrator/src/finance/shortline/fflow_pattern.ts(视图 shortline_fflow)。
  *
  * 展示与取数分层:FflowPanelView 纯展示(可单测),FflowSection 自轮询(约 60s,
@@ -61,7 +62,7 @@ export function FflowPanelView({ v }: { v: FflowView }) {
   };
   return (
     <Section icon={TrendingUp} title="分时资金 · 横盘后拉升(前 20)"
-      hint={`当日分钟级资金(DDX 近似):先横盘(带宽≤阈值、≥15分钟)后稳步拉升(≥阈值、上涨分钟≥60%、尾盘仍向上)。名单:资金流榜前 ${v.total_scanned} 只;通道:${v.source_label};数据截至 ${v.as_of ?? "—"}。客观资金形态,不是推荐也不是预测。`}>
+      hint={`当日分钟级资金(DDX 近似):先横盘(≥15分钟、带宽相对全日振幅收敛)后稳步拉升(日内主要涨幅在后段、上涨分钟≥60%、末桶仍向上)。名单:资金流榜前 ${v.total_scanned} 只;通道:${v.source_label};数据截至 ${v.as_of ?? "—"}。客观资金形态,不是推荐也不是预测。`}>
       {!v.stocks.length ? (
         <p role="status" className="text-[13px] text-muted-foreground">
           {v.with_data === 0
@@ -75,34 +76,35 @@ export function FflowPanelView({ v }: { v: FflowView }) {
               <tr>
                 <th className="px-2 py-1 font-medium">#</th>
                 <th className="px-2 py-1 font-medium">名称</th>
-                <th className="px-2 py-1 font-medium">申万二级</th>
+                <th className="hidden px-2 py-1 font-medium lg:table-cell">申万二级</th>
                 <th className="px-2 py-1 text-right font-medium">现价</th>
                 <th className="px-2 py-1 text-right font-medium">今日</th>
                 <th className="px-2 py-1 text-right font-medium">主力净流入</th>
-                <th className="px-2 py-1 text-right font-medium">横盘→拉升</th>
+                <th className="hidden px-2 py-1 text-right font-medium lg:table-cell">横盘→拉升</th>
                 <th className="px-2 py-1 text-right font-medium">拉升幅度</th>
-                <th className="px-2 py-1 text-right font-medium">稳步度</th>
+                <th className="hidden px-2 py-1 text-right font-medium lg:table-cell">稳步度</th>
                 <th className="px-2 py-1 font-medium">资金曲线(bp)</th>
               </tr>
             </thead>
             <tbody>
               {v.stocks.map((s, i) => (
-                <tr key={s.code} className="border-t border-border/40">
+                <tr key={s.code} className="border-t border-border/40"
+                  title={`横盘带宽 ${s.flat_band_bp}bp · 形态评分 ${s.score}(拉升−0.5×带宽+时长加成)`}>
                   <td className="px-2 py-1 font-mono text-muted-foreground">{i + 1}</td>
                   <td className="whitespace-nowrap px-2 py-1">
                     <StockName code={s.code} name={s.name} className="font-medium" />
                     <WatchToggle code={s.code} inWatch={watchCodes.includes(s.code)} onToggle={onToggle} busy={busy === s.code} />{" "}
                     <span className="font-mono text-[11px] text-muted-foreground">{s.code}</span>
                   </td>
-                  <td className={cn("whitespace-nowrap px-2 py-1", s.sw2 ? "text-foreground" : "text-muted-foreground")}>
+                  <td className={cn("hidden whitespace-nowrap px-2 py-1 lg:table-cell", s.sw2 ? "text-foreground" : "text-muted-foreground")}>
                     {s.sw2 ?? "—"}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">{s.price ?? "—"}</td>
                   <td className={cn("whitespace-nowrap px-2 py-1 text-right font-mono font-semibold tabular-nums", pctColor(s.pct))}>{signed(s.pct)}</td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono text-danger">{wan(s.main_net)}</td>
-                  <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">{s.flat_minutes}分→{s.rise_minutes}分</td>
+                  <td className="hidden whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums text-muted-foreground lg:table-cell">{s.flat_minutes}分→{s.rise_minutes}分</td>
                   <td className="whitespace-nowrap px-2 py-1 text-right font-mono font-semibold tabular-nums text-danger">+{s.rise_bp}bp</td>
-                  <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">{Math.round(s.up_ratio * 100)}%</td>
+                  <td className="hidden whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums lg:table-cell">{Math.round(s.up_ratio * 100)}%</td>
                   <td className="px-2 py-1"><Sparkline series={s.series_bp} /></td>
                 </tr>
               ))}

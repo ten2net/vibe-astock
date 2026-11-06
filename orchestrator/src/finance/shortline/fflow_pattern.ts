@@ -7,8 +7,11 @@
  *  - 逐只取当日**分钟资金累计曲线**:腾讯分钟线按「分钟涨跌方向 × 成交额增量」估算
  *    累计主动净买入(DDX 近似;东财分钟资金流存在时优先,那是真大单口径);
  *  - 曲线统一换算成 bp 再比形态:有流通市值按流通市值(万分比),没有按当日成交额
- *    (估算通道没有市值,bp 阈值相应放宽)——不然大盘股波动天然压过小票;
- *  - 形态 = **横盘段**(累计曲线带宽 ≤ 阈值,至少 FLAT_MIN_MINUTES 分钟)
+ *    (估算通道没有市值;成交额分母远小于流通市值,同样的资金换算出的 bp 天然更大,
+ *    横盘段的**绝对**带宽上限按 DAY_AMOUNT_FLAT_SCALE 放宽,相对阈值不变)——
+ *    不然大盘股波动天然压过小票;
+ *  - 形态 = **横盘段**(累计曲线带宽 ≤ 阈值,至少 FLAT_MIN_MINUTES 分钟,
+ *    按通道 barMinutes 换算桶数:1 分钟通道 15 桶、5 分钟通道 3 桶)
  *    接**拉升段**(其后到最新:涨幅 ≥ 阈值、上涨分钟占比 ≥ UP_RATIO、
  *    且最后一个分钟点仍在向上);
  *  - 按 score = 拉升幅度 − 0.5×横盘带宽(+横盘时长小幅加成)取前 20。
@@ -76,10 +79,15 @@ export const LOWS_RANGE_RATIO = 0.35;    // 分段点须落在日内低位区
 export const RISE_RANGE_RATIO = 0.55;    // 后段涨幅 ≥ 55% 全日振幅
 export const SLOPE_RATIO = 1.8;          // 后段斜率 / 前段斜率的切换倍数
 export const MIN_BARS = 10;              // 最少桶数(早盘不够不硬算)
-export const FLAT_MIN_BARS = 3;          // 横盘至少 3 桶
+export const FLAT_MIN_MINUTES = 15;      // 横盘至少 15 分钟(按 barMinutes 换算桶数)
 export const RISE_MIN_BARS = 3;          // 拉升至少 3 桶
+/** 分母为当日成交额时的横盘绝对带宽放宽倍数:成交额通常只有流通市值的几个百分点,
+ *  同一形态按成交额换算的 bp 明显更大,不放宽的话小振幅日子永远过不了绝对上限;
+ *  MIN_RANGE_BP 是噪声门槛,不放宽(放宽只会放噪声进来)。 */
+export const DAY_AMOUNT_FLAT_SCALE = 3;
 
-export function detectSidewaysRise(series: readonly FflowPoint[], denomYuan: number | null, barMinutes = 1):
+export function detectSidewaysRise(series: readonly FflowPoint[], denomYuan: number | null, barMinutes = 1,
+  denomKind: "cap" | "amount" = "cap"):
   Omit<FflowCandidate, "code" | "name" | "price" | "pct" | "sw2" | "main_net" | "float_cap"> | null {
   const denom = denomYuan;
   if (!denom || !(denom > 0)) return null;
@@ -104,10 +112,12 @@ export function detectSidewaysRise(series: readonly FflowPoint[], denomYuan: num
   const suffixUp: number[] = new Array(n).fill(0);
   for (let i = n - 1; i >= 1; i--) suffixUp[i - 1] = suffixUp[i]! + deltaUp(i);
 
+  const flatMinBars = Math.max(1, Math.ceil(FLAT_MIN_MINUTES / barMinutes));
+  const flatAbsBp = FLAT_ABS_BP * (denomKind === "amount" ? DAY_AMOUNT_FLAT_SCALE : 1);
   let best: { score: number; b: number; band: number; rise: number; up: number } | null = null;
-  for (let b = FLAT_MIN_BARS - 1; b <= n - RISE_MIN_BARS - 1; b++) {
+  for (let b = flatMinBars - 1; b <= n - RISE_MIN_BARS - 1; b++) {
     const band = preMax[b]! - preMin[b]!;
-    if (band > Math.max(FLAT_ABS_BP, FLAT_RANGE_RATIO * range)) continue;  // 前段不横盘
+    if (band > Math.max(flatAbsBp, FLAT_RANGE_RATIO * range)) continue;  // 前段不横盘
     if (curve[b]! > lo + LOWS_RANGE_RATIO * range) continue;               // 分段点不在低位区
     const rise = curve[n - 1]! - curve[b]!;
     if (rise < RISE_RANGE_RATIO * range) continue;                         // 日内主要涨幅不在后段
@@ -253,11 +263,11 @@ export async function shortlineFflow(ctx: ServiceContext, _query: Record<string,
       ({ series, fetchedAt, dayAmount, barMinutes } = minuteSeries(env.envelope));
     }
     if (!series.length) return null;   // 无分钟数据:不计入 with_data
-    // 分母:优先流通市值(bp 口径),估算通道没有市值就用当日成交额
+    // 分母:优先流通市值(bp 口径),估算通道没有市值就用当日成交额(绝对带宽阈值相应放宽)
     const denom = row.float_cap && row.float_cap > 0 ? row.float_cap
       : dayAmount && dayAmount > 0 ? dayAmount : null;
     if (!denom) return { row, pat: null, fetchedAt: fetchedAt ?? "" };
-    const pat = detectSidewaysRise(series, denom, barMinutes);
+    const pat = detectSidewaysRise(series, denom, barMinutes, row.float_cap && row.float_cap > 0 ? "cap" : "amount");
     return { row, pat, fetchedAt: fetchedAt ?? "" };
   });
 

@@ -14,6 +14,7 @@ export const MAIN_NET_ABS_MIN = 2e7;      // 无流通市值时主力净额 ≥ 
 export const BUY_COOLDOWN_DAYS = 3;       // 近 3 个交易日内买过不买
 export const SELL_COOLDOWN_DAYS = 1;      // 卖出后 1 个交易日冷却
 export const CURVE_NEG_MIN_MINUTES = 30;  // 资金曲线转负持续 ≥30 分钟卖出
+export const EXPIRY_SELL_AFTER = "14:45"; // 到期强平只在收盘前执行(spec §6「收盘前现价卖出」),给 14:45/14:50 两个窗口容错
 const SLIP = 1.001, LOT = 100;
 
 export interface AutoTradeConfig {
@@ -34,7 +35,7 @@ export interface AutoTradeHolding {
   price: number | null;                  // 现价,取不到为 null
   mainToday: number | null;              // 当日主力净额(累计曲线末值)
   negMinutes: number;                    // 资金曲线由正转负持续分钟数(runner 算好传入)
-  positionValue?: number;                // 市值;缺省用 shares × max(price, unitCost) 估算
+  positionValue?: number;                // 市值(展示用;预算按成本占用,不用市值 —— 见 buyOrders)
 }
 
 export interface AutoTradeHistory { trades: { symbol: string; type: "buy" | "sell"; date: string }[] }
@@ -66,7 +67,9 @@ export function buyOrders(
   tradingDays?: string[],
 ): Order[] {
   const heldSyms = new Set(holdings.map((h) => h.symbol));
-  const busy = holdings.reduce((s, h) => s + (h.positionValue ?? h.shares * Math.max(h.price ?? 0, h.unitCost)), 0);
+  // 预算按持仓**成本**占用,不按市值:涨了的持仓不挤占新买额度,卖出一只固定释放一笔
+  // slot 额度(spec §4「不做再平衡、卖出释放 10 万补位」;旧实现按市值占用,与此不符)。
+  const busy = holdings.reduce((s, h) => s + h.shares * h.unitCost, 0);
   const budget = cfg.totalYuan * cfg.positionRatio;
   const orders: Order[] = [];
   // 冷却窗口:recent(n) = 含今天的最近 n+1 个交易日。买入冷却 3 日 → n=2;
@@ -115,6 +118,7 @@ export function sellOrders(
   history: AutoTradeHistory,
   cal: CalendarFacts,
   tradingDays?: string[],
+  nowHm?: string,
 ): Order[] {
   const orders: Order[] = [];
   const boughtToday = new Set(
@@ -133,8 +137,9 @@ export function sellOrders(
     if (price <= cost * cfg.stopLoss) { orders.push(tag("sell_stop")); continue; }
     if (price >= cost * cfg.takeProfit) { orders.push(tag("sell_take_profit")); continue; }
     if (h.negMinutes >= CURVE_NEG_MIN_MINUTES) { orders.push(tag("sell_curve")); continue; }
-    // 到期强平:openedAt 之后满 holdDays 个交易日(含今天);tdi=-1(日历不一致)时不触发,保守不卖
-    if (tradingDays && tdi >= 0) {
+    // 到期强平:openedAt 之后满 holdDays 个交易日(含今天);tdi=-1(日历不一致)时不触发,保守不卖。
+    // 只在收盘前执行(spec §6):runner 传当前 HH:MM;缺省视为允许,保持纯函数旧调用语义。
+    if (tradingDays && tdi >= 0 && (!nowHm || nowHm >= EXPIRY_SELL_AFTER)) {
       const oi = tradingDays.indexOf(h.openedAt);
       if (oi >= 0 && tdi - oi >= cfg.holdDays) orders.push(tag("sell_expiry"));
     }

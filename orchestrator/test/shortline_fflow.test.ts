@@ -90,6 +90,26 @@ test("先拉升后横盘(顺序反了)不命中:分段点高位区/后段斜率�
   assert.equal(detectSidewaysRise(inv, CAP), null, "拉升在前的形态不命中");
 });
 
+test("横盘最少 15 分钟按通道换算:同样的 12 桶横盘,5 分钟通道命中、1 分钟通道不命中", () => {
+  // 5 分钟桶:12 桶 = 60 分钟横盘,分段点可以落在横盘末尾
+  assert.ok(detectSidewaysRise(makeBars(18, 12, 4, 80), CAP, 5), "5 分钟桶:横盘 60 分钟,命中");
+  // 1 分钟桶:12 桶 = 12 分钟 < 15 分钟,分段点被迫落入拉升段,后段涨幅占比不够 → 拒
+  assert.equal(detectSidewaysRise(makeBars(18, 12, 4, 80), CAP, 1), null, "1 分钟桶:横盘不足 15 分钟不硬算");
+});
+
+test("分母为当日成交额时横盘绝对带宽上限放宽,流通市值口径仍按原阈值", () => {
+  // 前 12 桶在 0/24bp 交替(带宽 24bp > FLAT_ABS_BP=20),后 16 桶稳步升到 64bp。
+  // R=64,0.3R=19.2 < 24:市值口径前段不算横盘;成交额口径上限放宽到 60bp 后放行。
+  const series = Array.from({ length: 28 }, (_, i) => ({
+    time: `b${i}`,
+    main: Math.round(yuan(i < 12 ? (i % 2 ? 0 : 24) : ((i - 11) / 16) * 64)),
+  }));
+  assert.equal(detectSidewaysRise(series, CAP, 5, "cap"), null, "市值口径:带宽 24bp 超绝对上限");
+  const r = detectSidewaysRise(series, CAP, 5, "amount");
+  assert.ok(r, "成交额口径:绝对带宽上限放宽后命中");
+  assert.ok(r.rise_bp > 0);
+});
+
 function tmpCtx(): ServiceContext {
   return { repoRoot: REPO, dataRoot: fs.mkdtempSync(path.join(os.tmpdir(), "vra-fflow-")), python: "python3", node: process.execPath };
 }

@@ -154,8 +154,10 @@ export async function runOnce(
     });
   }
 
+  // 到期强平只在收盘前窗口触发(EXPIRY_SELL_AFTER),其余价格规则任意窗口照常
+  const nowHm = localClock((deps.clock ?? (() => new Date()))(), SCHEDULE_TZ).hm;
   const orders = [
-    ...sellOrders(CONFIG, holdings, history, cal.facts, tradingDays),
+    ...sellOrders(CONFIG, holdings, history, cal.facts, tradingDays, nowHm),
     ...buyOrders(CONFIG, candidates, holdings, history, cal.facts, tradingDays),
   ];
   // 逐条落账、收集成败:有一笔失败就是半落账 —— 不封窗(由 beat 跳过 writeState),

@@ -137,3 +137,29 @@ test("卖出释放额度补位:5 只吃满 50 万预算时新票被拒,卖出一
   assert.equal(o.symbol, "600099");
   assert.equal(o.shares, 9900);                                 // 仍按单笔 10 万整手补位
 });
+
+test("预算按成本占用:持仓浮盈不挤占新买额度(不做再平衡)", () => {
+  // 4 只持仓成本各 10 万(共 40 万),市值涨到各 15 万(共 60 万)。
+  // 旧实现按市值占用 → 60 万 > 50 万预算,新票被误拒;成本口径 → 40+10=50 万,可买。
+  const fourHeld: AutoTradeHolding[] = [1, 2, 3, 4].map((i) => ({
+    symbol: `60001${i}`, name: `持${i}`, shares: 5000, unitCost: 20,
+    openedAt: "2026-10-23", price: 30, mainToday: 1e8, negMinutes: 0,
+    positionValue: 1.5e5,
+  }));
+  const signal = cand({ code: "600099", name: "新票", price: 10 });
+  const orders = buyOrders(CFG, [signal], fourHeld);
+  assert.equal(orders.length, 1, "浮盈部分不占预算,第 5 只应能补位");
+  assert.equal(orders[0]!.symbol, "600099");
+});
+
+test("到期强平只在收盘前窗口触发,盘中不强平", () => {
+  const DAYS = ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-26", "2026-10-27"];
+  const h = held({ openedAt: "2026-10-22", price: 1700 });       // 已满 3 个交易日
+  assert.equal(sellOrders(CFG, [h], hist([]), CAL, DAYS, "10:00").length, 0, "盘中到期不强平");
+  const atClose = sellOrders(CFG, [h], hist([]), CAL, DAYS, "14:45");
+  assert.equal(atClose[0]?.reason, "sell_expiry", "收盘前窗口触发强平");
+  assert.equal(sellOrders(CFG, [h], hist([]), CAL, DAYS, "14:50")[0]?.reason, "sell_expiry", "最后窗口仍可强平");
+  // 止损/止盈/形态破坏不受时点限制
+  const stop = sellOrders(CFG, [held({ openedAt: "2026-10-22", price: 1700 * 0.9 })], hist([]), CAL, DAYS, "10:00");
+  assert.equal(stop[0]?.reason, "sell_stop", "盘中止损照常");
+});
