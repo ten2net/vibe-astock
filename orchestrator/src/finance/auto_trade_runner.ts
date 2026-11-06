@@ -30,7 +30,7 @@ const STATE_DIR = "auto_trade";
 const WIN_START = "09:35", WIN_END = "14:50";
 const CONFIG: AutoTradeConfig = {
   totalYuan: 1_000_000, positionRatio: 0.5, maxPositions: 5,
-  stopLoss: 0.95, takeProfit: 1.08, holdDays: 3,
+  stopLoss: 0.95, takeProfit: 1.3, holdDays: 3,
   buyCooldownDays: 3, sellCooldownDays: 1,
 };
 
