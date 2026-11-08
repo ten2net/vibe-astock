@@ -9,9 +9,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from billing import orders, products
+from billing import auth, orders, products
 from billing.db import connect, init_schema, transaction
 from billing.router import create_router
+
+SECRET = "skeleton-test-secret"
 
 
 @pytest.fixture()
@@ -23,10 +25,15 @@ def conn(tmp_path):
 
 
 @pytest.fixture()
-def client(tmp_path):
+def client(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTOCK_BILLING_JWT_SECRET", SECRET)
     app = FastAPI()
     app.include_router(create_router(tmp_path / "billing.db"))
     return TestClient(app)
+
+
+def auth_header(user_id="u1"):
+    return {"Authorization": f"Bearer {auth.sign(user_id, secret=SECRET)}"}
 
 
 pytestmark = pytest.mark.unit
@@ -125,38 +132,45 @@ def test_router_products_is_read_only(client):
 
 
 def test_router_ignores_frontend_tampered_amounts(client):
-    """前端硬塞 price_cents / credits 一律忽略，服务端按商品表定（§5.1 核心）。"""
+    """前端硬塞 price_cents / credits / user_id 一律忽略，服务端按商品表 + JWT 定（§5.1 核心）。"""
     r = client.post("/api/billing/orders", json={
-        "user_id": "u1", "product_id": "pro_month",
+        "user_id": "attacker", "product_id": "pro_month",
         "price_cents": 1, "currency": "JPY", "credits": 999999,
-    })
+    }, headers=auth_header("u1"))
     assert r.status_code == 201
     body = r.json()
     assert body["price_cents"] == 2900
     assert body["currency"] == "USD"
     assert body["credits"] == 3000
+    assert body["user_id"] == "u1"          # user_id 从 JWT 取，不信请求体
     assert body["status"] == "pending"
 
 
 def test_router_rejects_unknown_product(client):
-    r = client.post("/api/billing/orders", json={"user_id": "u1", "product_id": "NOPE"})
+    r = client.post("/api/billing/orders", json={"product_id": "NOPE"}, headers=auth_header())
     assert r.status_code == 400
 
 
 def test_router_get_order_and_404(client):
-    created = client.post("/api/billing/orders", json={"user_id": "u1", "product_id": "credits_small"})
+    created = client.post("/api/billing/orders", json={"product_id": "credits_small"},
+                          headers=auth_header())
     oid = created.json()["order_id"]
     assert client.get(f"/api/billing/orders/{oid}").status_code == 200
     assert client.get("/api/billing/orders/nope").status_code == 404
 
 
-def test_router_has_no_payment_endpoints_yet(client):
-    """§12-2 未做：checkout / webhook 均不暴露（等 Waffo 官方文档）。"""
-    assert client.post("/api/billing/checkout", json={}).status_code == 404
-    assert client.post("/api/billing/webhook", json={}).status_code == 404
+def test_orders_requires_jwt(client):
+    """§12-3：建单端点受 JWT gate 保护，无令牌 401。"""
+    assert client.post("/api/billing/orders", json={"product_id": "pro_month"}).status_code == 401
 
 
-def test_entitlement_requires_jwt(client, monkeypatch):
-    """§12-3 新增的 entitlement 端点受 JWT gate 保护，无令牌 401。"""
-    monkeypatch.setenv("ASTOCK_BILLING_JWT_SECRET", "test-secret")
+def test_payment_endpoints_exist_but_are_guarded(client):
+    """§12-2 已实现：checkout 需 JWT；webhook 需验签（无签名头 → 401/503，而非 404）。"""
+    assert client.post("/api/billing/checkout", json={"product_id": "pro_month"}).status_code == 401
+    r = client.post("/api/billing/webhook", data=b"{}")
+    assert r.status_code in (401, 503)  # 缺签名头 / 缺 Waffo 配置，都不是 404
+
+
+def test_entitlement_requires_jwt(client):
+    """entitlement 端点受 JWT gate 保护，无令牌 401。"""
     assert client.get("/api/billing/entitlement").status_code == 401

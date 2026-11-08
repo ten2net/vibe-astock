@@ -10,6 +10,11 @@ python-dotenv>=1
 fastapi>=0.110
 uvicorn>=0.29
 
+# v2 付费版 Waffo 集成（billing/waffo.py）：API Key 请求 RSA-SHA256 签名 +
+# Webhook RSA-SHA256 验签。官方文档给的 Python 手动接入即用此库；不引入官方
+# TypeScript SDK，保持纯 Python 单进程。
+cryptography>=42
+
 # 数据层
 requests
 beautifulsoup4>=4.12

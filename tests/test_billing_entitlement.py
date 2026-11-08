@@ -128,26 +128,45 @@ def test_refund_clawback_is_idempotent(conn):
     assert entitlement.balance(conn, "u1") == 0
 
 
-# ---------------------------------------------------------------- waffo.parse_amount
+# ---------------------------------------------------------------- waffo.parse_amount（官方事件结构）
 
 def test_parse_amount_payment_uses_charged_and_list_total():
-    v = waffo.parse_amount({"type": "payment", "chargedAmount": 2850,
-                            "listPrice": {"total": 2900}, "amount": 2850})
-    assert (v.charged, v.list_total) == (2850, 2900)
-    # §5.4：断言绝不依赖 amount == total；按比例退款时二者本就不同
+    """官方 payload：eventType + data 嵌套，金额是 display 格式字符串。"""
+    event = {"eventType": "order.completed", "data": {
+        "chargedAmount": "28.50", "listPrice": {"total": "29.00"}, "amount": "28.50",
+    }}
+    v = waffo.parse_amount(event)
+    assert (v.charged, v.list_total) == ("28.50", "29.00")
+    # §5.4：断言绝不依赖 amount == total；按比例抵扣时二者本就不同
     assert v.charged != v.list_total
 
 
 def test_parse_amount_refund_and_subscription():
-    r = waffo.parse_amount({"type": "refund", "refundedAmount": 500, "originalPayment": 2900})
-    assert (r.refunded, r.original) == (500, 2900)
-    s = waffo.parse_amount({"type": "subscription", "planPrice": 29900})
-    assert s.plan_price == 29900
+    r = waffo.parse_amount({"eventType": "refund.succeeded", "data": {
+        "refundedAmount": "5.00", "originalPayment": {"total": "29.00"},
+    }})
+    assert (r.refunded, r.original_total) == ("5.00", "29.00")
+    s = waffo.parse_amount({"eventType": "subscription.activated", "data": {
+        "planPrice": {"total": "299.00"},
+    }})
+    assert s.plan_total == "299.00"
 
 
-def test_parse_amount_rejects_unknown_type():
+def test_parse_amount_subscription_payment_succeeded_is_payment_event():
+    """subscription.payment_succeeded 是纯支付事件，用 chargedAmount/listPrice，不是 planPrice。"""
+    v = waffo.parse_amount({"eventType": "subscription.payment_succeeded", "data": {
+        "chargedAmount": "29.00", "listPrice": {"total": "29.00"},
+        "planPrice": {"total": "29.00"},
+    }})
+    assert v.charged == "29.00" and v.plan_total is None
+
+
+def test_parse_amount_unknown_type_raises_and_store_events_are_benign():
     with pytest.raises(waffo.UnknownEventType):
-        waffo.parse_amount({"type": "mystery"})
+        waffo.parse_amount({"eventType": "mystery.event", "data": {}})
+    # store 事件不携带金额，返回全 None 视图而不抛错
+    v = waffo.parse_amount({"eventType": "store.domain_changed", "data": {}})
+    assert v.charged is None and v.plan_total is None
 
 
 # ---------------------------------------------------------------- router gate
@@ -208,6 +227,8 @@ def test_ai_echo_does_not_call_real_model(client, tmp_path):
     assert r.json()["stub"] is True
 
 
-def test_no_checkout_or_webhook_endpoints(client):
-    assert client.post("/api/billing/checkout", json={}).status_code == 404
-    assert client.post("/api/billing/webhook", json={}).status_code == 404
+def test_payment_endpoints_now_exist(client):
+    """§12-2 已落地：checkout 需 JWT（无令牌 401），webhook 需验签（非 404）。"""
+    assert client.post("/api/billing/checkout", json={"product_id": "credits_small"}).status_code == 401
+    r = client.post("/api/billing/webhook", data=b"{}")
+    assert r.status_code in (401, 503)

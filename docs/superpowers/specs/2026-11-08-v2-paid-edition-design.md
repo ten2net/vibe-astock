@@ -85,40 +85,91 @@ billing/
 
 `server.py` 改动仅限：`app.include_router(billing_router)` 一行 + 必要的配置读取；vr/ 与 review_agent 现有逻辑零改动（遵循 `_merge_vr_routes` 的逐文件合并纪律）。
 
-## 5. 支付流程（Waffo 文章要点的落地约束）
+## 5. 支付流程（Waffo 官方契约，2026-11-08 按官方文档重写）
 
-### 5.1 建单
+> 权威来源（本章以官方文档为准，覆盖那篇公众号文章的表述）：
+> - `https://docs.waffo.ai/api-reference/webhooks.md`（验签、payload、事件类型、响应/重试）
+> - `https://docs.waffo.ai/api-reference/endpoints/orders/create-checkout-session.md`（建会话）
+> - `https://docs.waffo.ai/api-reference/authentication.md`（API Key 请求签名）
+> - `https://docs.waffo.ai/integrate/ai-integration.md`（环境变量、SDK 概览）
+>
+> 技术栈决策：后端是 Python/FastAPI 单进程，官方 SDK 是 TypeScript，故用官方文档给出的
+> **Python 手动 REST 接入**（`requests` + `cryptography`），不引入 Node 子进程。
 
-1. 服务端先创建**带内部订单号**的待处理订单（关联站内用户、商品、额度流水），再创建 Waffo 支付会话，把内部订单号传给 Waffo。
-2. **商品映射由服务端说了算**：前端只传「用户选了哪个商品 id」；最终价格、币种、积分数一律由 `billing/products.py` 按商品配置确定。文章原话落地为：「无映射、规格不符、正式凭据缺失，就拒绝发起」——对不上就 4xx，不建会话。
-3. 一个 Vibe AStock 站点 = 一个 Waffo Store；订阅与积分包都在这一个店铺内，不跨站混收。
+### 5.1 建单与建会话
+
+1. 服务端先创建**带内部订单号**的待处理订单，再 `POST /v1/actions/checkout/create-session`。
+2. **商品映射由服务端说了算**：前端只传 `product_id`；价格/币种/额度由 `products.py` 定。
+   真实 Waffo Product ID 走运行时环境变量 `WAFFO_PRODUCT_<大写站内ID>`（`PROD_xxx`），
+   不硬编码。价格以 Waffo 后台商品定价为准（官方推荐「Path B：复用控制台商品」），
+   `products.py` 的 price_cents 用于展示与发放积分，**必须与后台商品价一致**。
+3. **API Key 认证**（不能用 Store Slug，否则 `metadata` / `orderMerchantExternalId` 被静默忽略）：
+   - `canonical = METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + SHA256_BASE64(BODY)`
+   - `X-Signature = Base64(RSA-SHA256(canonical, privateKey, PKCS1v15))`
+   - 头：`X-Merchant-Id` / `X-Timestamp` / `X-Signature`；**不需要** `X-Environment`（每个 Key 绑定环境）
+   - 出站时间戳窗口：落后 ≤5 分钟、超前 ≤1 分钟（与 webhook 的 45 分钟不同！）
+4. **内部订单号回传**：`orderMerchantExternalId`（≤128 字符）+ `metadata.orderId`，
+   分别透传到 webhook `data.orderMerchantExternalId` / `data.orderMetadata`，用于找回站内订单。
+   `user_id` 从 JWT 取，不再信任请求体（§12-3）。
+5. 响应 `{data:{sessionId, checkoutUrl, expiresAt}}`；回填订单后把 `checkoutUrl` 返给前端跳转。
+6. 一个 Vibe AStock 站点 = 一个 Waffo Store；订阅与积分包都在这一个店铺内。
 
 ### 5.2 支付成功判定
 
 - 用户从收银台跳回网站**只代表浏览器回来了**，不能凭跳转参数认定付款成功、开始发额度。
+  （官方：无 `cancelUrl`，放弃支付不触发任何 webhook；`successUrl` 也不会自动跳转。）
 - 唯一可信来源是**验签通过的 Webhook**；前端回调页只展示「处理中/去账户中心查看」。
 
-### 5.3 Webhook 三件事（发额度前必做）
+### 5.3 Webhook：验签、幂等、原子（发额度前必做）
 
-1. **验签**：保留请求原始字节/文本，按 Waffo 规定校验签名、时间、店铺环境（测试/生产），再解析处理。签名错、过期、错误店铺、错误环境的事件一律拒绝。测试与生产公钥分开放。
-2. **幂等**：支付商可能重发、网络可能重复送达。用确定性 key（如 `grant-<内部订单号>` + 唯一约束）保证一笔订单只发一次额度、同一退款只处理一次、同一通知不重复发。
-3. **订单与额度原子处理**：在**同一个数据库事务**内完成「订单置已付 + 额度发放」，避免出现「订单已付但额度没到」「额度到了订单还待付」「重试后又发一次」。文章作者用 Cloudflare D1 batch + 条件写入；本仓库用 SQLite/Postgres 事务 + 唯一约束即可，不要套用不具备原子保证的包装。
+1. **验签**（官方「Signature Verification」）：
+   - 头 `X-Waffo-Signature: t=<毫秒时间戳>,v1=<base64签名>`；另有 `X-Waffo-Event` 事件类型。
+   - 签名输入 **`${t}.${rawRequestBody}`**——必须 `request.body()` 取**原始字节**，
+     先 JSON 解析再序列化会改变空白字符导致验签失败（官方「常见陷阱」第一条）。
+   - **RSA-SHA256 + PKCS1v15 + SHA256**，用 Dashboard → Settings → Webhooks 的**平台级公钥 PEM**
+     （test / prod 各一把，所有店铺共用）。按 payload 的 `mode` 选对应公钥，选错会验签失败。
+   - 时间容差 **45 分钟（不是 5 分钟）**：重试复用原始签名头（`t` 永不重签），最后一次重试
+     在首次投递 31+ 分钟后；5 分钟窗口会把合法重试误判为 401。
+   - **真正的防重放靠 `eventType + eventId` 去重**，不靠收紧时间窗。
+   - 验签通过后额外校验 `mode` / `storeId` 与配置一致（`WAFFO_EXPECTED_MODE` / `WAFFO_STORE_ID`），
+     错误店铺、错误环境一律拒绝（§5.3 原约束保留）。
+2. **幂等**：官方 `processed_webhooks` 用 `(event_type, event_id)` 联合主键 + `INSERT OR IGNORE`。
+   额度发放另有 `credit_ledger.idempotency_key`：一次性订单用 `grant-<order_id>`，
+   订阅按 `grant-<eventId>`（每次扣款各发一期、重试不重复），退款用 `refund-<order_id>-<eventId>`。
+3. **订单与额度原子处理**：事件去重标记、订单置 `paid`、发放/扣回额度**全部在单个事务**内
+   （`db.transaction` + `*_in_tx` 变体，避免嵌套事务提前提交）。任一环节失败整事务回滚，
+   连事件标记一起回滚 → Waffo 重试可安全重放。满足 §5.3「订单与额度一起处理」。
 
-### 5.4 金额字段语义（易错点，必须写进代码注释）
+### 5.4 金额字段语义（易错点，已写进代码注释）
 
-Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与 `chargedAmount` 一致），不再是下单标价；仅在按比例退款或零元卡验证时与标价不同。**禁止**再断言 `amount == total`。
+官方「Deprecated amount fields」确认了文章所述并补充了层级与类型：金额都在 `data` 下、
+是 **display 格式字符串**（如 `"98.00"`），`amount` 已被标记 **Deprecated**（在支付/退款/订阅
+三类事件里指三种不同的东西）。**禁止**再断言 `amount == total`。
 
-- 支付事件：用 **`chargedAmount`（实扣）配 `listPrice.total`（标价）** 校验；
-- 退款事件：`refundedAmount` / `originalPayment`；
-- 订阅事件：`planPrice`。
+| 事件主体 | 实扣 | 标价 / 原价 | 弃用字段对应 |
+|---|---|---|---|
+| `order.completed` / `subscription.payment_succeeded` | `data.chargedAmount` | `data.listPrice.total` | `amount`→chargedAmount；`total`→listPrice.total |
+| `refund.succeeded` / `refund.failed` | `data.refundedAmount` | `data.originalPayment.total` | `amount`→refundedAmount；`total`→originalPayment.total |
+| 订阅状态事件（`subscription.activated` 等） | — | `data.planPrice.total` | `amount`→planPrice.total |
 
-`billing/waffo.py` 按事件主体命名字段解析，不复用一个 `amount` 字段走三种语义。
+`billing/waffo.py::parse_amount` 按 `eventType` 主体命名解析，绝不复用一个 `amount`。
+`listPrice` 与 `chargedAmount` 仅在按比例抵扣或零元卡验证时不同（折扣场景用
+`listTotal − discountAmount = total`，不用 `subtotal + taxAmount`）。
 
-### 5.5 退款与边界
+### 5.5 退款、边界与响应
 
-- 回调早于建单到达、乱序、重复到达：留可核对记录与恢复路径，**不假装处理成功**；记录原始事件供对账，下一轮或人工补单。
-- 退款事件按幂等扣回额度（已消耗部分按策略处理，细则待定）；订阅到期/续费失败由 entitlement 状态机处理。
-- 回调处理失败不静默吞掉：记错误日志、返回非 2xx 让 Waffo 重发，靠幂等兜底。
+- 官方**响应要求**：10 秒内返回 **2xx**（建议 200，body 不限）；推荐「先返回 200 再异步处理」，
+  重试由非 2xx / 超时触发（最多 3 次，间隔约 12s / 2m28s / 30m8s）。
+  **本实现刻意同步处理**：本地 SQLite 为毫秒级、无外部 IO，远在时限内；同步能让意外失败
+  返回 500 触发重试（因幂等而安全），且不必引入后台任务与「标记已处理却没发放」的窗口。
+  这是对官方「建议异步」的简化，若将来发放涉及慢 IO 再改异步。
+- 回调早于建单 / 关联不上 / 乱序：留 `processed_webhooks` 原始记录（`outcome=ignored`），
+  **不假装处理成功**，供人工或下一轮核对（§7）。
+- `refund.succeeded` 幂等扣回该订单额度；部分退款按整单额度扣回（细则待定）；
+  订阅状态机（canceled / past_due / recovered / renewed）v1 只记录事件、不改额度。
+- **部署约束**：`/api/billing/webhook` 需公网可达，而 `server.py` 的 `_vr_guard` 对所有 `/api/`
+  校验 Host 白名单 → 生产必须把对外域名写进 `VIBE_ALLOW_HOSTS`，否则 Waffo 回调被 403。
+  这是运营配置，不改中间件语义（§6 不放宽白名单）。
 
 ## 6. 授权与额度
 
@@ -155,11 +206,12 @@ Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与
 
 ## 10. 测试
 
-- `billing/products.py`：前端篡改价格/币种/积分被拒；无映射、规格不符、缺凭据拒绝建会话。
-- Webhook 验签：正确签名通过；错签/过期/错误店铺/错误环境一律拒绝；测试公钥不验生产事件。
-- 幂等：同一订单重复回调只发一次额度；同一退款只处理一次；乱序/早到回调留记录可恢复。
-- 原子性：模拟「订单已付但发额度失败」事务回滚，不出现半状态。
-- 金额字段：支付用 `chargedAmount`/`listPrice.total`（含按比例退款、零元卡验证的差异用例），退款/订阅事件各用对应字段；**断言不依赖 `amount == total`**。
+- `billing/products.py`：前端篡改价格/币种/积分/user_id 被拒（user_id 从 JWT 取）；无映射、规格不符、缺凭据拒绝建会话。
+- **Webhook 验签（官方契约）**：用临时 RSA 密钥对真实签名——正确签名通过；篡改 body、重新序列化 JSON、错公钥、超 45 分钟、缺 mode、错店铺/环境一律拒绝；31 分钟后的合法重试必须通过（5 分钟窗口会误杀）；测试公钥不验生产事件。
+- **API Key 出站签名**：canonical request 的签名可被对应公钥验证；建会话请求带 `orderMerchantExternalId` + `metadata.orderId`、不含 `priceSnapshot`（防前端改价）；响应 `{data:{...}}` 与错误 `{errors:[...]}` 解析。
+- **幂等**：`eventType + eventId` 重复投递只发一次额度；订阅按 `eventId` 每期各发一次；同一退款只处理一次；乱序/早到回调留原始记录可恢复。
+- **原子性**：模拟「发放额度抛错」→ 订单状态、额度、事件标记整事务回滚，不出现半状态。
+- **金额字段**：支付用 `chargedAmount`/`listPrice.total`，退款用 `refundedAmount`/`originalPayment.total`，订阅状态用 `planPrice.total`；值为 display 字符串、位于 `data` 下；`subscription.payment_succeeded` 按支付事件解析；**断言不依赖 `amount == total`**（`amount` 已弃用）。
 - 授权 gate：无 JWT / 过期 / 额度耗尽均被后端拦截，前端隐藏按钮不构成绕过；社区版自带 Key 路径回归不受影响。
 - 回归：`npm --prefix frontend run build`、`.venv/bin/python -m pytest tests backtest/tests research_data/tests -q`；新增 billing 单测以 `-m unit` 可离线跑（不打网络）。
 - 合规回归：Pro 报告文本经 `has_trade_recommendation` 仍被拦截（复用现有产品政策测试）。
@@ -177,13 +229,33 @@ Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与
 ## 12. 落地顺序建议
 
 1. `billing/` 骨架 + 服务端商品表 + 内部订单（不接真钱，纯结构）。
-2. Waffo 测试环境：建会话、Webhook 验签、金额字段解析、幂等与事务（测试 Key/公钥）。
+2. ✅ Waffo 测试环境：建会话、Webhook 验签、金额字段解析、幂等与事务（已按官方契约完成，2026-11-08；生产 Key/公钥与入驻仍待运营动作）。
 3. 授权(JWT) + 额度账本 + `/api/ai/*` gate 接隔离引擎。
 4. 前端「账号/订阅/额度」视图 + 收银台跳转与回调页。
 5. 生产 Key/公钥、Waffo 入驻与域名验证、测试支付跑通后再开真实收款；提款账户核对放在有首笔成功提款前完成。
 6. 对账视图与退款策略补齐。
 
 ## 13. 修订记录
+
+### 2026-11-08（Waffo 官方契约集成，§12-2 完成）
+
+用户提供官方文档 `https://docs.waffo.ai/zh/integrate/ai-integration`，据此按真实契约重写 §5、落地 §12-2。**§5 以官方文档为准，覆盖公众号文章的表述**。技术栈选 Python 手动 REST（不引入官方 TS SDK / Node 子进程）。
+
+- `waffo.py` 全量重写（删掉之前的 Protocol 占位）：
+  - `verify_webhook`：`X-Waffo-Signature: t=<ms>,v1=<base64>`，`${t}.${rawBody}` → RSA-SHA256/PKCS1v15/SHA256，**45 分钟**容差，公钥 PEM 按 `mode` 选 test/prod；`select_and_verify` + `check_event_scope`（mode/storeId 校验）。
+  - `build_signed_headers` / `create_checkout_session`：API Key canonical request 签名，`POST /v1/actions/checkout/create-session`，body 带 `orderMerchantExternalId` + `metadata.orderId`，解析 `{data:{sessionId,checkoutUrl,expiresAt}}`；`poster` 可注入做离线单测。
+  - `parse_amount`：按 `eventType`（非旧的 `type`）解析，字段在 `data` 下、值为字符串；`amount` 视为 Deprecated；新增 `PAYMENT_EVENTS` / `REFUND_EVENTS`。
+  - `WaffoConfig.from_env`：`WAFFO_MERCHANT_ID` / `WAFFO_PRIVATE_KEY(_BASE64)` / `WAFFO_WEBHOOK_PUBLIC_KEY_TEST` / `_PROD` / `WAFFO_API_BASE`；`resolve_waffo_product_id` 用 `WAFFO_PRODUCT_<ID>`。缺配置 fail closed。
+- `db.py`：增 `processed_webhooks`（`PRIMARY KEY(event_type,event_id)`，含 raw_payload/outcome，§7 对账）；`orders` 经 `_add_columns_if_missing` 补 `checkout_url` / `checkout_expires_at` / `waffo_order_id` / `buyer_email` / `waffo_event_id`，老库平滑升级。
+- `entitlement.py` / `orders.py`：拆出 `_apply_unlocked` / `_set_status_unlocked` + `grant_in_tx` / `refund_clawback_in_tx` / `set_status_in_tx`，让 Webhook 在**单个事务**内完成「去重标记 + 置 paid + 发额度」，避免嵌套事务提前提交。
+- `webhooks.py`（新）：验签后事件分发。`order.completed` / `subscription.payment_succeeded` → 置 paid + 发放订单快照额度；`refund.succeeded` → 幂等扣回；其余订阅/store 事件只记录（`outcome=ignored`）；关联不上订单留原始记录不假装成功。内部订单号经 `orderMerchantExternalId` / `orderMetadata.orderId` 找回。
+- `router.py`：新增 `POST /api/billing/checkout`（需 JWT，服务端建单→Waffo 建会话→回填→返 `checkout_url`）与 `POST /api/billing/webhook`（原始 body 验签、不需 JWT）；`POST /api/billing/orders` 的 `user_id` 改为从 JWT 取。
+- `requirements.txt` 显式加 `cryptography>=42`（RSA 签名/验签）。
+- **与公众号文章/旧设计的差异（重要）**：① 验签算法、45 分钟容差（**非 5 分钟**）、毫秒时间戳、靠 `eventType+eventId` 去重（非订单号、非时间窗）；② 官方推荐「先返回 200 再异步处理」，本实现因本地 SQLite 毫秒级而**同步处理完再返回**（偏差已在 §5.5 说明理由）；③ 事件是 `eventType`+`data` 嵌套、`amount` 弃用、金额是字符串；④ 建会话要 API Key RSA 签名，Store Slug 会忽略 metadata；⑤ `orderMerchantExternalId` 是官方的业务订单号回传字段。
+- **部署约束**：`/api/billing/webhook` 需公网可达，`_vr_guard` 的 Host 白名单要求把对外域名写进 `VIBE_ALLOW_HOSTS`，否则 Waffo 回调 403（§5.5）。不改中间件语义。
+- 待补（§12-3 之后）：真实账号/登录、`/api/ai/*` 接隔离引擎、订阅状态机、前端视图、对账视图、退款细则。
+- 离线单测 `tests/test_waffo_integration.py` 新增 28 例（`-m unit`，用临时 RSA 密钥对真实签名/验签，不写死假验签）：验签通过/篡改/错公钥/45 分钟容差(含 31 分钟重试)/重解析 body 失败/缺 mode、API Key canonical 签名、配置 fail closed、事件分发/幂等/原子回滚、checkout+webhook 端到端。既有两份 billing 测试按新契约同步调整。三个 billing 测试文件合计 **64 passed**。
+- 回归：全量 **1774 passed / 5 pre-existing failed**（5 例在 `main` 基线同样失败，与本次改动无关）/ 5 skipped / 2 xfailed；`py_compile` 全通过；真实 `server.app` 开启开关冒烟：products 200、未配 Waffo 时 checkout **503 fail closed**、非法 Host 的 webhook **403**（印证 §5.5 的 `VIBE_ALLOW_HOSTS` 约束）。
 
 ### 2026-11-08（协议无关授权额度内核，§12-3 部分）
 
@@ -195,8 +267,8 @@ Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与
 - `waffo.py`：`parse_amount` 按 §5.4 已知字段名（`chargedAmount`/`listPrice.total`/`refundedAmount`/`originalPayment`/`planPrice`）纯函数解析，**禁止 `amount == total` 断言**；`WebhookVerifier`/`CheckoutClient` 用 `typing.Protocol` 只声明契约，具体实现 pending 官方文档。
 - `router.py`：改单 router 全路径（保持 `/api/billing/*` 不变，可挂 `/api/ai/*`）。新增 `GET /api/billing/entitlement`（需 Bearer JWT）与 `POST /api/ai/echo` **gate 占位**：验 JWT → 原子扣 `AI_CALL_COST` → 返回 stub，额度耗尽 402 引导积分包、**不降级自配 Key 旁路**（§6）；**不调用任何真实大模型**，真实 handler 接 `review_agent` 隔离引擎后替换。
 - 单测 `tests/test_billing_entitlement.py` 21 例（`-m unit`）：JWT 签发/篡改/过期/算法混淆/缺密钥、发放与扣减幂等、余额不足回滚、三类事件金额解析、gate 401/402/幂等/不产建议。`test_billing_skeleton.py` 同步调整为 15 例。
-- **待补（§12-2，等官方文档）**：签名算法/请求头、Webhook 事件外层结构、收银台会话创建端点；`webhook_events` 落库表（§7）、`(订单置已付 + grant)` 同事务、`/checkout` 与 `/webhook` 端点。拿到文档后按真实契约一次补齐。
-- 行为备注：真实 `server.app` 的 SPA fallback 是 GET-only（`server.py:1677`），故对未实现的 `POST /api/billing/checkout` 返回 **405**（GET 返回 404）——这是 server.py 既有行为，非 billing 引入；router 隔离测试里为 404。
+- 当时待补的 §12-2（签名算法、事件结构、建会话、幂等表、checkout/webhook 端点）已于同日按官方文档补齐，见上方修订记录。
+- 行为备注（历史）：当时 `POST /api/billing/checkout` 尚未实现，真实 `server.app` 的 GET-only SPA fallback（`server.py:1677`）使其返回 405；现已实现，该备注不再适用。
 - 回归：全量 1746 passed / 5 pre-existing failed（同 `main` 基线）/ 5 skipped / 2 xfailed；真实 app 开启开关后冒烟通过（JWT→扣 10 额度→entitlement 余额 90）。
 
 ### 2026-11-08（骨架落地，§12-1）

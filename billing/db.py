@@ -33,13 +33,22 @@ def connect(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def init_schema(conn: sqlite3.Connection) -> None:
-    """建表（幂等，全部 ``IF NOT EXISTS``，老库直接升级）。
+def _add_columns_if_missing(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    """给老库补列（SQLite 不支持 ``ADD COLUMN IF NOT EXISTS``）。"""
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, decl in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
-    - ``orders``：内部订单（§12-1）
+
+def init_schema(conn: sqlite3.Connection) -> None:
+    """建表（幂等，全部 ``IF NOT EXISTS``，老库通过 ``ALTER`` 平滑升级）。
+
+    - ``orders``：内部订单（§12-1）；§12-2 补了 checkout_url / waffo_order_id 等回写列
     - ``entitlements`` / ``credit_ledger``：额度账本（§12-3 内核，同时是 §12-2
       Webhook「发额度」的落点）
-    - ``webhook_events`` 等留到 Waffo 官方协议确定后再加（§7）。
+    - ``processed_webhooks``：官方推荐的幂等去重表（``eventType + eventId`` 唯一约束），
+      同时留存原始事件与处理结果供 §7 对账
     """
     with transaction(conn):
         conn.execute(
@@ -53,13 +62,21 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 currency          TEXT NOT NULL,
                 credits           INTEGER NOT NULL,
                 status            TEXT NOT NULL DEFAULT 'pending',  -- pending / paid / refunded
-                waffo_session_id  TEXT,                            -- 后续步骤回填
-                waffo_txn_id      TEXT UNIQUE,                     -- 后续步骤回填；唯一约束是幂等种子
+                waffo_session_id  TEXT,                            -- Waffo 会话 id（cs_xxx）
+                waffo_txn_id      TEXT UNIQUE,                     -- Waffo 支付/订单 id
                 created_at        TEXT NOT NULL,
                 updated_at        TEXT NOT NULL
             )
             """
         )
+        # §12-2 新增列：老库升级用 ALTER，新库由上面 CREATE 不含这些列、靠这里补齐。
+        _add_columns_if_missing(conn, "orders", {
+            "checkout_url": "TEXT",          # 收银台 URL，返回给前端跳转
+            "checkout_expires_at": "TEXT",   # 会话过期时间
+            "waffo_order_id": "TEXT",        # webhook data.orderId（ORD_xxx）
+            "buyer_email": "TEXT",           # webhook data.buyerEmail
+            "waffo_event_id": "TEXT",        # 触发 paid 的 eventId（PAY_xxx）
+        })
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS entitlements (
@@ -81,6 +98,21 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 reason            TEXT NOT NULL,          -- grant / consume / refund
                 ref_id            TEXT,                   -- 关联订单号 / 请求号，供对账（§7）
                 created_at        TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS processed_webhooks (
+                event_type    TEXT NOT NULL,
+                event_id      TEXT NOT NULL,
+                mode          TEXT,                       -- test / prod
+                store_id      TEXT,
+                order_id      TEXT,                       -- 关联站内内部订单（可空）
+                outcome       TEXT NOT NULL,              -- granted / duplicate / ignored / refunded / error
+                raw_payload   TEXT,                       -- 原始 body，供对账/恢复（§7、§5.5）
+                received_at   TEXT NOT NULL,
+                PRIMARY KEY (event_type, event_id)
             )
             """
         )

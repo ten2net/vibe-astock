@@ -5,11 +5,11 @@ Waffo 支付会话并把订单号传过去。本模块只负责订单本身：�
 
 - 下单瞬间把商品配置**快照**进订单（price_cents / currency / credits），
   之后商品表调价不影响已建订单。
-- ``waffo_txn_id`` 上的 UNIQUE 约束是后续 Webhook 幂等的种子（§5.3）。
-- 骨架阶段不创建支付会话、不发额度、不接 Waffo API。
+- ``waffo_txn_id`` 上的 UNIQUE 约束是订单级幂等的补充；官方推荐的事件级幂等
+  （``eventType + eventId``）在 ``processed_webhooks`` 表，见 ``webhooks.py``。
 
-状态机（骨架只实现到 pending；paid/refunded 留给后续 Webhook 步骤驱动）：
-    pending ──(验签通过的支付事件)──> paid ──(退款事件)──> refunded
+状态机（由验签通过的 Webhook 驱动，见 ``webhooks.py``）：
+    pending ──(order.completed / subscription.payment_succeeded)──> paid ──(refund.succeeded)──> refunded
 """
 from __future__ import annotations
 
@@ -83,30 +83,59 @@ def get(conn: sqlite3.Connection, order_id: str) -> dict:
     return _row_to_dict(row)
 
 
-def set_status(conn: sqlite3.Connection, order_id: str, new_status: str) -> dict:
-    """按状态机流转。非法跳转（含 paid→pending）抛 ``IllegalTransition``。
-
-    后续 Webhook 在**同一个事务**里调用本函数 + 发放额度，保证原子性（§5.3）。
-    """
+def _set_status_unlocked(conn: sqlite3.Connection, order_id: str, new_status: str,
+                         *, waffo_order_id: str | None = None,
+                         buyer_email: str | None = None,
+                         waffo_event_id: str | None = None) -> dict:
+    """状态流转核心（不自行开事务），并可选回填 Waffo 侧标识。"""
     if new_status not in _ALLOWED_STATUSES:
         raise OrderError(f"未知状态：{new_status!r}")
     current = get(conn, order_id)["status"]
     if new_status not in _ALLOWED_TRANSITIONS[current]:
         raise IllegalTransition(f"不允许 {current} → {new_status}")
-    with transaction(conn):
-        conn.execute(
-            "UPDATE orders SET status = ?, updated_at = ? WHERE order_id = ?",
-            (new_status, _now(), order_id),
-        )
+    conn.execute(
+        """
+        UPDATE orders
+           SET status = ?, updated_at = ?,
+               waffo_order_id = COALESCE(?, waffo_order_id),
+               buyer_email = COALESCE(?, buyer_email),
+               waffo_event_id = COALESCE(?, waffo_event_id)
+         WHERE order_id = ?
+        """,
+        (new_status, _now(), waffo_order_id, buyer_email, waffo_event_id, order_id),
+    )
     return get(conn, order_id)
 
 
-def attach_waffo_session(conn: sqlite3.Connection, order_id: str, session_id: str) -> dict:
-    """后续建会话成功后回填 Waffo 会话 id（骨架不调用）。"""
+def set_status(conn: sqlite3.Connection, order_id: str, new_status: str) -> dict:
+    """按状态机流转。非法跳转（含 paid→pending）抛 ``IllegalTransition``。"""
+    with transaction(conn):
+        return _set_status_unlocked(conn, order_id, new_status)
+
+
+def set_status_in_tx(conn: sqlite3.Connection, order_id: str, new_status: str,
+                     *, waffo_order_id: str | None = None,
+                     buyer_email: str | None = None,
+                     waffo_event_id: str | None = None) -> dict:
+    """``set_status`` 的事务内版本（§12-2 Webhook 用，与发放额度共享一个事务）。"""
+    return _set_status_unlocked(
+        conn, order_id, new_status,
+        waffo_order_id=waffo_order_id, buyer_email=buyer_email, waffo_event_id=waffo_event_id,
+    )
+
+
+def attach_waffo_session(conn: sqlite3.Connection, order_id: str, *,
+                         session_id: str, checkout_url: str,
+                         expires_at: str | None = None) -> dict:
+    """建会话成功后回填 Waffo 会话 id / 收银台 URL / 过期时间（§12-2）。"""
     get(conn, order_id)  # 存在性校验
     with transaction(conn):
         conn.execute(
-            "UPDATE orders SET waffo_session_id = ?, updated_at = ? WHERE order_id = ?",
-            (session_id, _now(), order_id),
+            """
+            UPDATE orders
+               SET waffo_session_id = ?, checkout_url = ?, checkout_expires_at = ?, updated_at = ?
+             WHERE order_id = ?
+            """,
+            (session_id, checkout_url, expires_at, _now(), order_id),
         )
     return get(conn, order_id)
