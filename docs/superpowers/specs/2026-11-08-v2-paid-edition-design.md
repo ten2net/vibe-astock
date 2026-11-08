@@ -174,8 +174,12 @@ billing/
 ## 6. 授权与额度
 
 - 登录后后端签发短期 JWT（含用户 id、授权等级、到期时间）；付费功能在 **FastAPI 依赖/中间件层** gate，而非前端隐藏按钮。
-- `/api/ai/*`（Pro 托管）调用链：校验 JWT → 查额度 → 预扣/扣减 → 进入 `review_agent` 隔离引擎（FrozenInputs 冻结日期与取数范围、`DISABLED` 仍禁 shell/联网、ANSWER_SCHEMA 引用校验、`has_trade_recommendation` 保存前拦截）→ 返回结果。托管额度用尽返回明确提示，引导购买积分包，**不降级到用户自配 Key 的旁路**以免绕过计费。
-- 社区版路径完全不变：用户自带 Key 直连现有 `review_agent/access.py` 接入源，不经过 billing。
+- **`X-Account-Token` 独立头（2026-11-08 决策）**：前端 `api.ts::authHeaders()` 已把 `VR_API_KEY` 放进 `Authorization: Bearer`，且 `_vr_guard` 对所有 `/api/` 校验它；JWT 若也占用 `Authorization` 会与之冲突。故 billing/ai 的 JWT 走专门的 **`X-Account-Token`** 头，`Authorization` 仍归 `VR_API_KEY`，两者互不干扰，`_vr_guard` 与社区版零改动。JWT **不落 localStorage**（§11 禁止项），放内存。
+- **托管 LLM 走环境变量（2026-11-08 决策）**：`Manager.submit` 的 `llm: ModelInput` 必填，社区版由浏览器传 `apiKey`（localStorage）。Pro「免配 Key」由服务端从 `ASTOCK_HOSTED_LLM_PROVIDER / MODEL / BASE_URL / API_KEY(_ENV)` 等 env 注入；未配置时 `/api/ai/*` 返回 **503**，**不降级到用户自配 Key 旁路**（§6 红线）。凭据只在服务端，绝不进前端或代码。
+- **隔离引擎先用 `direct` 模式（2026-11-08 决策）**：`/api/ai/*` 调用链为 校验 JWT → 查/扣额度 → 取 `app.state.review_agent`（现成 `Manager`，不自己 new，避免抢 `backend.lock`）→ `TurnInput(scope.mode='direct', llm=托管配置, request_id=uuid4().hex)` → `submit` → 返回 `turn_id` 供前端轮询 `/api/review-agent/turns/{id}`。`direct` 模式不读复盘 bundle、无工具/联网，自动套 `PRODUCT_POLICY` + `ORDINARY_STATISTICS_POLICY` + `has_trade_recommendation` 拦截（`runtime.py:496-506`），是「给资料做解释」的最短路。
+  - **已知限制（诚实记录）**：`direct` 模式**不**触发 `FrozenInputs`（只复盘/辩论链路用）与 `ToolSession` 引用校验全套，与 §6 括号里「全套不变」的理想态有差距；要全套需 `scope.mode='agent'` 且该 `anchor` 有已存复盘（`build_bundle` 会读 `ASTOCK_DATA_HOME/reviews`）。本轮先跑通 gate→submit 链路，`agent` 模式与证据解读留后续。产品政策拦截不受影响。
+- **全局单活跃 turn**：`Manager` 同一时刻只允许一个 active turn（`store.start` 查 `status='running'`，`daily/deepdive` 忙碌时 `submit` 抛 `EvidenceError`）。`/api/ai/explain` 捕获 `EvidenceError` 转 4xx/409，不静默吞掉；付费并发排队留后续。
+- 托管额度用尽返回明确提示（402），引导购买积分包；社区版路径完全不变：用户自带 Key 直连现有 `review_agent/access.py` 接入源，不经过 billing。
 - 远程访问场景：若经反代/公网，`VIBE_ALLOW_HOSTS` 与 HTTPS 约束（server.py `_vr_guard`）依旧生效；付费不放宽 Host 白名单。公网地址仍强制 HTTPS。
 
 ## 7. 可观测性与对账
@@ -230,12 +234,61 @@ billing/
 
 1. `billing/` 骨架 + 服务端商品表 + 内部订单（不接真钱，纯结构）。
 2. ✅ Waffo 测试环境：建会话、Webhook 验签、金额字段解析、幂等与事务（已按官方契约完成，2026-11-08；生产 Key/公钥与入驻仍待运营动作）。
-3. 授权(JWT) + 额度账本 + `/api/ai/*` gate 接隔离引擎。
-4. 前端「账号/订阅/额度」视图 + 收银台跳转与回调页。
+3. ✅ 授权(JWT) + 额度账本 + `/api/ai/*` gate 接隔离引擎（已落地，2026-11-08；真实账号/登录体系、`agent` 模式证据解读留后续）。
+4. ✅ 前端「账号/订阅/额度」视图 + 收银台跳转（已落地，2026-11-08；独立回调页用 `?order_id=` 提示 + 手动刷新额度替代，因官方无自动跳转/cancelUrl）。
 5. 生产 Key/公钥、Waffo 入驻与域名验证、测试支付跑通后再开真实收款；提款账户核对放在有首笔成功提款前完成。
 6. 对账视图与退款策略补齐。
 
 ## 13. 修订记录
+
+### 2026-11-08（前端视图 + /api/ai/* 接隔离引擎，§12-3 / §12-4）
+
+用户确认四项架构决策（已写入 §6）：① JWT 走独立头 `X-Account-Token`；② 托管 LLM 走环境变量；
+③ 隔离引擎先用 `scope.mode='direct'`；④ 前端入口用 Layout 底部单独 Link（不动七模块）。
+
+**后端**
+- `router.py`：`_require_user` 改从 `X-Account-Token` 读 JWT（`Authorization` 仍归 `VR_API_KEY`，
+  避免与 `_vr_guard` 冲突）；`create_router` 新增 `review_agent_getter` 注入参数，缺省取
+  `request.app.state.review_agent`（现成 Manager，不自己 new，避免抢 `backend.lock`）。
+- `hosted_llm.py`（新）：`from_env()` 读 `ASTOCK_HOSTED_LLM_PROVIDER/MODEL/BASE_URL/API_KEY(_ENV)`，
+  构造 `ModelInput`；缺 model 抛 `HostedLLMNotConfigured` → 端点 503 fail closed，
+  **不降级到用户自配 Key 旁路**。支持 `API_KEY_ENV` 间接引用（凭据只记位置不记值）。
+- `POST /api/ai/explain`：验 JWT → 扣 `AI_CALL_COST` → 服务端注入 llm →
+  `Manager.submit(TurnInput(scope.mode='direct', request_id=uuid4().hex))` → 返回 `turn_id`。
+  `submit` 抛 `EvidenceError`（全局单活跃等）→ **退还额度** + 409；其他异常同样退还 + 502。
+  请求体**不含** llm/apiKey（前端硬塞被忽略）。
+- `GET /api/ai/turn/{id}`：同一 JWT gate 下轮询 `manager.store.turn`，不复用 review-agent
+  的 `VR_API_KEY` 路由，避免前端混用两套认证。
+- `/api/ai/echo` 保留为 gate 冒烟端点（不调模型），真实解读走 `explain`。
+
+**前端**（React 19 + Vite，产物仍由后端单端口托管）
+- `billing-core.ts`（新，零外部 import）：`X-Account-Token` **内存态**（不落 localStorage，§11）、
+  `buildBillingHeaders`（合并 `VR_API_KEY` 的 Authorization + JWT 独立头）、`formatPrice`、
+  32-hex `billingRequestId`、类型。拆出来是为了 `node --test` 能直接加载（Node strip-only
+  TS 不支持参数属性、扩展名解析不了 Vite 的无后缀 import）。
+- `billing-api.ts`：薄网络层，复用 `apiUrl()`/`authHeaders()`，封装 products / entitlement /
+  checkout（只传 product_id）/ explain / turn / echo；401/402 有专用提示。
+- `pages/Account.tsx`（新）：账号令牌输入（明确标注仅内存、刷新失效）、额度卡（手动刷新）、
+  商品列表 + 购买跳 Waffo 收银台、托管 AI 解读输入 + 1.5s 轮询终态、loading/error/pending
+  三态、`toast`、`PageHeader`、`glass` 卡、`role="status"/"alert"`。复用现有 UI 范式。
+  收银台返回用 `?order_id=` 提示「以验签回调为准，请手动刷新额度」（官方无自动跳转 / cancelUrl）。
+- `router.tsx` 加 `/account`；`Layout.tsx` 底部仿 `/settings` 加「账号与订阅」Link + title 特判；
+  `modules.ts` 的 `CHAT_PAGES` 登记 `/account`（**不改 MODULES**，`modules.test.ts` 七模块断言零改动）。
+
+**验证**
+- 新增 `tests/test_ai_gate.py` 12 例（fake Manager，离线）：X-Account-Token 必需/Authorization 不算、
+  未配 LLM 503、引擎未就绪 503、submit 注入服务端 llm 与 direct scope、前端覆盖 llm 无效、
+  额度不足 402、EvidenceError/意外异常均退还额度、轮询 gate、hosted_llm 配置解析。
+- 新增 `frontend/test/billing-api.test.ts` 5 例（纯函数）：token 内存态、请求头两不干扰、
+  formatPrice、32-hex id。前端 `node --test` **46 passed**，`npm run build` 通过。
+- 全量 Python 回归 **1786 passed / 5 pre-existing failed**（同 `main` 基线）/ 5 skipped / 2 xfailed；
+  真实 `server.app` 开启开关端到端冒烟：explain 200、额度 100→90、非法 Host 403。
+
+**已知限制 / 待补（§12-3 之后）**
+- 真实账号/登录体系未做：JWT 目前由用户手动粘贴服务端签发的短期令牌（内存态），刷新即失效。
+- `direct` 模式不触发 `FrozenInputs` / `ToolSession` 引用校验全套（§6 已诚实记录）；`agent` 模式
+  证据解读需该 anchor 有已存复盘，留后续。
+- `Manager` 全局单活跃 turn，付费并发排队留后续；退款细则、订阅状态机、对账视图仍待补。
 
 ### 2026-11-08（Waffo 官方契约集成，§12-2 完成）
 

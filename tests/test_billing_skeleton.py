@@ -33,7 +33,7 @@ def client(tmp_path, monkeypatch):
 
 
 def auth_header(user_id="u1"):
-    return {"Authorization": f"Bearer {auth.sign(user_id, secret=SECRET)}"}
+    return {"X-Account-Token": auth.sign(user_id, secret=SECRET)}
 
 
 pytestmark = pytest.mark.unit

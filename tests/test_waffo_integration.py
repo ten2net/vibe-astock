@@ -121,7 +121,7 @@ def client(tmp_path, config, fake_poster, monkeypatch):
 
 
 def _hdr(user_id="u1"):
-    return {"Authorization": f"Bearer {auth.sign(user_id, secret=SECRET)}"}
+    return {"X-Account-Token": auth.sign(user_id, secret=SECRET)}
 
 
 # ---------------------------------------------------------------- 验签（官方 § Signature Verification）

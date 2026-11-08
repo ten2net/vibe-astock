@@ -37,7 +37,7 @@ def _token(user_id="u1", **kw):
 
 
 def _auth(token):
-    return {"Authorization": f"Bearer {token}"}
+    return {"X-Account-Token": token}
 
 
 # ---------------------------------------------------------------- auth.py (JWT)

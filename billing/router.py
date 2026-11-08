@@ -7,11 +7,13 @@
     GET  /api/billing/entitlement         当前额度/等级（需 Bearer JWT）
     POST /api/billing/checkout            建 Waffo 收银台会话（需 Bearer JWT）
     POST /api/billing/webhook             Waffo 事件回调（**验签**，不需要 JWT）
-    POST /api/ai/echo                     gate 占位：校验 JWT → 查额度 → 扣减 → 返回 stub
+    POST /api/ai/explain                  Pro 托管 AI 解读（JWT → 扣额度 → 隔离引擎）
+    GET  /api/ai/turn/{turn_id}           轮询托管 AI 回合状态（同一 JWT gate）
+    POST /api/ai/echo                     gate 冒烟：校验 JWT → 查额度 → 扣减 → 返回 stub
 
-**刻意不做**（§12-3 之后）：真实账号/登录体系、``/api/ai/*`` 接真实
-``review_agent`` 隔离引擎、订阅状态机（subscription.* 事件目前只记录不发额度）。
-``echo`` 只是证明 gate 链路通，不调用任何大模型。
+**刻意不做**（§12-3 之后）：真实账号/登录体系、``agent`` 模式证据解读（当前用
+``direct``）、订阅状态机（subscription.* 事件目前只记录不发额度）。
+``echo`` 只是证明 gate 链路通，不调用任何大模型；真实解读走 ``explain``。
 
 路由默认不挂载：server.py 用 ``ASTOCK_BILLING_ENABLED`` 开关控制，默认关闭。
 生产部署注意：``/api/billing/webhook`` 需公网可达，``_vr_guard`` 的 Host 白名单
@@ -28,7 +30,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from . import auth, entitlement, orders, products, waffo, webhooks
+from . import auth, entitlement, hosted_llm, orders, products, waffo, webhooks
 from .db import connect, init_schema
 
 logger = logging.getLogger(__name__)
@@ -54,12 +56,25 @@ class AiEchoBody(BaseModel):
     request_id: str | None = None
 
 
+class AiExplainBody(BaseModel):
+    """Pro 托管 AI 解读请求。**不含** llm / apiKey —— 凭据由服务端注入。"""
+
+    question: str = Field(min_length=1, max_length=2000)
+    anchor: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    # 客户端可给请求级 id 做扣费幂等；不给则服务端生成。
+    request_id: str | None = None
+
+
 def _require_user(request: Request) -> str:
-    """FastAPI 依赖：从 Bearer JWT 取 user_id。任何异常都转成合适的 HTTP 状态。"""
-    header = request.headers.get("authorization", "")
-    if not header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="缺少 Bearer 令牌")
-    token = header[len("Bearer "):].strip()
+    """FastAPI 依赖：从 ``X-Account-Token`` 头读 JWT。
+
+    **不占用 ``Authorization``**：那个头归 ``VR_API_KEY``（前端 ``api.ts::authHeaders``
+    写入、``_vr_guard`` 校验），若 JWT 也放进去会与之冲突。设计文档 §6 决策。
+    任何异常都转成合适的 HTTP 状态。
+    """
+    token = request.headers.get("x-account-token", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少 X-Account-Token 令牌")
     try:
         payload = auth.verify(token)
     except RuntimeError as exc:  # 未配置 JWT 密钥 → 服务未就绪，不是 401
@@ -71,12 +86,14 @@ def _require_user(request: Request) -> str:
 
 def create_router(db_path: str | Path | None = None, *,
                   waffo_config: "waffo.WaffoConfig | None" = None,
-                  checkout_poster=None) -> APIRouter:
+                  checkout_poster=None, review_agent_getter=None) -> APIRouter:
     """构造 router。
 
     ``db_path`` 显式注入（测试传 tmp_path）；``waffo_config`` / ``checkout_poster``
-    注入便于离线单测（不打网络）。缺省时 Waffo 配置按请求从环境变量惰性读取，
-    这样「只开 billing、没配 Waffo」时商品/订单端点仍可用，只有 checkout/webhook 返回 503。
+    / ``review_agent_getter`` 注入便于离线单测（不打网络、不依赖真实引擎）。
+    缺省时 Waffo 配置按请求从环境变量惰性读取；``review_agent_getter`` 缺省时从
+    ``request.app.state.review_agent`` 取（server.py 的 ``_lifespan`` 注入的现成 Manager，
+    不自己 new，避免抢 ``backend.lock``）。
     """
     from .db import default_db_path
 
@@ -99,6 +116,12 @@ def create_router(db_path: str | Path | None = None, *,
         if waffo_config is not None:
             return waffo_config
         return waffo.WaffoConfig.from_env()
+
+    def _manager(request: Request):
+        """取现成的 review_agent Manager；未就绪返回 None。"""
+        if review_agent_getter is not None:
+            return review_agent_getter()
+        return getattr(request.app.state, "review_agent", None)
 
     @router.get("/api/billing/products")
     def list_products():
@@ -220,11 +243,11 @@ def create_router(db_path: str | Path | None = None, *,
     @router.post("/api/ai/echo")
     def ai_echo(body: AiEchoBody, user_id: str = Depends(_require_user),
                 x_request_id: str | None = Header(default=None)):
-        """gate 占位端点：验证 JWT → 查额度 → 原子扣减 → 返回 stub。
+        """gate 冒烟端点：验证 JWT → 查额度 → 原子扣减 → 返回 stub。
 
-        只证明 §6 的 gate 链路（鉴权 + 计费）通；**不调用任何真实大模型**，
-        真实 handler 接 ``review_agent`` 隔离引擎后替换本函数体（§12-3 之后）。
-        托管额度耗尽时返回 402 并引导积分包，**不降级到用户自配 Key 旁路**（§6）。
+        保留用于离线验证 gate 链路（鉴权 + 计费），**不调用任何真实大模型**；
+        真实托管解读走 ``/api/ai/explain``。托管额度耗尽 402 引导积分包，
+        **不降级到用户自配 Key 旁路**（§6）。
         """
         ref_id = body.request_id or x_request_id or uuid.uuid4().hex
         conn = _conn()
@@ -233,8 +256,6 @@ def create_router(db_path: str | Path | None = None, *,
                 view = entitlement.consume(conn, user_id, AI_CALL_COST, ref_id=ref_id)
             except entitlement.InsufficientCredits:
                 raise HTTPException(status_code=402, detail="托管额度不足，请购买积分包") from None
-            # 占位：真实实现在这里走 review_agent.isolated engine（FrozenInputs /
-            # DISABLED / ANSWER_SCHEMA / has_trade_recommendation 全部不变）。
             return {
                 "stub": True,
                 "user_id": user_id,
@@ -244,5 +265,95 @@ def create_router(db_path: str | Path | None = None, *,
             }
         finally:
             conn.close()
+
+    @router.post("/api/ai/explain")
+    def ai_explain(request: Request, body: AiExplainBody,
+                   user_id: str = Depends(_require_user)):
+        """Pro 托管 AI 解读：JWT → 扣额度 → 服务端注入 llm → 进隔离引擎。
+
+        - ``llm`` 由 ``hosted_llm.from_env()`` 从环境变量注入，**绝不取自请求体**，
+          未配置返回 503（fail closed，不降级到用户自配 Key）。
+        - 用 ``scope.mode='direct'``：普通受控对话、无工具/联网、自动套
+          ``PRODUCT_POLICY`` + ``has_trade_recommendation`` 拦截（设计文档 §6 决策）。
+          已知限制见文档：direct 不走 FrozenInputs / 引用校验全套。
+        - ``Manager.submit`` 是异步的（内部起 daemon 线程），立即返回 ``turn_id``，
+          前端再用 ``GET /api/ai/turn/{id}`` 轮询终态。
+        - 额度扣减在 submit **之前**；submit 抛 ``EvidenceError``（全局单活跃等）时
+          要**退还**已扣额度，避免扣了钱没干活。
+        """
+        from datetime import datetime, timezone
+        from review_agent.api import TurnInput
+        from review_agent.evidence import EvidenceError
+
+        # 1) 托管 LLM 配置（服务端注入）
+        try:
+            llm = hosted_llm.from_env().as_model_input()
+        except hosted_llm.HostedLLMNotConfigured as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        # 2) 现成 Manager（server.py 注入），不自己 new
+        manager = _manager(request)
+        if manager is None:
+            raise HTTPException(status_code=503, detail="复盘 Agent 服务尚未启动")
+
+        ref_id = body.request_id or uuid.uuid4().hex
+        anchor = body.anchor or datetime.now(timezone.utc).astimezone().date().isoformat()
+
+        # 3) 扣额度（原子、幂等）
+        conn = _conn()
+        try:
+            try:
+                view = entitlement.consume(conn, user_id, AI_CALL_COST, ref_id=ref_id)
+            except entitlement.InsufficientCredits:
+                raise HTTPException(status_code=402, detail="托管额度不足，请购买积分包") from None
+        finally:
+            conn.close()
+
+        # 4) 进隔离引擎；失败退还额度（用一个反向 grant 抵消，幂等 key 独立）
+        try:
+            turn = manager.submit(TurnInput(
+                anchor=anchor,
+                question=body.question,
+                request_id=uuid.uuid4().hex,   # 引擎内部 32hex 幂等键，与计费 ref_id 分开
+                llm=llm,
+                scope={"mode": "direct", "page": "账号与订阅"},
+            ))
+        except EvidenceError as exc:
+            conn = _conn()
+            try:
+                entitlement.grant(conn, user_id, AI_CALL_COST, order_id=f"refund-{ref_id}")
+            finally:
+                conn.close()
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        except Exception as exc:  # noqa: BLE001  pydantic/运行时异常同样退还，避免静默扣费
+            logger.exception("托管 AI submit 失败：%s", exc)
+            conn = _conn()
+            try:
+                entitlement.grant(conn, user_id, AI_CALL_COST, order_id=f"refund-{ref_id}")
+            finally:
+                conn.close()
+            raise HTTPException(status_code=502, detail="托管 AI 调用失败，额度已退还") from None
+
+        return {
+            "turn_id": turn["id"],
+            "conversation_id": turn.get("conversation_id"),
+            "status": turn.get("status"),
+            "charged_credits": AI_CALL_COST,
+            "remaining_credits": view["credits"],
+        }
+
+    @router.get("/api/ai/turn/{turn_id}")
+    def ai_turn(turn_id: str, request: Request, user_id: str = Depends(_require_user)):
+        """轮询托管 AI 回合状态。走同一套 JWT gate，不复用 review-agent 的
+        ``VR_API_KEY`` 路由，避免前端混用两套认证。只读 ``manager.store.turn``。"""
+        from review_agent.evidence import EvidenceError
+
+        manager = _manager(request)
+        if manager is None:
+            raise HTTPException(status_code=503, detail="复盘 Agent 服务尚未启动")
+        try:
+            return manager.store.turn(turn_id)
+        except EvidenceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from None
 
     return router

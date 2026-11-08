@@ -35,7 +35,7 @@ const CHAT_PAGES: Record<string, string> = {
   '/backtest': '涨停样本统计', '/watch': '盯盘', '/agent/intraday': '盘中核验',
   '/stock-data': '个股数据', '/agent/deepdive': '个股深挖',
   '/portfolio': '持仓股', '/watchlist': '自选股', '/journal': '交易日志',
-  '/settings': '接入 AI', '/my-stocks': '我的股票',
+  '/settings': '接入 AI', '/account': '账号与订阅', '/my-stocks': '我的股票',
   '/yesterday-ladder': '昨日梯队', '/backtest-agent': '策略回测',
 };
 export function chatPageFor(pathname: string) { return CHAT_PAGES[pathname] ?? '工作空间'; }

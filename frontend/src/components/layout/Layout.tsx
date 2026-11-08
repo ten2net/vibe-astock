@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { ChevronsLeft, ChevronsRight, Globe, Github, Cog, Menu, Moon, Sparkles, Sun, X ,Sparkle } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Globe, Github, Cog, Menu, Moon, Sparkles, Sun, X , Sparkle, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { moduleFor, chatPageFor, navigationPath } from '@/lib/workspace/modules';
@@ -25,7 +25,7 @@ function Shell() {
   const navRef = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const activeModule = moduleFor(pathname);
-  const title = activeModule?.pages.find(page => page.to === navigationPath(pathname))?.title ?? (pathname === '/settings' ? '接入 AI' : '工作空间');
+  const title = activeModule?.pages.find(page => page.to === navigationPath(pathname))?.title ?? (pathname === '/settings' ? '接入 AI' : pathname === '/account' ? '账号与订阅' : '工作空间');
   useEffect(() => { setMobileOpen(false); setChatOpen(false); }, [pathname, search]);
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)');
@@ -51,6 +51,7 @@ function Shell() {
     </nav>
     <div className={cn('border-t border-border', compact ? 'p-1.5' : 'p-3')}>
       <Link to="/settings" title="接入 AI" aria-label="接入 AI" aria-current={pathname === '/settings' ? 'page' : undefined} onClick={() => setMobileOpen(false)} className={cn('mb-2 flex min-h-10 items-center gap-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground', compact ? 'justify-center' : 'px-3')}><Cog className="h-4 w-4" />{!compact && '接入 AI'}</Link>
+      <Link to="/account" title="账号与订阅" aria-label="账号与订阅" aria-current={pathname === '/account' ? 'page' : undefined} onClick={() => setMobileOpen(false)} className={cn('mb-2 flex min-h-10 items-center gap-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground', compact ? 'justify-center' : 'px-3')}><UserRound className="h-4 w-4" />{!compact && '账号与订阅'}</Link>
       <div className={cn('flex items-center text-muted-foreground', compact ? 'flex-col gap-3' : 'justify-between gap-2')}>
         <a href="https://q.luckybrother.cc/" target="_blank" rel="noopener noreferrer" aria-label="LGBM量化" title="LGBM量化" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary"><Globe className="h-3.5 w-3.5 shrink-0" />{!compact && <span>LGBM量化</span>}</a>
         <a href="https://www.luckybrother.cc/" target="_blank" rel="noopener noreferrer" aria-label="A股热力图" title="A股热力图" className="flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded text-xs text-primary"><Sparkle className="h-3.5 w-3.5 shrink-0" />{!compact && <span>热力图</span>}</a>
