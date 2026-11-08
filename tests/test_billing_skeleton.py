@@ -150,8 +150,13 @@ def test_router_get_order_and_404(client):
     assert client.get("/api/billing/orders/nope").status_code == 404
 
 
-def test_router_has_no_money_endpoints_yet(client):
-    """骨架阶段刻意不暴露 checkout / webhook / entitlement（§12 后续步骤）。"""
+def test_router_has_no_payment_endpoints_yet(client):
+    """§12-2 未做：checkout / webhook 均不暴露（等 Waffo 官方文档）。"""
     assert client.post("/api/billing/checkout", json={}).status_code == 404
     assert client.post("/api/billing/webhook", json={}).status_code == 404
-    assert client.get("/api/billing/entitlement").status_code == 404
+
+
+def test_entitlement_requires_jwt(client, monkeypatch):
+    """§12-3 新增的 entitlement 端点受 JWT gate 保护，无令牌 401。"""
+    monkeypatch.setenv("ASTOCK_BILLING_JWT_SECRET", "test-secret")
+    assert client.get("/api/billing/entitlement").status_code == 401

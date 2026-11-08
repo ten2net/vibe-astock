@@ -34,7 +34,13 @@ def connect(path: str | Path) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """建表（幂等）。骨架阶段只建 ``orders``；权益/事件表留到后续步骤。"""
+    """建表（幂等，全部 ``IF NOT EXISTS``，老库直接升级）。
+
+    - ``orders``：内部订单（§12-1）
+    - ``entitlements`` / ``credit_ledger``：额度账本（§12-3 内核，同时是 §12-2
+      Webhook「发额度」的落点）
+    - ``webhook_events`` 等留到 Waffo 官方协议确定后再加（§7）。
+    """
     with transaction(conn):
         conn.execute(
             """
@@ -51,6 +57,30 @@ def init_schema(conn: sqlite3.Connection) -> None:
                 waffo_txn_id      TEXT UNIQUE,                     -- 后续步骤回填；唯一约束是幂等种子
                 created_at        TEXT NOT NULL,
                 updated_at        TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS entitlements (
+                user_id     TEXT PRIMARY KEY,
+                credits     INTEGER NOT NULL DEFAULT 0,   -- 当前托管 AI 额度余额
+                tier        TEXT NOT NULL DEFAULT 'community',  -- community / pro
+                expires_at  TEXT,                          -- 订阅到期（积分包购买不设）
+                updated_at  TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_ledger (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                idempotency_key   TEXT NOT NULL UNIQUE,   -- grant-<order_id> / consume-<ref_id>
+                user_id           TEXT NOT NULL,
+                delta             INTEGER NOT NULL,        -- 正=发放，负=扣减
+                reason            TEXT NOT NULL,          -- grant / consume / refund
+                ref_id            TEXT,                   -- 关联订单号 / 请求号，供对账（§7）
+                created_at        TEXT NOT NULL
             )
             """
         )

@@ -185,11 +185,25 @@ Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与
 
 ## 13. 修订记录
 
+### 2026-11-08（协议无关授权额度内核，§12-3 部分）
+
+用户提供 Waffo 官方文档前，先落地不依赖支付协议的部分；**验签/建会话不写假实现**。
+
+- `db.py`：`init_schema` 增 `entitlements`（余额/等级/到期）与 `credit_ledger`（追加式流水，`idempotency_key UNIQUE`），全部 `CREATE IF NOT EXISTS` 老库可直接升级。
+- `entitlement.py`：`grant`（`grant-<order_id>` 幂等，§12-2 发额度落点）、`consume`（`consume-<ref_id>` 幂等，余额不足**整事务回滚**且不落流水、不烧幂等键，§12-3 扣额度落点）、`balance`/`entitlement`、`refund_clawback`。均走 `db.transaction` 原子。
+- `auth.py`：stdlib HS256 JWT（`hmac.compare_digest` 常量时间、`exp` 过期、`alg` 混淆拒绝），密钥取 `ASTOCK_BILLING_JWT_SECRET`，**缺失即报错不硬编码**，不引 PyJWT 等新依赖。仅签发/校验令牌，账号/登录体系仍未设计。
+- `waffo.py`：`parse_amount` 按 §5.4 已知字段名（`chargedAmount`/`listPrice.total`/`refundedAmount`/`originalPayment`/`planPrice`）纯函数解析，**禁止 `amount == total` 断言**；`WebhookVerifier`/`CheckoutClient` 用 `typing.Protocol` 只声明契约，具体实现 pending 官方文档。
+- `router.py`：改单 router 全路径（保持 `/api/billing/*` 不变，可挂 `/api/ai/*`）。新增 `GET /api/billing/entitlement`（需 Bearer JWT）与 `POST /api/ai/echo` **gate 占位**：验 JWT → 原子扣 `AI_CALL_COST` → 返回 stub，额度耗尽 402 引导积分包、**不降级自配 Key 旁路**（§6）；**不调用任何真实大模型**，真实 handler 接 `review_agent` 隔离引擎后替换。
+- 单测 `tests/test_billing_entitlement.py` 21 例（`-m unit`）：JWT 签发/篡改/过期/算法混淆/缺密钥、发放与扣减幂等、余额不足回滚、三类事件金额解析、gate 401/402/幂等/不产建议。`test_billing_skeleton.py` 同步调整为 15 例。
+- **待补（§12-2，等官方文档）**：签名算法/请求头、Webhook 事件外层结构、收银台会话创建端点；`webhook_events` 落库表（§7）、`(订单置已付 + grant)` 同事务、`/checkout` 与 `/webhook` 端点。拿到文档后按真实契约一次补齐。
+- 行为备注：真实 `server.app` 的 SPA fallback 是 GET-only（`server.py:1677`），故对未实现的 `POST /api/billing/checkout` 返回 **405**（GET 返回 404）——这是 server.py 既有行为，非 billing 引入；router 隔离测试里为 404。
+- 回归：全量 1746 passed / 5 pre-existing failed（同 `main` 基线）/ 5 skipped / 2 xfailed；真实 app 开启开关后冒烟通过（JWT→扣 10 额度→entitlement 余额 90）。
+
 ### 2026-11-08（骨架落地，§12-1）
 
 - 新增 `billing/`：`db.py`（SQLite 连接/建表/事务，库落 `ASTOCK_AGENT_HOME/billing/billing.db`）、`products.py`（服务端商品表唯一真源，`resolve` 只收 product_id、不接受前端金额）、`orders.py`（内部订单：下单瞬间快照价格/币种/积分、状态机 pending→paid→refunded、`waffo_txn_id` UNIQUE 作幂等种子）、`router.py`（仅 products / 建待处理订单 / 查订单三个不碰钱端点）。
 - `server.py` 仅加一段 env 开关：`ASTOCK_BILLING_ENABLED=1` 才 `include_router`，**默认关闭**，骨架阶段不改变线上 API 行为；开启后仍受 `_vr_guard` 的 Host 白名单约束（§6 不放宽）。
-- 刻意未做（留 §12-2/3）：Waffo 建会话、Webhook 验签/幂等/发额度、JWT 授权与 `/api/ai/*` gate、前端视图。router 对 `/checkout`、`/webhook`、`/entitlement` 均返回 404。
+- 刻意未做（留 §12-2/3）：Waffo 建会话、Webhook 验签/幂等/发额度、JWT 授权与 `/api/ai/*` gate、前端视图。router 对 `/checkout`、`/webhook` 返回 404。
 - 离线单测 `tests/test_billing_skeleton.py` 14 例（`-m unit`）：商品表唯一真源、**前端篡改 price/credits 被忽略**、未知商品拒绝、状态机非法跳转拒绝、事务回滚、幂等种子、router 端点与「无金钱端点」。
 - 环境说明：本机 FastAPI 0.141 起 `include_router` 以 `_IncludedRouter` 包装挂载，`app.router.routes` 不再平铺计费路由，验证端点须用 `TestClient`；本机 pytest 需 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`（ROS `launch_testing` 插件缺 `lark`）。
 - 全量回归：1729 passed / 5 pre-existing failed（5 例在 `main` 基线同样失败，与本次改动无关）/ 5 skipped / 2 xfailed。
