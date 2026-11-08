@@ -185,6 +185,15 @@ Waffo 自 **2026-09-21** 起 `amount` 变为「通道实际扣款金额」（与
 
 ## 13. 修订记录
 
-### 2026-11-08
+### 2026-11-08（骨架落地，§12-1）
+
+- 新增 `billing/`：`db.py`（SQLite 连接/建表/事务，库落 `ASTOCK_AGENT_HOME/billing/billing.db`）、`products.py`（服务端商品表唯一真源，`resolve` 只收 product_id、不接受前端金额）、`orders.py`（内部订单：下单瞬间快照价格/币种/积分、状态机 pending→paid→refunded、`waffo_txn_id` UNIQUE 作幂等种子）、`router.py`（仅 products / 建待处理订单 / 查订单三个不碰钱端点）。
+- `server.py` 仅加一段 env 开关：`ASTOCK_BILLING_ENABLED=1` 才 `include_router`，**默认关闭**，骨架阶段不改变线上 API 行为；开启后仍受 `_vr_guard` 的 Host 白名单约束（§6 不放宽）。
+- 刻意未做（留 §12-2/3）：Waffo 建会话、Webhook 验签/幂等/发额度、JWT 授权与 `/api/ai/*` gate、前端视图。router 对 `/checkout`、`/webhook`、`/entitlement` 均返回 404。
+- 离线单测 `tests/test_billing_skeleton.py` 14 例（`-m unit`）：商品表唯一真源、**前端篡改 price/credits 被忽略**、未知商品拒绝、状态机非法跳转拒绝、事务回滚、幂等种子、router 端点与「无金钱端点」。
+- 环境说明：本机 FastAPI 0.141 起 `include_router` 以 `_IncludedRouter` 包装挂载，`app.router.routes` 不再平铺计费路由，验证端点须用 `TestClient`；本机 pytest 需 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`（ROS `launch_testing` 插件缺 `lark`）。
+- 全量回归：1729 passed / 5 pre-existing failed（5 例在 `main` 基线同样失败，与本次改动无关）/ 5 skipped / 2 xfailed。
+
+### 2026-11-08（初稿并定稿）
 
 初稿并定稿（用户确认，分支 `feat/v2-paid-edition`）。确认设计对象为当前 v2.1.x 源码基线（非文章作者的 AI 视频站），Waffo 文章定位为收款/支付实现参考。分级、授权、支付流程、金额字段语义、合规约束均按本仓库现状与文章要点落地。

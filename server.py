@@ -292,6 +292,14 @@ def _get_review_agent(_app=app):
 
 app.include_router(review_agent_router(_get_review_agent, _VR_API_KEY))
 
+# v2 付费版 billing 骨架（设计文档 §4 / §12-1）。默认关闭：只有显式设置
+# ASTOCK_BILLING_ENABLED=1 才挂入，骨架阶段不改动现有 API 行为；接上 Waffo
+# 测试环境（§12-2）后再默认开启。
+if os.environ.get("ASTOCK_BILLING_ENABLED", "").strip() == "1":
+    from billing.router import create_router as _create_billing_router
+
+    app.include_router(_create_billing_router())
+
 
 @app.get("/api/astock/health")
 def astock_health():
