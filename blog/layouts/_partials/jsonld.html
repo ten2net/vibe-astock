@@ -1,0 +1,53 @@
+{{- /* JSON-LD 结构化数据（schema.org），给搜索引擎与社交爬虫读。
+       首页 → WebSite；文章页 → BlogPosting。用 dict + jsonify 生成，
+       避免手写 JSON 时中文/引号转义出错。
+       在 head.html 末尾以 {{ partial "jsonld.html" . }} 引入。
+*/ -}}
+{{- $site := .Site -}}
+{{- $base := $site.BaseURL -}}
+{{- $img := "img/home-bg.jpg" | absURL -}}
+{{- $desc := .Params.description | default $site.Params.description -}}
+{{- $publisher := dict
+      "@type" "Organization"
+      "name" $site.Title
+      "url" $base
+      "logo" (dict "@type" "ImageObject" "url" $img)
+-}}
+{{- if .IsHome -}}
+  {{- $web := dict
+        "@context" "https://schema.org"
+        "@type" "WebSite"
+        "name" $site.Title
+        "alternateName" $site.Params.SEOTitle
+        "url" $base
+        "description" $desc
+        "inLanguage" "zh-CN"
+        "publisher" $publisher
+  -}}
+  {{- /* 站点暂未生成可用搜索页；配置了 search_url 才输出 SearchAction，
+         否则会指向 404。留钩子，将来做了搜索页只需在 hugo.toml 加一行。 */ -}}
+  {{- with $site.Params.search_url -}}
+    {{- $web = merge $web (dict "potentialAction" (dict
+          "@type" "SearchAction"
+          "target" (dict "@type" "EntryPoint" "urlTemplate" .)
+          "query-input" "required name=search_term_string")) -}}
+  {{- end -}}
+  <script type="application/ld+json">{{ $web | jsonify | safeJS }}</script>
+{{- else if .IsPage -}}
+  {{- $post := dict
+        "@context" "https://schema.org"
+        "@type" "BlogPosting"
+        "headline" .Title
+        "description" $desc
+        "url" .Permalink
+        "mainEntityOfPage" (dict "@type" "WebPage" "@id" .Permalink)
+        "datePublished" (.Date.Format "2006-01-02T15:04:05-07:00")
+        "dateModified" (.Lastmod.Format "2006-01-02T15:04:05-07:00")
+        "inLanguage" "zh-CN"
+        "image" $img
+        "author" $publisher
+        "publisher" $publisher
+  -}}
+  {{- with .Params.tags -}}{{- $post = merge $post (dict "keywords" (delimit . ",")) -}}{{- end -}}
+  <script type="application/ld+json">{{ $post | jsonify | safeJS }}</script>
+{{- end -}}

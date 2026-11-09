@@ -19,54 +19,44 @@
     })();
     </script>
 
-    <!-- start ogp -->
+    <!-- start ogp / SEO 元数据
+         站点级标题用 .Site.Title / .Site.Params.SEOTitle，页面标题用 .Title。
+         （旧版误用 .Params.title / .Params.summary，导致首页 og:title 为空、
+          twitter:card 被塞成整段摘要；分享出去没有卡片。） -->
+    {{- $isHome := .IsHome -}}
+    {{- $pageTitle := cond $isHome .Site.Params.SEOTitle .Title -}}
+    {{- $desc := .Params.description | default .Site.Params.description -}}
+    {{- $shareImage := "img/home-bg.jpg" | absURL -}}
     <meta property="og:site_name" content="{{ .Site.Title }}">
-    <meta property="og:type" content="article">
-
-    {{ if .Params.thumbnail }}
-    <meta property="og:image" content="{{ .Site.BaseURL }}{{ .Params.thumbnail }}">
-    <meta property="twitter:image" content="{{ .Site.BaseURL }}{{ .Params.thumbnail }}" />
-    {{ else if .Params.image}}
-    <meta property="og:image" content="{{ .Site.BaseURL }}{{ .Params.image }}">
-    <meta property="twitter:image" content="{{ .Site.BaseURL }}{{ .Params.image }}" />
-    {{ else }}
-    <meta property="og:image" content="{{ .Site.BaseURL }}/{{ .Site.Params.header_image }}">
-    <meta property="twitter:image" content="{{ .Site.BaseURL }}/{{ .Site.Params.header_image }}" />
-    {{ end }}
-
-    {{ if .Params.title }}
-    <meta name="title" content="{{ .Params.title }}" />
-    <meta property="og:title" content="{{ .Params.title }}" />
-    <meta property="twitter:title" content="{{ .Params.title }}" />
-    {{ else }}
-    <meta name="title" content="{{ .Site.Params.title }}" />
-    <meta property="og:title" content="{{ .Site.Params.title }}" />
-    <meta property="twitter:title" content="{{ .Site.Params.title }}" />
-    {{ end }}
-
-    {{ if .Params.description }}
-    <meta name="description" content="{{ .Params.description }}">
-    <meta property="og:description" content="{{ .Params.description }}" />
-    <meta property="twitter:description" content="{{ .Params.description }}" />
-    {{ else }}
-    <meta name="description" content="{{ .Site.Params.description }}">
-    <meta property="og:description" content="{{ .Site.Params.description }}" />
-    <meta property="twitter:description" content="{{ .Site.Params.description }}" />
-    {{ end }}
-
+    <meta property="og:type" content="{{ cond $isHome "website" "article" }}">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="{{ $shareImage }}">
+    <meta property="twitter:image" content="{{ $shareImage }}" />
+    <meta name="title" content="{{ $pageTitle }}" />
+    <meta property="og:title" content="{{ $pageTitle }}" />
+    <meta property="twitter:title" content="{{ $pageTitle }}" />
+    <meta name="description" content="{{ $desc }}">
+    <meta property="og:description" content="{{ $desc }}" />
+    <meta property="twitter:description" content="{{ $desc }}" />
     <meta property="og:url" content="{{ .Permalink }}" />
-
-    {{ if .Params.summary }}
-    <meta property="twitter:card" content="{{ .Params.summary }}" />
-    {{ else }}
-    <meta property="twitter:card" content="summary" />
-    {{ end }}
+    <meta property="twitter:card" content="summary_large_image" />
+    {{- if not $isHome }}
+    {{- /* 时间戳里的 + 在 HTML 属性上下文会被 Hugo 转成 &#43;（safeHTML/safeHTMLAttr
+           都挡不住），故整行用 printf + safeHTML 输出，保证 ISO 8601 原样。 */ -}}
+    {{- $pub := .Date.Format "2006-01-02T15:04:05-07:00" -}}
+    {{- $mod := .Lastmod.Format "2006-01-02T15:04:05-07:00" -}}
+    {{ printf `<meta property="article:published_time" content="%s">` $pub | safeHTML }}
+    {{ printf `<meta property="article:modified_time" content="%s">` $mod | safeHTML }}
+    {{- range .Params.tags }}<meta property="article:tag" content="{{ . }}">{{ end }}
+    {{- end }}
     <!-- end ogp -->
 
     <meta name="keyword"  content="{{ .Site.Params.keyword }}">
     <link rel="shortcut icon" href="{{ "img/favicon.ico" | relURL }}">
 
-    <title>{{ if .Title }}{{ .Title }} | {{ .Site.Params.SEOTitle }}{{ else }}{{ .Site.Params.SEOTitle }}{{ end }}</title>
+    {{- /* 首页直接用品牌串（不叠加站点名，否则「揽宝.复盘 | 揽宝.复盘 | 揽宝投研」）；
+          文章/列表页用「页面标题 | 站点名」。 */ -}}
+    <title>{{ if .IsHome }}{{ .Site.Params.SEOTitle }}{{ else }}{{ .Title }} | {{ .Site.Title }}{{ end }}</title>
 
     <link rel="canonical" href="{{ .RelPermalink }}">
 
@@ -124,6 +114,7 @@
     <script src="{{ . | absURL }}"></script>
     {{ end }}
 
+    {{ partial "jsonld.html" . }}
 </head>
 
 {{ if .Site.Config.Services.GoogleAnalytics.ID }}
