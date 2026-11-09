@@ -3,6 +3,7 @@
 由 Vibe AStock 的 `scripts/publish_review.py` 写入与构建，**不要手改**这里生成出来的页面：
 
 - `content/post/YYYY-MM-DD-每日复盘.md`：每天一篇文章，从本机已核对的复盘产物转写
+- `static/cards/YYYY-MM-DD.png` + `latest.png`：每天一张情绪卡片图（社交平台 OG 头图），由生成器产出
 - `public/`：`hugo` 的构建产物（会被同步到 Pages 仓库），已在 .gitignore 里
 
 手动预览：
@@ -15,8 +16,9 @@ hugo server -D          # 打开 http://127.0.0.1:1313/
 
 ```bash
 cd <仓库根>
-.venv/bin/python scripts/publish_review.py            # 写 md → hugo 构建 → 推 Pages
-.venv/bin/python scripts/publish_review.py --dry-run  # 只写 md 与构建，不推
+.venv/bin/python scripts/publish_review.py            # 写 md → 生成卡片 → hugo 构建 → 推 Pages
+.venv/bin/python scripts/publish_review.py --dry-run  # 只写 md + 生成卡片，不构建、不推
+.venv/bin/python scripts/gen_emotion_cards.py         # 单独重生成/预览卡片（一般不必）
 ```
 ## 订阅源（发布后自动分发的入口）
 
@@ -32,6 +34,31 @@ cd <仓库根>
 - 三个文件都在 `review_agent/blog_publish.py` 的 `OWNED_FILES` 里，发布时会同步到 Pages；少列一个线上就是 404。
 - `<head>` 里的 `rel="alternate"` 自动发现链接写在主题 `themes/cleanwhite/layouts/_partials/head.html`（本地定制点，换主题要带上）。
 - 日期字符串的 `+0800` / `+08:00` 用 `safeHTML` 输出，不能被转义成 `&#43;`。
+
+## 情绪卡片图（社交平台头图）
+
+`review_agent/emotion_card.py` 用 **Pillow** 把每日复盘渲染成 `1200×630` PNG：
+情绪档位大字 + 涨停家数 / 晋级率 / 炸板率三读数 + 免责声明小字，落在
+`static/cards/<date>.png`，另出 `static/cards/latest.png`（最新一天）。
+
+- 数据来源 `~/.duanxian-agents/reviews/YYYY-MM-DD.json`：
+  `focus.emotion_phase`、`emotion_metrics.promotion.limit_up_count`（缺则回退
+  `market_facts.seal_quality.total`）、`promotion.overall.rate`、
+  `market_facts.seal_quality.broken_rate`（两个率是 0~1 小数，×100 显示）。
+  缺数据写「—」，不写 0、不编造。
+- 字体统一用 **Noto Sans CJK SC**（`NotoSansCJK-{Bold,Regular}.ttc` 的 `index=2`）。
+  实测 `DroidSansFallbackFull.ttf` 缺 ASCII 数字 / `·` / `→` 的字形，会把
+  `2026-11-06` 画成一排豆腐块，故不用。
+- **发布自动接入**：`blog_publish.publish()` 在写 md 之后、hugo 之前调用
+  `emotion_card.generate()`（dry-run 也会生成，可本地预览）；`OWNED_DIRS` 含
+  `cards`，`sync_public` 才会把 PNG 同步到 Pages。图片是增强项，缺 Pillow/字体/
+  坏数据都只记 log 并跳过，绝不阻断复盘正文发布。
+- **OG 接入**：`layouts/_partials/og-image.html` 统一决定分享图 URL，被
+  `head.html`（`og:image` / `twitter:image`）与 `jsonld.html`（`image` / `logo`）共用：
+  首页 → `/cards/latest.png`、文章 → `/cards/<date>.png`，**文件不存在则回退
+  `img/home-bg.jpg`**，避免 og:image 指向 404。用 Hugo `fileExists "static/cards/..."` 判断。
+- 单独生成：`scripts/gen_emotion_cards.py`（支持 `--date` / `--reviews` / `--out`）。
+- 回归：`tests/test_emotion_card.py`（抽数/渲染/批量/发布钩子/同步清单）。
 
 ## SEO / 社交分享元数据
 
@@ -49,6 +76,7 @@ cd <仓库根>
 - 复盘卡片与表格样式在 `static/css/astock.css`，通过 `custom_css` 挂载；换主题只需改 `theme` 与这个样式文件，文章内容不用动
 - 头图 `static/img/home-bg.jpg` 取自主题示例，可自行替换成自家图
 - **本地定制点**（同步上游主题时逐文件合并，别整目录覆盖）：
-  - `themes/cleanwhite/layouts/_partials/head.html`：三行 feed 自动发现 link + 整块 SEO 元数据重写 + `partial "jsonld.html"` 引入
+  - `themes/cleanwhite/layouts/_partials/head.html`：三行 feed 自动发现 link + 整块 SEO 元数据重写 + `partial "jsonld.html"` / `partial "og-image.html"` 引入
   - `layouts/index.rssxml.xml` / `layouts/index.atomxml.xml`：站点级自定义 feed 模板
   - `layouts/_partials/jsonld.html`：站点级 JSON-LD partial
+  - `layouts/_partials/og-image.html`：分享图 URL 选择（卡片图 / 缺图回退）

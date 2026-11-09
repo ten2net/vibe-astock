@@ -37,3 +37,7 @@ baostock>=0.8.9
 # 成交额榜降级源：东财 clist 对无凭据请求会直接掐连接，部分网络下完全取不到数。
 # 配 TUSHARE_TOKEN 后可自动降级（不配也能跑，只是榜会空）。需要 Tushare 积分权限。
 tushare>=1.4
+
+# 情绪卡片图生成器（review_agent/emotion_card.py）：把每日复盘的情绪档位与
+# 三个读数渲染成 1200×630 PNG，作社交平台 OG 头图。用系统中文字体，无浏览器依赖。
+Pillow>=10

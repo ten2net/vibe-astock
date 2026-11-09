@@ -5,7 +5,8 @@
 */ -}}
 {{- $site := .Site -}}
 {{- $base := $site.BaseURL -}}
-{{- $img := "img/home-bg.jpg" | absURL -}}
+{{- /* 与 head.html 的 og:image 共用同一选择逻辑（含缺图回退）。 */ -}}
+{{- $img := partial "og-image.html" . -}}
 {{- $desc := .Params.description | default $site.Params.description -}}
 {{- $publisher := dict
       "@type" "Organization"

@@ -26,7 +26,9 @@
     {{- $isHome := .IsHome -}}
     {{- $pageTitle := cond $isHome .Site.Params.SEOTitle .Title -}}
     {{- $desc := .Params.description | default .Site.Params.description -}}
-    {{- $shareImage := "img/home-bg.jpg" | absURL -}}
+    {{- /* 卡片图（每篇一张 / 首页 latest），缺图回退默认头图。
+           逻辑集中在 layouts/_partials/og-image.html，与 JSON-LD 共用。 */ -}}
+    {{- $shareImage := partial "og-image.html" . -}}
     <meta property="og:site_name" content="{{ .Site.Title }}">
     <meta property="og:type" content="{{ cond $isHome "website" "article" }}">
     <meta property="og:locale" content="zh_CN">

@@ -1523,7 +1523,9 @@ def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], No
 
 # 站上这些路径归本工具所有：同步时删掉仓库里有、本次构建没有的页面
 # 主题自带的样式、脚本、字体与图片一起同步：少了它们，线上页面就是裸 HTML
-OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts", "reward", "search")
+# "cards" 是情绪卡片图（blog/static/cards/ → public/cards/），缺了它 sync_public
+# 会跳过这些 PNG，社交平台 og:image 就全指向 404。
+OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts", "reward", "search", "cards")
 # 三个订阅源都要发：index.xml 是 Hugo 内置默认 RSS，rss.xml / atom.xml 是
 # 「发布后自动分发」管道依赖的固定入口（缺了它们线上就是 404）。
 OWNED_FILES = ("index.html", "index.xml", "rss.xml", "atom.xml",
@@ -1670,6 +1672,21 @@ def publish(
                                      keep_others=bool(date) or min_days > 0)
     if not list((Path(site_dir) / "content" / "post").glob("*-每日复盘.md")):
         raise PublishError("没有任何一份复盘能发布（都未通过公开检查）")
+
+    # 情绪卡片图（社交平台 og:image）：写 md 之后、hugo 之前生成，这样 dry-run
+    # 也能本地预览，正式发布会随 public/cards/ 同步到 Pages。生成全部已有复盘，
+    # 不只本次 dates——站上历史文章的 og:image 也要指向各自那天的卡片。
+    # 图片是增强项：缺 Pillow/字体/坏数据由 generate() 内部降级并记 log，
+    # 这里再兜一层，绝不让卡片问题阻断复盘正文的发布。
+    try:
+        from . import emotion_card  # 函数内 import，避免与 emotion_card 的模块级循环
+
+        cards_dir = Path(site_dir) / "static" / "cards"
+        emotion_card.generate(reviews, cards_dir,
+                              dates=emotion_card.iter_review_dates(reviews), log=log)
+    except Exception as exc:  # noqa: BLE001  增强项失败不阻断主流程
+        log(f"情绪卡片：生成环节异常，已跳过（{type(exc).__name__}: {exc}）")
+
     # skipped 是内容没变、没重写的旧 md；只有全部刷新时才可能与站上页面不一致
     result = PublishResult(written=written, removed=skipped if date is None and not min_days else [],
                            url=f"https://{repo.split('/')[0]}.github.io/post/")

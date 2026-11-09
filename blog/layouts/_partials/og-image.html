@@ -1,0 +1,18 @@
+{{- /* 返回本页应使用的社交分享图 URL（纯字符串，无 HTML）。
+       首页 → /cards/latest.png；文章/页面 → /cards/<YYYY-MM-DD>.png；
+       文件不存在（比如某天没生成卡片）→ 回退默认头图 img/home-bg.jpg。
+       head.html 的 og:image / twitter:image 与 jsonld.html 的 image/logo 共用此逻辑，
+       避免两处不一致、也避免 og:image 指向 404。
+*/ -}}
+{{- $fallback := "img/home-bg.jpg" | absURL -}}
+{{- $candidate := "" -}}
+{{- if .IsHome -}}
+  {{- $candidate = "cards/latest.png" -}}
+{{- else -}}
+  {{- $candidate = printf "cards/%s.png" (.Date.Format "2006-01-02") -}}
+{{- end -}}
+{{- if fileExists (printf "static/%s" $candidate) -}}
+  {{- $candidate | absURL -}}
+{{- else -}}
+  {{- $fallback -}}
+{{- end -}}
