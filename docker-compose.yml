@@ -226,6 +226,9 @@ services:
       VR_DATA_DIR: /data/market
       # GitHub Pages 仓库写权限令牌；没配就在这里由 .env 提供，配错了发布直接失败并打印原因
       ASTOCK_PAGES_TOKEN: ${ASTOCK_PAGES_TOKEN:-}
+      # 社媒分发凭据也走 .env（TG_BOT_TOKEN / TG_CHAT_ID / X_API_KEY / X_API_SECRET /
+      # X_ACCESS_TOKEN / X_ACCESS_SECRET）。publish_review.py 在 Pages 推送成功后自动分发；
+      # 哪个平台凭据没配就跳过哪个，不影响博客/卡片发布；雪球只出图文包不发帖。
       # 容器里直连 github.com:443 会被拦（连接超时），必须走代理；git 认的是小写
       # https_proxy，所以这里按 compose 的默认展开规则取宿主环境里的代理地址。
       # 部署机代理不同时改这两行即可。

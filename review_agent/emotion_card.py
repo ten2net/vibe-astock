@@ -29,7 +29,8 @@ from typing import Callable
 
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
-WIDTH, HEIGHT = 1200, 630  # 社交平台 OG 标准尺寸
+WIDTH, HEIGHT = 1200, 630           # 横版：社交平台 OG 标准尺寸（链接预览用）
+V_WIDTH, V_HEIGHT = 1080, 1350      # 竖版：手机信息流发图（X/TG/雪球）
 
 # 免责声明（口径同 blog_publish.DISCLAIMER）
 DISCLAIMER = (
@@ -238,15 +239,114 @@ def render_card(metrics: CardMetrics, out_path: Path | str) -> Path:
     return out
 
 
+def _qr_image(url: str, size: int) -> "object | None":
+    """把 URL 编成二维码 PIL 图；缺 qrcode 库返回 None（竖版降级为无码，不报错）。"""
+    try:
+        import qrcode
+        from qrcode.image.pil import PilImage
+    except ImportError:
+        return None
+    qr = qrcode.QRCode(version=None, box_size=8, border=1,
+                       error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(url)
+    qr.make(fit=True)
+    im = qr.make_image(image_factory=PilImage).convert("RGB")
+    return im.resize((size, size))
+
+
+def render_card_vertical(metrics: CardMetrics, out_path: Path | str,
+                         *, go_url: str | None = None) -> Path:
+    """画一张 1080×1350 竖版社媒图（信息流发图用）。
+
+    与横版区别：档位更大、三读数竖排、底部带短链文字 + 二维码 +「扫码看全文」CTA。
+    二维码指向 ``go_url``（缺省用 tg 平台的 /go/ 跳页）；缺 qrcode 库时跳过二维码。
+    """
+    from PIL import Image, ImageDraw
+
+    if go_url is None:
+        from . import social_links  # 局部 import，避免模块级循环
+        go_url = social_links.go_url("tg", metrics.date)
+
+    font_big = _load_font(176, bold=True)
+    font_title = _load_font(38, bold=True)
+    font_label = _load_font(30, bold=False)
+    font_value = _load_font(68, bold=True)   # 太大就会压到卡片底部的小注
+    font_note = _load_font(24, bold=False)
+    font_disclaimer = _load_font(20, bold=False)
+    font_cta = _load_font(28, bold=True)
+
+    img = _gradient((V_WIDTH, V_HEIGHT))
+    d = ImageDraw.Draw(img)
+    pad = 72
+
+    # 顶部：品牌 + 日期
+    d.text((pad, 56), "揽宝.复盘", font=font_title, fill=ACCENT)
+    tw = d.textlength(metrics.date, font=font_label)
+    d.text((V_WIDTH - pad - tw, 64), metrics.date, font=font_label, fill=LABEL_COLOR)
+    d.line([(pad, 130), (V_WIDTH - pad, 130)], fill=ACCENT, width=4)
+
+    # 情绪档位大字
+    d.text((pad, 176), "情绪档位", font=font_label, fill=LABEL_COLOR)
+    d.text((pad, 226), metrics.phase, font=font_big, fill=PHASE_COLOR)
+    d.text((pad, 436), "分析框架 · 非客观事实", font=font_note, fill=NOTE_COLOR)
+
+    # 三读数竖排（每张占满宽度）
+    cards = [
+        ("涨停家数", metrics.limit_up, "当日涨停池样本"),
+        ("晋级率", metrics.promote_rate, "昨日涨停 → 今日"),
+        ("炸板率", metrics.broken_rate, "封板质量口径"),
+    ]
+    top, card_h, gap = 510, 176, 11
+    for i, (label, value, sub) in enumerate(cards):
+        y0 = top + i * (card_h + gap)
+        d.rounded_rectangle([(pad, y0), (V_WIDTH - pad, y0 + card_h)],
+                            radius=20, fill=CARD_BG)
+        d.text((pad + 32, y0 + 14), label, font=font_label, fill=LABEL_COLOR)
+        d.text((pad + 32, y0 + 54), value, font=font_value, fill=VALUE_COLOR)
+        d.text((pad + 32, y0 + 140), sub, font=font_note, fill=NOTE_COLOR)
+
+    # 底部：二维码 + 短链 + CTA
+    qr_size = 180
+    qr = _qr_image(go_url, qr_size)
+    cta_y = 1090
+    if qr is not None:
+        img.paste(qr, (V_WIDTH - pad - qr_size, cta_y))
+        d = ImageDraw.Draw(img)  # paste 后重建 draw
+    text_x = pad
+    text_w = V_WIDTH - 2 * pad - (qr_size + 24 if qr is not None else 0)
+    d.text((text_x, cta_y + 16), "扫码看全文", font=font_cta, fill=ACCENT)
+    short = go_url.replace("https://", "")
+    short_lines = _wrap(d, short, font_note, text_w)[:2]
+    sy = cta_y + 62
+    for ln in short_lines:
+        d.text((text_x, sy), ln, font=font_note, fill=LABEL_COLOR)
+        sy += 30
+    # 免责声明（最多 2 行）
+    lines = _wrap(d, DISCLAIMER, font_disclaimer, V_WIDTH - 2 * pad)[:2]
+    y = V_HEIGHT - 32 - len(lines) * 28
+    for ln in lines:
+        d.text((pad, y), ln, font=font_disclaimer, fill=DISCLAIMER_COLOR)
+        y += 28
+
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, format="PNG", optimize=True)
+    return out
+
+
 # ---------------------------------------------------------------- 批量生成
 
 def generate(reviews_dir: Path | str, out_dir: Path | str,
              *, dates: list[str] | None = None,
+             vertical: bool = True,
              log: Callable[[str], None] = lambda _m: None) -> list[Path]:
-    """按日期批量生成卡片，另出一张 latest.png（取最新日期）。
+    """按日期批量生成卡片。
 
-    返回成功写出的路径列表。**任何单篇失败只记 log 并跳过**，不让整个发布失败
-    （缺字体/缺 Pillow/坏 json 都属增强项故障）。
+    横版（OG 用，文件名契约不变）：``<date>.png`` + ``latest.png``。
+    竖版（社媒发图用）：``<date>-vertical.png`` + ``latest-vertical.png``。
+
+    返回成功写出的路径列表。**任何单篇/单形态失败只记 log 并跳过**，不让整个发布
+    失败（缺字体/缺 Pillow/缺 qrcode/坏 json 都属增强项故障）；竖版失败不影响横版。
     """
     try:
         from PIL import Image  # noqa: F401  仅探测可用性
@@ -269,20 +369,38 @@ def generate(reviews_dir: Path | str, out_dir: Path | str,
         try:
             payload = json.loads(src.read_text(encoding="utf-8"))
             metrics = extract_metrics(payload, date)
-            render_card(metrics, out / f"{date}.png")
-        except (OSError, ValueError, CardError) as exc:
-            log(f"情绪卡片：{date} 生成失败，跳过（{exc}）")
+        except (OSError, ValueError) as exc:
+            log(f"情绪卡片：{date} 读取失败，跳过（{exc}）")
             continue
-        written.append(out / f"{date}.png")
+
+        # 横版（OG 契约，不能因竖版失败而缺失）
+        try:
+            render_card(metrics, out / f"{date}.png")
+            written.append(out / f"{date}.png")
+        except (OSError, CardError) as exc:
+            log(f"情绪卡片：{date} 横版生成失败，跳过（{exc}）")
+        # 竖版（社媒发图，独立降级）
+        if vertical:
+            try:
+                render_card_vertical(metrics, out / f"{date}-vertical.png")
+                written.append(out / f"{date}-vertical.png")
+            except (OSError, CardError, ValueError) as exc:
+                log(f"情绪卡片：{date} 竖版生成失败，跳过（{exc}）")
         if date > latest_date:
             latest_date, latest_metrics = date, metrics
 
-    # latest.png：优先用刚生成的最新一张复制，避免重复渲染
+    # latest：取最新一天，横竖各一张
     if latest_metrics is not None:
         try:
             render_card(latest_metrics, out / "latest.png")
             written.append(out / "latest.png")
         except (OSError, CardError) as exc:
             log(f"情绪卡片：latest.png 生成失败（{exc}）")
+        if vertical:
+            try:
+                render_card_vertical(latest_metrics, out / "latest-vertical.png")
+                written.append(out / "latest-vertical.png")
+            except (OSError, CardError, ValueError) as exc:
+                log(f"情绪卡片：latest-vertical.png 生成失败（{exc}）")
     log(f"情绪卡片：生成 {len(written)} 张到 {out}")
     return written

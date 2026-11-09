@@ -58,7 +58,35 @@ cd <仓库根>
   首页 → `/cards/latest.png`、文章 → `/cards/<date>.png`，**文件不存在则回退
   `img/home-bg.jpg`**，避免 og:image 指向 404。用 Hugo `fileExists "static/cards/..."` 判断。
 - 单独生成：`scripts/gen_emotion_cards.py`（支持 `--date` / `--reviews` / `--out`）。
-- 回归：`tests/test_emotion_card.py`（抽数/渲染/批量/发布钩子/同步清单）。
+- **竖版社媒图**：同一模块 `render_card_vertical()` 出 `1080×1350`（手机信息流发图），
+  底部带 UTM 短链文字 + 二维码（`qrcode[pil]`）+「扫码看全文」CTA；横版仍专供 OG。
+  文件名 `<date>-vertical.png` / `latest-vertical.png`。缺 qrcode 库只跳过二维码、不报错。
+- 回归：`tests/test_emotion_card.py`（抽数/横竖渲染/二维码/批量/发布钩子/同步清单）。
+
+## 社媒自动分发（X / Telegram / 雪球）
+
+设计文档：`docs/superpowers/specs/2026-11-09-social-distribution-design.md`。
+
+- **X / TG 默认自动发帖**，**雪球半自动**（无官方发帖 API，只生成图文包人工粘贴，
+  不做浏览器自动化）。凭据未配 / 接口失败 / 限流一律记日志跳过，**不阻断博客发布**。
+- **UTM 短链**：`review_agent/social_links.py` 生成 `/go/<platform>/<date>/` 跳页
+  （meta refresh → 带 `utm_source` / `utm_medium=social` / `utm_campaign=<date>` 的文章
+  URL）。零外部服务、可离线验证。`OWNED_DIRS` 含 `go`，跳页才会同步到 Pages。
+- **分发模块**：`review_agent/social_publish.py` + `scripts/social_daily.py`
+  （`--dry-run` / `--date` / `--platform`）。平台专属 caption（X ≤280 字符）、
+  合规闸门、发帖台账 `~/.duanxian-agents/social-posts.json`（`date:platform` 幂等，
+  帖子不可撤回重发）、雪球图文包 `static/social/packs/<date>/`。
+- **合规红线**：caption 与原始复盘都过不荐股闸门（`check_public_text` +
+  `has_trade_recommendation`）。注意 `has_trade_recommendation(DISCLAIMER)` 会命中
+  「不推荐个股」等产品口径词，所以扫 caption 时**必须先剔除免责声明**再扫。
+- **凭据**（只从 env 读、不进日志）：`TG_BOT_TOKEN` / `TG_CHAT_ID`；
+  `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_SECRET`。
+  缺哪个平台就跳过哪个。雪球不需要凭据。
+- **发布顺序**：`publish()` 在 Pages **推送成功之后**才分发（文章/短链已上线，
+  帖子里的链接才不会 404），只发最新一篇（避免首次接入把历史全发一遍）。
+  dry-run 只生成跳页/竖图/合规检查，**不调任何平台 API、不写成功台账**。
+- 回归：`tests/test_social_distribution.py`（跳页 UTM、竖图二维码、caption 合规、
+  台账幂等、dry-run 零 API、失败不阻断、发布钩子）。
 
 ## SEO / 社交分享元数据
 

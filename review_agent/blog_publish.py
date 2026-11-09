@@ -1523,9 +1523,10 @@ def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], No
 
 # 站上这些路径归本工具所有：同步时删掉仓库里有、本次构建没有的页面
 # 主题自带的样式、脚本、字体与图片一起同步：少了它们，线上页面就是裸 HTML
-# "cards" 是情绪卡片图（blog/static/cards/ → public/cards/），缺了它 sync_public
-# 会跳过这些 PNG，社交平台 og:image 就全指向 404。
-OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts", "reward", "search", "cards")
+# "cards" 情绪卡片图（og:image）、"go" UTM 跳页、"social" 雪球图文包：
+# 缺了它们 sync_public 会跳过，线上 og:image / 短链就指向 404。
+OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts",
+              "reward", "search", "cards", "go", "social")
 # 三个订阅源都要发：index.xml 是 Hugo 内置默认 RSS，rss.xml / atom.xml 是
 # 「发布后自动分发」管道依赖的固定入口（缺了它们线上就是 404）。
 OWNED_FILES = ("index.html", "index.xml", "rss.xml", "atom.xml",
@@ -1679,13 +1680,15 @@ def publish(
     # 图片是增强项：缺 Pillow/字体/坏数据由 generate() 内部降级并记 log，
     # 这里再兜一层，绝不让卡片问题阻断复盘正文的发布。
     try:
-        from . import emotion_card  # 函数内 import，避免与 emotion_card 的模块级循环
+        from . import emotion_card, social_links  # 函数内 import，避免模块级循环
 
         cards_dir = Path(site_dir) / "static" / "cards"
-        emotion_card.generate(reviews, cards_dir,
-                              dates=emotion_card.iter_review_dates(reviews), log=log)
+        all_dates = emotion_card.iter_review_dates(reviews)
+        emotion_card.generate(reviews, cards_dir, dates=all_dates, log=log)
+        # UTM 跳页：同样按全部已发布文章生成，站上历史文章的短链也要可用
+        social_links.go_pages(Path(site_dir) / "static" / "go", all_dates, log=log)
     except Exception as exc:  # noqa: BLE001  增强项失败不阻断主流程
-        log(f"情绪卡片：生成环节异常，已跳过（{type(exc).__name__}: {exc}）")
+        log(f"情绪卡片/跳页：生成环节异常，已跳过（{type(exc).__name__}: {exc}）")
 
     # skipped 是内容没变、没重写的旧 md；只有全部刷新时才可能与站上页面不一致
     result = PublishResult(written=written, removed=skipped if date is None and not min_days else [],
@@ -1737,6 +1740,24 @@ def publish(
         if push:
             _run(["git", "push", "origin", f"HEAD:{branch}"], cwd=tmp)
             result.pushed = True
+
+        # 社媒分发放在 Pages 推送成功之后：文章/短链已上线，帖子里的链接才不会 404。
+        # 只发最新一篇（避免首次接入把全部历史重发一遍）；X/TG 默认自动、雪球出图文包；
+        # 合规/台账/失败跳过都在 distribute() 内部处理。增强项，任何意外都不阻断主流程。
+        try:
+            from . import social_publish  # 函数内 import，避免模块级循环
+
+            latest = dates[0] if dates else ""
+            if latest:
+                social_publish.distribute(
+                    latest, load_review(reviews, latest),
+                    reviews_dir=reviews,
+                    cards_dir=Path(site_dir) / "static" / "cards",
+                    packs_dir=Path(site_dir) / "static" / "social" / "packs",
+                    log=log,
+                )
+        except Exception as exc:  # noqa: BLE001  社媒失败不阻断主流程
+            log(f"社媒分发：环节异常，已跳过（{type(exc).__name__}: {exc}）")
         return result
     finally:
         if owned:

@@ -99,9 +99,42 @@ def test_generate_writes_per_date_and_latest(tmp_path):
     logs = []
     written = ec.generate(reviews, out, log=lambda m: logs.append(m))
     names = {p.name for p in written}
-    assert names == {"2026-11-05.png", "2026-11-06.png", "latest.png"}
+    # 横版（OG 契约）+ 竖版（社媒发图），横竖各出 latest
+    assert names == {
+        "2026-11-05.png", "2026-11-06.png", "latest.png",
+        "2026-11-05-vertical.png", "2026-11-06-vertical.png", "latest-vertical.png",
+    }
     assert (out / "latest.png").read_bytes() == (out / "2026-11-06.png").read_bytes()
+    assert (out / "latest-vertical.png").read_bytes() == (out / "2026-11-06-vertical.png").read_bytes()
     assert any("情绪卡片" in m for m in logs)
+
+
+def test_generate_vertical_false_keeps_og_contract(tmp_path):
+    """vertical=False 时只出横版，供只想刷 OG 图的场景（向后兼容）。"""
+    reviews, out = tmp_path / "reviews", tmp_path / "cards"
+    reviews.mkdir()
+    (reviews / "2026-11-06.json").write_text(json.dumps(payload()), encoding="utf-8")
+    written = ec.generate(reviews, out, dates=["2026-11-06"], vertical=False,
+                          log=lambda _m: None)
+    assert {p.name for p in written} == {"2026-11-06.png", "latest.png"}
+
+
+def test_render_card_vertical_is_1080x1350_with_qr(tmp_path):
+    from PIL import Image
+
+    out = tmp_path / "v.png"
+    ec.render_card_vertical(ec.extract_metrics(payload(), DATE), out,
+                            go_url="https://ten2net.github.io/go/tg/2026-11-06/")
+    with Image.open(out) as im:
+        assert im.size == (ec.V_WIDTH, ec.V_HEIGHT) == (1080, 1350)
+        assert im.format == "PNG"
+
+
+def test_qr_image_encodes_url_and_degrades_without_lib(tmp_path):
+    """有 qrcode 库时产出可解码尺寸的图；缺库返回 None 不抛。"""
+    img = ec._qr_image("https://ten2net.github.io/go/tg/2026-11-06/", 180)
+    if img is not None:  # 装了 qrcode 才有
+        assert img.size == (180, 180)
 
 
 def test_generate_skips_bad_json_without_crashing(tmp_path):
