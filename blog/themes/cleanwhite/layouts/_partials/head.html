@@ -70,6 +70,12 @@
 
     <link rel="canonical" href="{{ .RelPermalink }}">
 
+    <!-- Feed 自动发现：发布后自动分发管道 / 阅读器靠这三个 link 找到订阅源。
+         固定文件名，别换成 index.xml；换主题时把这段一起带过去。 -->
+    <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }} (RSS)" href="{{ "rss.xml" | absURL }}">
+    <link rel="alternate" type="application/atom+xml" title="{{ .Site.Title }} (Atom)" href="{{ "atom.xml" | absURL }}">
+    <link rel="alternate" type="application/rss+xml" title="{{ .Site.Title }} (RSS, 默认)" href="{{ "index.xml" | absURL }}">
+
     {{ if .Site.Params.disqus_proxy }}
     <link rel="stylesheet" href="{{ "css/iDisqus.min.css" | relURL }}"/>
     {{ end }}

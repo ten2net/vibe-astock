@@ -1524,7 +1524,10 @@ def build(site_dir: Path | str, hugo: str | None = None, log: Callable[[str], No
 # 站上这些路径归本工具所有：同步时删掉仓库里有、本次构建没有的页面
 # 主题自带的样式、脚本、字体与图片一起同步：少了它们，线上页面就是裸 HTML
 OWNED_DIRS = ("post", "tags", "page", "css", "js", "webfonts", "img", "fonts", "reward", "search")
-OWNED_FILES = ("index.html", "index.xml", "sitemap.xml", "404.html", "robots.txt")
+# 三个订阅源都要发：index.xml 是 Hugo 内置默认 RSS，rss.xml / atom.xml 是
+# 「发布后自动分发」管道依赖的固定入口（缺了它们线上就是 404）。
+OWNED_FILES = ("index.html", "index.xml", "rss.xml", "atom.xml",
+               "sitemap.xml", "404.html", "robots.txt")
 # 上一版「静态页补丁」留下的自有路径：发布时清掉，站上原有文件不在其中
 LEGACY_PATHS = ("reviews", "year", "month", "date", "astock", "astock-feed.xml", "deploy.json")
 

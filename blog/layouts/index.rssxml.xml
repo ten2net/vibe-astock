@@ -1,0 +1,31 @@
+{{- /* /rss.xml —— RSS 2.0，固定文件名订阅源。
+       数据取 Section=post 的最新 20 篇（排除 section/taxonomy 页）。
+       输出格式 RSSXML 定义在 hugo.toml，用独立 mediaType 与内置 index.xml 隔离。
+       日期字符串过 safeHTML，避免 "+0800" 被转义成 "&#43;0800"（RFC 822 要原样 +）。
+*/ -}}
+{{- $pages := first 20 (where .Site.RegularPages "Section" "post") -}}
+{{- printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>{{ .Site.Title }}</title>
+    <link>{{ .Site.BaseURL }}</link>
+    <description>{{ with .Site.Params.description }}{{ . }}{{ else }}Recent content on {{ .Site.Title }}{{ end }}</description>
+    <generator>Hugo</generator>
+    <language>{{ .Site.LanguageCode }}</language>
+    {{ with .Site.Params.SEOTitle }}<managingEditor>{{ . }}</managingEditor>{{ end }}
+    {{- with (index $pages 0) }}
+    <lastBuildDate>{{ .Date.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</lastBuildDate>
+    {{- end }}
+    <atom:link href="{{ "rss.xml" | absURL }}" rel="self" type="application/rss+xml" />
+    {{- range $pages }}
+    <item>
+      <title>{{ .Title }}</title>
+      <link>{{ .Permalink }}</link>
+      <pubDate>{{ .Date.Format "Mon, 02 Jan 2006 15:04:05 -0700" | safeHTML }}</pubDate>
+      <guid>{{ .Permalink }}</guid>
+      <description>{{ .Summary | html }}</description>
+      {{- range .Params.tags }}<category>{{ . }}</category>{{ end }}
+    </item>
+    {{- end }}
+  </channel>
+</rss>

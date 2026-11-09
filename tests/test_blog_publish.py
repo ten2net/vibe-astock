@@ -530,3 +530,50 @@ class TestLianbanTable:
     def test_table_align_param(self):
         html_text = bp._table(["a", "b"], [["x", "y"]], align={1: "right"})
         assert '<th class="va-al-right">b</th>' in html_text
+
+
+class TestFeeds:
+    """发布后自动分发依赖 /rss.xml 与 /atom.xml；缺一个整条管道就是空中楼阁。"""
+
+    def test_feed_files_are_owned_and_synced(self, tmp_path):
+        assert "rss.xml" in bp.OWNED_FILES and "atom.xml" in bp.OWNED_FILES
+        assert bp._owned(Path("rss.xml")) and bp._owned(Path("atom.xml"))
+        pub, repo = tmp_path / "public", tmp_path / "repo"
+        pub.mkdir(); repo.mkdir()
+        (pub / "rss.xml").write_text("<rss/>", encoding="utf-8")
+        (pub / "atom.xml").write_text("<feed/>", encoding="utf-8")
+        changed, _ = bp.sync_public(pub, repo)
+        assert "rss.xml" in changed and "atom.xml" in changed
+        assert (repo / "rss.xml").exists() and (repo / "atom.xml").exists()
+        assert bp.sync_public(pub, repo) == ([], [])  # 幂等
+
+    def test_real_hugo_build_emits_three_valid_feeds(self, tmp_path):
+        """用真实 hugo 构建，确认三个 feed 都是合法 XML、绝对 URL 用 baseURL。"""
+        import xml.dom.minidom as minidom
+
+        if not (ROOT / ".local" / "bin" / "hugo").exists() and not shutil.which("hugo"):
+            pytest.skip("没有 hugo")
+        out = tmp_path / "out"
+        bp.build(ROOT / "blog", hugo=str(ROOT / ".local" / "bin" / "hugo"),
+                 dest_dir=out)
+        for name in ("index.xml", "rss.xml", "atom.xml"):
+            path = out / name
+            assert path.is_file(), f"缺 {name}"
+            minidom.parse(str(path))  # 不是合法 XML 就抛
+        rss = (out / "rss.xml").read_text(encoding="utf-8")
+        atom = (out / "atom.xml").read_text(encoding="utf-8")
+        base = bp._site_baseurl(ROOT / "blog")
+        assert base in rss and base in atom and "192.168" not in rss + atom
+        assert 'rel="self"' in rss and f'{base.rstrip("/")}/rss.xml' in rss
+        assert 'xmlns="http://www.w3.org/2005/Atom"' in atom
+        assert f'{base.rstrip("/")}/atom.xml' in atom
+        assert rss.count("<item>") > 0 and atom.count("<entry>") > 0
+        # 时间戳里的 + 必须是原样（safeHTML），不能是 &#43;；正文/subtitle 的 + 转义是 XML 合法字符引用，不在此列
+        import re
+        for line in atom.splitlines():
+            if "<updated>" in line or "<published>" in line:
+                assert "&#43;" not in line, f"时间戳 + 号被转义：{line.strip()}"
+        for line in rss.splitlines():
+            if "<pubDate>" in line or "<lastBuildDate>" in line:
+                assert "&#43;" not in line, f"日期 + 号被转义：{line.strip()}"
+        assert re.search(r"<updated>\d{4}-\d{2}-\d{2}T[\d:]+\+08:00</updated>", atom)

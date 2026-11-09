@@ -17,11 +17,29 @@ summaryLength = 60
   category = "categories"
 
 [outputs]
-  home = ["HTML", "RSS"]
+  home = ["HTML", "RSS", "RSSXML", "ATOMXML"]
   section = ["HTML", "RSS"]
   taxonomy = ["HTML"]
   term = ["HTML"]
   page = ["HTML"]
+
+# 固定文件名订阅源。/rss.xml 和 /atom.xml 是「发布后自动分发」管道依赖的入口，
+# 不能用 Hugo 默认的 index.xml 顶替。自定义 outputFormat 用**独立的 mediaType**
+# （不是内置 application/rss+xml），否则 home 的模板查找会和内置 RSS 串味，
+# 把 index.xml 也渲染成自定义模板（实测 Hugo 0.169）。
+[mediaTypes."application/x-astock-rss+xml"]
+  suffixes = ["xml"]
+[mediaTypes."application/x-astock-atom+xml"]
+  suffixes = ["xml"]
+
+[outputFormats.RSSXML]
+  name = "RSSXML"
+  mediaType = "application/x-astock-rss+xml"
+  baseName = "rss"
+[outputFormats.ATOMXML]
+  name = "ATOMXML"
+  mediaType = "application/x-astock-atom+xml"
+  baseName = "atom"
 
 [markup.goldmark.renderer]
   unsafe = true
