@@ -53,26 +53,38 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
   const failuresRef = useRef(0);
   const inFlightRef = useRef(false);
   const staleRef = useRef(false);          // 请求飞行途中自选变过 / 有请求被跳过
+  /**
+   * 每趟取数的序号。🔴 不能用布尔锁单独判「在途」：用户点刷新时若正有一趟在途
+   * （最常见是失败后 finally 触发的补拉卡住），布尔锁会把这次手动刷新静默 return 掉，
+   * 一个请求都不发、界面毫无反馈 —— 就是「行情获取失败，点刷新再试却没用」。
+   * 与 core/data/useArchiveThenRefresh.ts 的 run 号同解：手动刷新另起一趟并接管，
+   * 旧请求回来时 run 已过期，结果一律丢弃，不会覆盖新数据。
+   */
+  const runRef = useRef(0);
   const fetchRef = useRef<(() => Promise<boolean>) | null>(null);
 
-  const fetchOnce = useCallback(async (onlyCodes?: string[]): Promise<boolean> => {
+  const fetchOnce = useCallback(async (onlyCodes?: string[], manual = false): Promise<boolean> => {
     const cs = onlyCodes ?? codesRef.current;
     if (!cs.length) {
       if (!onlyCodes) { setQuotes({}); setSettled(""); }
       return true;
     }
-    if (inFlightRef.current) {
+    // 在途只拦自动轮询 / 补拉；手动刷新是用户显式意图，必须穿透另起一趟。
+    if (inFlightRef.current && !manual) {
       // 上一次还没回来，跳过这一拍；但要记下来，等它回来后补拉一次。
       // 否则「首次请求在飞 → 用户此时粘贴新代码」会让新代码的行情永远缺失
       // （默认不开轮询时没有下一拍来兜底，只能手动刷新）。
       staleRef.current = true;
       return true;
     }
+    const run = ++runRef.current;
     inFlightRef.current = true;
     const requested = cs.join(",");
     setLoading(true);
+    if (manual) setError(null);   // 立刻撤掉旧提示并转圈，让用户看见「收到，正在重试」
     try {
       const data = await api.quote(requested, true);
+      if (run !== runRef.current) return false;   // 已被手动刷新取代，旧结果作废
       // 200 但一只都没回来（上游空表、代码全部对不上）不能当成「成功」：以前这里把空表整体替换上去，
       // 页面每行显示「—」又不报错，点刷新还是空。按失败处理，让提示和撤价逻辑照常生效。
       const asked = onlyCodes ?? cs;
@@ -85,28 +97,32 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
       failuresRef.current = 0;
       return true;
     } catch {
+      if (run !== runRef.current) return false;   // 旧趟失败也别把提示盖到新刷新上
       failuresRef.current += 1;
       // 旧价不留着当现价：手动 / 首次取数失败马上撤价提示，自动轮询连续失败才撤（见 quoteFailure）
       const failed = quoteFailure(failuresRef.current, onlyCodes);
       if (failed) { setQuotes(failed.drop); setError(failed.error); }
       return false;
     } finally {
-      inFlightRef.current = false;
-      setLoading(false);
-      if (!onlyCodes) setSettled(requested);
-      // 这一趟拉的是不是已经过期的名单？过期就立刻补一次（只补一次，不会滚雪球：
-      // 补拉时 staleRef 已复位，只有再次发生变动才会再补）。
-      const changed = !onlyCodes && codesRef.current.join(",") !== requested;
-      if (staleRef.current || changed) {
-        staleRef.current = false;
-        void fetchRef.current?.();
+      // 只有仍在生效的那一趟才收尾：旧趟不能提前把 loading 放开、也不能触发补拉
+      if (run === runRef.current) {
+        inFlightRef.current = false;
+        setLoading(false);
+        if (!onlyCodes) setSettled(requested);
+        // 这一趟拉的是不是已经过期的名单？过期就立刻补一次（只补一次，不会滚雪球：
+        // 补拉时 staleRef 已复位，只有再次发生变动才会再补）。
+        const changed = !onlyCodes && codesRef.current.join(",") !== requested;
+        if (staleRef.current || changed) {
+          staleRef.current = false;
+          void fetchRef.current?.();
+        }
       }
     }
   }, []);
   fetchRef.current = fetchOnce;
 
   const refresh = useCallback(() => {
-    void fetchOnce();
+    void fetchOnce(undefined, true);
   }, [fetchOnce]);
 
   // 首次进入 / 自选变化：立即拉一次（与开关无关，页面总要有数据）

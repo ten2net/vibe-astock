@@ -74,3 +74,24 @@ test("取数失败不把旧价留着当现价：手动刷新失败马上撤价�
   const hook = readFileSync(new URL("../src/verticals/finance/hooks/useLiveQuotes.ts", import.meta.url), "utf8");
   assert.match(hook, /const failed = quoteFailure\(failuresRef\.current, onlyCodes\);\s*if \(failed\) \{ setQuotes\(failed\.drop\); setError\(failed\.error\); \}/);
 });
+
+// 🔴 回归：提示「行情获取失败，可以点刷新再试」后点刷新无效。
+// 根因：fetchOnce 用布尔 inFlightRef 当并发锁，在途（尤其 finally 触发的补拉卡住）
+// 时手动刷新被静默 return 掉，一个请求都没发、界面毫无反馈（旧 core 的
+// useArchiveThenRefresh 早用 run 号修过同类坑，见其 51-57 行注释）。
+// 手动刷新是用户显式意图，必须另起一趟、立即给反馈，且旧请求结果不能覆盖它。
+test("手动刷新不受在途布尔锁吞掉：另起一趟、旧结果作废（点刷新无效回归）", () => {
+  const hook = readFileSync(new URL("../src/verticals/finance/hooks/useLiveQuotes.ts", import.meta.url), "utf8");
+  // 1) refresh 必须带 manual 标记，走与自动轮询不同的分支
+  assert.match(hook, /const refresh = useCallback\(\(\) => \{\s*void fetchOnce\(undefined, true\);/,
+    "refresh 必须显式传 manual=true，否则仍会被 inFlight 布尔锁当成重复的一拍吞掉");
+  // 2) 在途拦截只对「非手动」生效：手动刷新要能穿透
+  assert.match(hook, /if \(inFlightRef\.current && !manual\)/,
+    "在途布尔锁只能拦自动轮询/补拉，不能拦用户点的刷新");
+  // 3) 每趟带递增 run 号，回来时与当前 run 比对，过期结果直接丢弃
+  assert.match(hook, /const run = \+\+runRef\.current;/);
+  assert.match(hook, /run !== runRef\.current/,
+    "旧请求（被手动刷新取代的那趟）回来时不能写 quotes/error/loading");
+  // 4) 手动刷新立刻清掉旧错误提示并进入 loading，让用户看到「收到，正在重试」
+  assert.match(hook, /if \(manual\) setError\(null\);/);
+});
