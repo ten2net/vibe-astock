@@ -62,6 +62,21 @@ test("实时动态:盯盘中的状态、异动流带来源;持仓只列现价涨
   });
 });
 
+test("实时动态自选:缺省只列最新加入的 10 只(新→旧),超过 10 只给「显示全部」开关;10 只以内不显示开关", async () => {
+  await withRenderer(async (r) => {
+    const { LiveView } = await r.load(`${DIR}/LiveTab.tsx`);
+    const many = Array.from({ length: 12 }, (_, i) => row(`3000${String(i + 1).padStart(2, "0")}`, `自选${i + 1}`, 10, 1));
+    const props = (watchlist: typeof many) => ({ v: { ...LIVE, watchlist }, threshold: 1.5, scope: "all" as const, ladderMin: 1, onThreshold: noop, onScope: noop, onLadderMin: noop, error: null });
+    const t = textOf(await routed(r)(LiveView, props(many)));
+    assert.match(t, /自选\(12 只\).*显示全部 12 只/, "标题带总数,开关文案是显示全部");
+    assert.match(t, /名称 现价 今日 成交额 自选12 300012 10 \+1\.00% 3\.2 亿 自选11 300011 10 \+1\.00% 3\.2 亿 自选10 300010 10 \+1\.00% 3\.2 亿 自选9/, "缺省列最新 10 只,新加的在前");
+    assert.doesNotMatch(t, /自选1 300001|自选2 300002/, "最早加入的两只缺省不列");
+    const few = textOf(await routed(r)(LiveView, props(many.slice(0, 3))));
+    assert.match(few, /名称 现价 今日 成交额 自选3 300003 10 \+1\.00% 3\.2 亿 自选2 300002 10 \+1\.00% 3\.2 亿 自选1 300001 10 \+1\.00%/, "10 只以内全部列出,新→旧");
+    assert.doesNotMatch(few, /显示全部 \d+ 只|自选\(\d+ 只\)/, "10 只以内不给开关");
+  });
+});
+
 test("实时动态表格:股票名是雪球超链接,旁边有去研究和自选开关;自选里的显示为「移出自选」", async () => {
   await withRenderer(async (r) => {
     const { LiveView } = await r.load(`${DIR}/LiveTab.tsx`);

@@ -17,6 +17,8 @@ import { StockName } from "../components/StockLink";
 import type { AlertKind, LadderWatchRow, WatchAlert, WatchRow, WatchView } from "./watchTypes";
 
 export const THRESHOLDS = [1.5, 3, 5];
+/** 实时动态的自选缺省只列最新加入的前几只 */
+export const WATCH_PREVIEW = 10;
 export type Scope = "all" | "mine";
 export type LadderFilter = 1 | 2 | 3;
 
@@ -156,9 +158,12 @@ export function LiveView({ v, threshold, scope, ladderMin, onThreshold, onScope,
   /** 页面切到后台:不再取行情,异动也不判断 */
   paused?: boolean;
 }) {
+  const [watchAll, setWatchAll] = useState(false);
   const detecting = v.detecting && !paused;
   const ls = v.ladder ? ladderStats(v.ladder.rows) : null;
   const ladderRows = (v.ladder?.rows ?? []).filter((r) => r.boards >= ladderMin);
+  // 台账按录入顺序返回(先加在前);缺省只列最新加入的 10 只,新→旧
+  const watchRows = watchAll ? [...v.watchlist].reverse() : v.watchlist.slice(-WATCH_PREVIEW).reverse();
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -181,8 +186,17 @@ export function LiveView({ v, threshold, scope, ladderMin, onThreshold, onScope,
         <Section icon={Wallet} title="持仓" hint="只列现价、今日涨跌和浮动盈亏 %;股数和成本在「自选与持仓」页。">
           <StockTable label="持仓" rows={v.holdings} cols={[NAME, PRICE, PCT, PNL]} empty="还没有 A 股持仓(B 股、港美股不在这里盯)。" />
         </Section>
-        <Section icon={Wallet} title="自选">
-          <StockTable label="自选" rows={v.watchlist} cols={[NAME, PRICE, PCT, AMOUNT]} empty="自选里还没有 A 股。在「自选与持仓」页加。" />
+        <Section icon={Wallet} title={`自选${watchAll || v.watchlist.length <= WATCH_PREVIEW ? "" : `(${v.watchlist.length} 只)`}`}
+          hint="缺省只列最新加入的 10 只,新加的在前;「显示全部」看完整名单。">
+          {v.watchlist.length > WATCH_PREVIEW && (
+            <div className="mb-2 inline-flex items-center gap-1 rounded-lg border border-border/60 p-0.5 text-[12px]">
+              <button type="button" aria-pressed={watchAll} onClick={() => setWatchAll(!watchAll)}
+                className={cn("rounded-md px-2 py-0.5", watchAll ? "bg-primary/15 font-medium text-primary" : "text-muted-foreground hover:text-foreground")}>
+                {watchAll ? "只看最新 10 只" : `显示全部 ${v.watchlist.length} 只`}
+              </button>
+            </div>
+          )}
+          <StockTable label="自选" rows={watchRows} cols={[NAME, PRICE, PCT, AMOUNT]} empty="自选里还没有 A 股。在「自选与持仓」页加。" />
         </Section>
       </div>
 
