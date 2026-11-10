@@ -39,13 +39,19 @@ if str(ROOT) not in sys.path:
 DEFAULT_FALLBACK = "kimi-k3.1-pro,deepseek-v4-pro,glm-5.3"
 
 
-def _api(base: str, path: str, body: dict | None = None, timeout: float = 30) -> dict:
+def _api(base: str, path: str, body: dict | None = None, timeout: float = 30,
+         direct: bool = False) -> dict:
     url = base.rstrip("/") + path
     data = None if body is None else json.dumps(body).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST" if data else "GET")
     if data:
         req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    if direct:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        open_url = opener.open
+    else:
+        open_url = urllib.request.urlopen
+    with open_url(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -99,12 +105,31 @@ def _run_once(base: str, date: str, provider: str, model: str, force: bool,
     return _wait(base, wait, poll, log)
 
 
+def _bark_notify(log, date: str) -> None:
+    key = os.environ.get("BARK_DEVICE_KEY", "").strip()
+    if not key:
+        return
+    server = os.environ.get("BARK_SERVER", "https://api.day.app").strip().rstrip("/")
+    try:
+        _api(server, "/push", {
+            "device_key": key,
+            "title": "每日复盘发布成功",
+            "body": f"{date} 博客与微信公众号均已发布。",
+            "url": f"https://ten2net.github.io/post/{date}-每日复盘/",
+        }, timeout=15, direct=True)
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        log(f"Bark 通知失败（不影响发布）：{exc}")
+        return
+    log("Bark 通知已发送")
+
+
 def _publish(log, date: str) -> int:
     """生成成功后立刻发布：博客（最近几篇增量）+ 微信公众号草稿箱。
 
     微信侧失败不阻塞、不改变博客发布的结果：博客已上线，草稿次日可补
     （scripts/wechat_daily.py --date <日期>）。凭据走 env_file 注入的
-    WECHAT_APPID / WECHAT_SECRET；未配置就跳过这一步。
+    WECHAT_APPID / WECHAT_SECRET；未配置就跳过这一步。两边都成功后发 Bark；
+    未配置或通知失败不影响发布结果。
     """
     import subprocess
     env = dict(os.environ)
@@ -129,6 +154,8 @@ def _publish(log, date: str) -> int:
         wp.publish_review(data_path("reviews"), date, draft_only=not auto, log=log)
     except Exception as exc:  # noqa: BLE001  微信失败不翻盘已完成的博客发布
         log(f"微信失败（博客已发布，可稍后补：scripts/wechat_daily.py --date {date}）：{exc}")
+    else:
+        _bark_notify(log, date)
     return 0
 
 

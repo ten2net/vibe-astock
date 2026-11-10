@@ -1,5 +1,6 @@
 """微信公众号发布：正文渲染、凭据闸门、草稿/发布接口（网络全部 mock）。"""
 import sys
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -101,6 +102,25 @@ class TestDraftPayload:
         assert len(art["digest"]) == 120
         assert art["thumb_media_id"] == "thumb1"
         assert art["content_source_url"] == "https://e.com/"
+
+
+class TestProxy:
+    def test_wechat_proxy_env_is_used_for_both_protocols(self, monkeypatch):
+        monkeypatch.setenv("WECHAT_PROXY", "http://127.0.0.1:13128")
+        opener = wp._build_opener()
+        proxies = next(h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)).proxies
+        assert proxies == {
+            "http": "http://127.0.0.1:13128",
+            "https": "http://127.0.0.1:13128",
+        }
+
+    def test_generic_proxy_env_remains_bypassed(self, monkeypatch):
+        monkeypatch.delenv("WECHAT_PROXY", raising=False)
+        monkeypatch.setenv("https_proxy", "http://192.168.200.24:7890")
+        opener = wp._build_opener()
+        proxies = next((h.proxies for h in opener.handlers
+                        if isinstance(h, urllib.request.ProxyHandler)), {})
+        assert proxies == {}
 
 
 class TestGuard:

@@ -56,7 +56,8 @@ RUN https_proxy="$BUILD_PROXY" http_proxy="$BUILD_PROXY" \
 
 WORKDIR /app
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN https_proxy="$BUILD_PROXY" http_proxy="$BUILD_PROXY" \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 # 这两个目录已被 .dockerignore 排除（避免把宿主机的构建产物带进来），从构建阶段取

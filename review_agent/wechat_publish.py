@@ -25,9 +25,14 @@ PRODUCT_NAME = "揽宝投研"
 # 全部复盘文章共用的封面（仓库里的硬币徽章）；None=不上封面（草稿接口里 thumb_media_id 必填，必须给）
 DEFAULT_COVER = Path(__file__).resolve().parents[1] / "blog" / "static" / "img" / "avatar.png"
 
-# 微信 IP 白名单按调用方出口 IP 校验：必须直连，绝不能走环境变量里的代理
-# （容器部署里 http_proxy 会把请求发到代理出口，微信看到的 IP 就不在白名单里）。
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+# 默认直连，避免通用代理改变微信校验的出口 IP；需要固定出口时只走 WECHAT_PROXY。
+def _build_opener() -> urllib.request.OpenerDirector:
+    proxy = os.environ.get("WECHAT_PROXY", "").strip()
+    proxies = {"http": proxy, "https": proxy} if proxy else {}
+    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+
+
+_OPENER = _build_opener()
 
 
 class WechatError(PublishError):

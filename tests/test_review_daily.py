@@ -19,6 +19,7 @@ def fake_publish(monkeypatch):
         stdout = "提交 abc123，已推送"
         stderr = ""
 
+    monkeypatch.delenv("BARK_DEVICE_KEY", raising=False)
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: Proc())
     monkeypatch.setattr(wp, "publish_review",
                         lambda reviews, date, draft_only=True, log=lambda m: None:
@@ -63,3 +64,41 @@ def test_wechat_failure_keeps_success(fake_publish, monkeypatch):
 
     monkeypatch.setattr(wp, "publish_review", boom)
     assert rd._publish(lambda m: None, "2026-11-04") == 0   # 博客成功，整体仍算成功
+
+
+def test_bark_sent_after_blog_and_wechat_succeed(fake_publish, monkeypatch):
+    monkeypatch.setenv("BARK_DEVICE_KEY", "test-device-key")
+    calls = []
+
+    def fake_api(base, path, body=None, timeout=30, direct=False):
+        calls.append((base, path, body, timeout, direct))
+        return {"code": 200}
+
+    monkeypatch.setattr(rd, "_api", fake_api)
+    assert rd._publish(lambda m: None, "2026-11-04") == 0
+    assert len(calls) == 1
+    base, path, body, timeout, direct = calls[0]
+    assert base == "https://api.day.app"
+    assert path == "/push"
+    assert body["device_key"] == "test-device-key"
+    assert body["title"] == "每日复盘发布成功"
+    assert "2026-11-04" in body["body"]
+    assert "微信公众号" in body["body"]
+    assert body["url"] == "https://ten2net.github.io/post/2026-11-04-每日复盘/"
+    assert timeout == 15
+    assert direct is True
+
+
+def test_wechat_failure_does_not_send_bark_success(fake_publish, monkeypatch):
+    monkeypatch.setenv("BARK_DEVICE_KEY", "test-device-key")
+    calls = []
+    monkeypatch.setattr(rd, "_api", lambda *a, **k: calls.append((a, k)))
+    monkeypatch.setattr(wp, "publish_review", lambda *a, **k: (_ for _ in ()).throw(wp.WechatError("failed")))
+    assert rd._publish(lambda m: None, "2026-11-04") == 0
+    assert calls == []
+
+
+def test_bark_failure_keeps_publish_success(fake_publish, monkeypatch):
+    monkeypatch.setenv("BARK_DEVICE_KEY", "test-device-key")
+    monkeypatch.setattr(rd, "_api", lambda *a, **k: (_ for _ in ()).throw(OSError("network down")))
+    assert rd._publish(lambda m: None, "2026-11-04") == 0
