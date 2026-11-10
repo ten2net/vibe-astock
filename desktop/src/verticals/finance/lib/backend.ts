@@ -361,7 +361,7 @@ export const backend = {
    * 取一个端点。**默认读上次的快照**(见 service.fetchEndpoint):
    * 打开页面不重跑上游,真取数只发生在用户点刷新时。
    */
-  fetch: (endpoint: string, opts: { symbol?: string; args?: Record<string, unknown>; refresh?: boolean } = {}) =>
+  fetch: (endpoint: string, opts: { symbol?: string; args?: Record<string, unknown>; refresh?: boolean; signal?: AbortSignal } = {}) =>
     call<FetchResult>("/fetch", {
       method: "POST",
       body: JSON.stringify({
@@ -370,6 +370,7 @@ export const backend = {
         ...(opts.args ? { args: opts.args } : {}),
         ...(opts.refresh ? { refresh: true } : {}),
       }),
+      ...(opts.signal ? { signal: opts.signal } : {}),
     }),
 
   ledger: () =>

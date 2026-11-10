@@ -249,7 +249,7 @@ export interface GlobalIndex {
 }
 /* ==================== 映射:上游语义接口 → 我们的取数端点 ==================== */
 
-const env = async (endpoint: string, opts: { symbol?: string; args?: Record<string, unknown>; refresh?: boolean } = {}): Promise<Envelope> =>
+const env = async (endpoint: string, opts: { symbol?: string; args?: Record<string, unknown>; refresh?: boolean; signal?: AbortSignal } = {}): Promise<Envelope> =>
   (await backend.fetch(endpoint, opts)).envelope;
 
 /** 换算单位。**null 进 null 出** —— 直接写 `x * k` 会把"没有"变成 0，页面就显示成「0.00 亿」 */
@@ -257,11 +257,27 @@ const mul = (v: number | null, k: number): number | null => (v === null ? null :
 const subtract = (a: number | null, b: number | null): number | null => (a === null || b === null ? null : a - b);
 /* ---------- 行情 / 估值 ---------- */
 
-async function quoteMap(codes: string[], refresh = false): Promise<Record<string, Quote>> {
-  const canonical = [...new Set(codes.map(normalizeMarketSymbol).filter((c): c is string => c !== null))];
-  const queries = canonical.map(quoteQueryOfSymbol).filter((c): c is string => c !== null);
-  if (!queries.length) return {};
-  const e = await env("tx_quotes_batch", { args: { codes: queries }, refresh });
+/**
+ * 一次行情请求最多带几个代码。**必须 ≤ 编排器 `service.ts` 的 `MAX_ARG_ARR`(50)**，
+ * 超了整批在 `assertArgs` 就被拒（"args.codes 数组过长"），一只都取不到。
+ * 后端 `finance/schedule.ts` 的 `QUOTE_BATCH` 就是这个口径，前端必须一致 ——
+ * 用户自选 223 只时，一次性全传的表现正是「行情获取失败，点刷新再试」，且永远无效。
+ */
+const QUOTE_BATCH = 50;
+/** 分批并发度：与后端 schedule.ts 的 pool(batches, 2, ...) 一致，别把编排器打满 */
+const QUOTE_BATCH_CONCURRENCY = 2;
+
+/** 取一批并解析成 quotes；单批失败抛错，由调用方决定是跳过还是整体失败。 */
+async function quoteBatch(queries: string[], refresh: boolean, signal?: AbortSignal): Promise<Record<string, Quote>> {
+  const e = await env("tx_quotes_batch", { args: { codes: queries }, refresh, ...(signal ? { signal } : {}) });
+  // 上游 200 但信封是 failed / 一条证据都没有：如实报出原因，别让调用方只看到空表。
+  const status = typeof e?.status === "string" ? e.status : "";
+  const evCount = Array.isArray(e?.evidence) ? e.evidence.length : 0;
+  if (status === "failed" || evCount === 0) {
+    const errs = Array.isArray((e as { errors?: unknown })?.errors) ? (e as { errors: unknown[] }).errors : [];
+    const detail = errs.length ? String(errs[0]).slice(0, 100) : "";
+    throw new Error(`上游行情没取到（status=${status || "空"}，evidence=${evCount}${detail ? `，${detail}` : ""}）`);
+  }
   const out: Record<string, Quote> = {};
   for (const r of rows(e)) {
     const symbol = symbolFromQuoteKey(r.key);
@@ -289,6 +305,37 @@ async function quoteMap(codes: string[], refresh = false): Promise<Record<string
     };
   }
   return out;
+}
+
+async function quoteMap(codes: string[], refresh = false, signal?: AbortSignal): Promise<Record<string, Quote>> {
+  const canonical = [...new Set(codes.map(normalizeMarketSymbol).filter((c): c is string => c !== null))];
+  const queries = canonical.map(quoteQueryOfSymbol).filter((c): c is string => c !== null);
+  // 🔴 不要把「一个有效代码都没有」静默变成空表：页面会显示一片「—」加一句
+  //    「行情获取失败，可以点刷新再试」，点刷新还是同样结果，永远查不出原因。
+  if (!queries.length) throw new Error(`没有可用的行情代码（收到 ${codes.length} 个：${codes.slice(0, 6).join("、")}）`);
+
+  // 按 QUOTE_BATCH 分批、限并发取数；单批失败不影响其它批（与后端 schedule.ts 同解）。
+  const batches: string[][] = [];
+  for (let i = 0; i < queries.length; i += QUOTE_BATCH) batches.push(queries.slice(i, i + QUOTE_BATCH));
+  const merged: Record<string, Quote> = {};
+  const failures: string[] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < batches.length) {
+      const mine = batches[next++]!;
+      try {
+        Object.assign(merged, await quoteBatch(mine, refresh, signal));
+      } catch (e) {
+        failures.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(QUOTE_BATCH_CONCURRENCY, batches.length) }, worker));
+  // 全部批次都失败才整体报错（有部分数据就先显示出来，别把能取到的也清空）
+  if (!Object.keys(merged).length) {
+    throw new Error(failures[0] ?? `分 ${batches.length} 批取数，没有一批返回行情`);
+  }
+  return merged;
 }
 
 /* ---------- 财务 / 公告 / 研报 / 新闻 ---------- */
@@ -744,7 +791,7 @@ function globalIndexRows(e: Envelope): GlobalIndex[] {
 }
 
 export const api = {
-  quote: (codes: string, refresh = false) => quoteMap(codes.split(",").map((c) => c.trim()).filter(Boolean), refresh),
+  quote: (codes: string, refresh = false, signal?: AbortSignal) => quoteMap(codes.split(",").map((c) => c.trim()).filter(Boolean), refresh, signal),
   announcements: announcementsOf,
   news: newsOf,
 

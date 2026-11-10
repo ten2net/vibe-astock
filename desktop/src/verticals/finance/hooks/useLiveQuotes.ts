@@ -14,10 +14,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Quote } from "@/lib/api";
 import { isAnyMarketTrading, tradingMarketSymbols } from "@/lib/marketSymbol";
 import { startPollLoop } from "@/lib/pollLoop";
-import { mergePolledQuotes, missingQuotes, noQuotesBack, quoteFailure, quoteSnapshotTime } from "@/lib/quoteSnapshot";
+import { mergePolledQuotes, missingQuotes, noQuotesBack, quoteErrorReason, quoteFailure, quoteSnapshotTime } from "@/lib/quoteSnapshot";
 
 export const LIVE_INTERVAL_MS = 3000;
 const MAX_BACKOFF_MS = 30_000;
+/**
+ * 单次取数的上限。🔴 没有它，上游挂起（网络/代理不通、后端 single-flight 卡住）时
+ * `fetch()` 永远 pending，`finally` 永不执行 ⇒ `loading` 永远是 true、按钮一直转圈，
+ * 点刷新只是再发一个同样会挂起的请求 —— 就是「行情获取失败，刷新后还是一直转圈」。
+ * 实测单次取数 ~750ms，15s 足够覆盖慢网络；超时按「这次没取到」走既有失败分支。
+ */
+const QUOTE_TIMEOUT_MS = 15_000;
 
 /** 自选中任一市场开盘就轮询；空参数保留旧的 A 股语义。 */
 export const isTradingHours = (codes: string[] = [], at = new Date()): boolean => isAnyMarketTrading(codes, at);
@@ -61,6 +68,8 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
    * 旧请求回来时 run 已过期，结果一律丢弃，不会覆盖新数据。
    */
   const runRef = useRef(0);
+  /** 当前在途请求的 AbortController：手动刷新先取消它，超时也靠它把挂起的 fetch 打断 */
+  const abortRef = useRef<AbortController | null>(null);
   const fetchRef = useRef<(() => Promise<boolean>) | null>(null);
 
   const fetchOnce = useCallback(async (onlyCodes?: string[], manual = false): Promise<boolean> => {
@@ -78,12 +87,17 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
       return true;
     }
     const run = ++runRef.current;
+    // 手动刷新先掐掉上一趟（它可能正挂在后端 single-flight 上），否则新请求照样被拖住
+    if (manual) abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    const timer = setTimeout(() => ctl.abort(), QUOTE_TIMEOUT_MS);
     inFlightRef.current = true;
     const requested = cs.join(",");
     setLoading(true);
     if (manual) setError(null);   // 立刻撤掉旧提示并转圈，让用户看见「收到，正在重试」
     try {
-      const data = await api.quote(requested, true);
+      const data = await api.quote(requested, true, ctl.signal);
       if (run !== runRef.current) return false;   // 已被手动刷新取代，旧结果作废
       // 200 但一只都没回来（上游空表、代码全部对不上）不能当成「成功」：以前这里把空表整体替换上去，
       // 页面每行显示「—」又不报错，点刷新还是空。按失败处理，让提示和撤价逻辑照常生效。
@@ -96,16 +110,37 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
       setError(miss.length ? `这 ${miss.length} 只没取到行情：${miss.slice(0, 6).join("、")}${miss.length > 6 ? " 等" : ""}` : null);
       failuresRef.current = 0;
       return true;
-    } catch {
+    } catch (e) {
       if (run !== runRef.current) return false;   // 旧趟失败也别把提示盖到新刷新上
       failuresRef.current += 1;
+      const reason = quoteErrorReason(e);
+      // 🔴 真取数失败时先回退读一次「上次成功的快照」：站上明明有快照（本机实测
+      //    tx_quotes_batch 快照每分钟都在写），以前一律撤价 → 名称/代码外的列全变
+      //    「—」，用户以为行情彻底没了。能读到就显示快照并如实说明原因。
+      const snapCtl = new AbortController();
+      const snapTimer = setTimeout(() => snapCtl.abort(), QUOTE_TIMEOUT_MS);
+      try {
+        const snap = await api.quote(requested, false, snapCtl.signal);
+        if (run !== runRef.current) return false;       // 期间用户又点了刷新，以新的为准
+        if (Object.keys(snap).length) {
+          setQuotes((prev) => mergePolledQuotes(prev, snap, onlyCodes));
+          setError(`行情刷新没成功（${reason}）——当前显示的是上次快照`);
+          return false;
+        }
+      } catch {
+        // 连快照也没有（新机器 / 鉴权层就挡了）：走下面的撤价提示
+      } finally {
+        clearTimeout(snapTimer);
+      }
       // 旧价不留着当现价：手动 / 首次取数失败马上撤价提示，自动轮询连续失败才撤（见 quoteFailure）
-      const failed = quoteFailure(failuresRef.current, onlyCodes);
+      const failed = quoteFailure(failuresRef.current, onlyCodes, reason);
       if (failed) { setQuotes(failed.drop); setError(failed.error); }
       return false;
     } finally {
+      clearTimeout(timer);
       // 只有仍在生效的那一趟才收尾：旧趟不能提前把 loading 放开、也不能触发补拉
       if (run === runRef.current) {
+        abortRef.current = null;
         inFlightRef.current = false;
         setLoading(false);
         if (!onlyCodes) setSettled(requested);
@@ -128,6 +163,7 @@ export function useLiveQuotes(codes: string[], enabled: boolean): LiveQuotesStat
   // 首次进入 / 自选变化：立即拉一次（与开关无关，页面总要有数据）
   useEffect(() => {
     void fetchOnce();
+    return () => { abortRef.current?.abort(); };   // 名单变了 / 卸载：掐掉在途请求，别让它挂着
   }, [codes, fetchOnce]);
 
   // 轮询循环
