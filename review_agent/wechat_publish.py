@@ -1,7 +1,8 @@
 """微信公众号发布客户端：草稿箱 → 发布。订阅号（已认证）专用。
 
 凭据只从环境变量 / .env 读（WECHAT_APPID / WECHAT_SECRET），不入库、不进日志。
-封面图全站复用一张（硬币徽章），media_id 缓存在数据区，避免每天累积永久素材。
+封面图优先用每日情绪卡片（blog/static/cards/<date>.png），没有卡片才退回全站共用的
+硬币徽章；media_id 按图片缓存缓存在数据区，避免重复上传永久素材。
 
 接口文档：微信公众平台开发者文档 → 草稿箱 / 发布能力。
 """
@@ -22,8 +23,13 @@ from duanxian.paths import data_path  # noqa: E402
 
 API = "https://api.weixin.qq.com"
 PRODUCT_NAME = "揽宝投研"
-# 全部复盘文章共用的封面（仓库里的硬币徽章）；None=不上封面（草稿接口里 thumb_media_id 必填，必须给）
+# 卡片图缺失时退回的默认封面（仓库里的硬币徽章）；卡片见 card_cover()
+# 草稿接口里 thumb_media_id 必填，必须给一张
 DEFAULT_COVER = Path(__file__).resolve().parents[1] / "blog" / "static" / "img" / "avatar.png"
+
+# 公众号头条封面按 2.35:1（1080×460）展示，thumb_media_id 也按这个比例给，
+# 否则后台/分享时会被上下裁切。情绪卡片是 1.9:1，上传前居中裁一刀。
+THUMB_RATIO = 2.35
 
 # 默认直连，避免通用代理改变微信校验的出口 IP；需要固定出口时只走 WECHAT_PROXY。
 def _build_opener() -> urllib.request.OpenerDirector:
@@ -111,16 +117,58 @@ def _multipart_body(field: str, filename: str, data: bytes) -> tuple[bytes, str]
     return body, boundary
 
 
+def card_cover(date: str) -> Path | None:
+    """该日复盘的情绪卡片图（横版）；不存在则 None（调用方退回默认封面）。"""
+    card = Path(__file__).resolve().parents[1] / "blog" / "static" / "cards" / f"{date}.png"
+    return card if card.is_file() else None
+
+
+def _fit_cover(image: Path) -> Path:
+    """把封面图补成 2.35:1（微信头条封面比例）：不足宽度的图放在同色画布里居中，
+    只裁过高的部分（上下各留边），不裁左右内容。产物缓存在数据区。
+
+    Pillow 不可用或处理失败时原样返回，不阻断发布（增强项）。
+    """
+    try:
+        from PIL import Image  # noqa: PLC0415  与 emotion_card 同一降级思路
+    except ImportError:
+        return image
+    try:
+        with Image.open(image) as im:
+            im.load()
+            w, h = im.size
+            ratio = w / h
+            if ratio >= THUMB_RATIO or ratio < 1.4:  # 太宽，或竖图：上下居中裁到 2.35:1
+                target_h = round(w / THUMB_RATIO)
+                top = (h - target_h) // 2
+                out_im = im.crop((0, top, w, top + target_h))
+            else:  # 略扁于 2.35:1：加宽画布（取卡片底色），内容完整保留
+                target_w = round(h * THUMB_RATIO)
+                bg = Image.new("RGB", (target_w, h), im.convert("RGB").getpixel((0, h - 1)))
+                bg.paste(im.convert("RGB"), ((target_w - w) // 2, 0))
+                out_im = bg
+            out_dir = Path(data_path("reviews")).parent / "wechat-thumbs"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out = out_dir / f"{image.stem}-{out_im.size[0]}x{out_im.size[1]}.png"
+            if not out.exists():
+                out_im.save(out, format="PNG")
+            return out
+    except Exception:  # noqa: BLE001  封面处理是增强项，失败退回原图
+        return image
+
+
 def upload_cover(token: str, image: Path | None = None) -> str:
-    """上传永久图片素材，返回 media_id。全站一张封面，media_id 按天缓存。"""
-    image = Path(image or DEFAULT_COVER)
+    """上传永久图片素材，返回 media_id。media_id 按图片（路径+mtime+大小）缓存。"""
+    image = _fit_cover(Path(image or DEFAULT_COVER))
     if not image.exists():
         raise WechatError(f"封面图不存在：{image}")
     cache_file = Path(data_path("reviews")).parent / "wechat-cover.json"
+    cache_key = f"{image.resolve()}:{image.stat().st_mtime_ns}:{image.stat().st_size}"
     try:
         cached = json.loads(cache_file.read_text(encoding="utf-8"))
-        if cached.get("media_id") and time.time() < float(cached.get("expires_at", 0)):
-            return str(cached["media_id"])
+        entry = cached.get(cache_key) if isinstance(cached, dict) else None
+        if isinstance(entry, dict) and entry.get("media_id") and time.time() < float(entry.get("expires_at", 0)):
+            return str(entry["media_id"])
     except (OSError, ValueError):
         pass
     body, boundary = _multipart_body("media", image.name, image.read_bytes())
@@ -137,8 +185,15 @@ def upload_cover(token: str, image: Path | None = None) -> str:
         raise WechatError(f"封面上传被拒：{data.get('errcode')} {data.get('errmsg')}")
     try:
         # 永久素材不过期，但留 30 天缓存期，之后重传一次防素材被清
-        cache_file.write_text(json.dumps({"media_id": media_id, "expires_at": time.time() + 30 * 86400}),
-                              encoding="utf-8")
+        cached = {}
+        try:
+            old = json.loads(cache_file.read_text(encoding="utf-8"))
+            if isinstance(old, dict):
+                cached = {k: v for k, v in old.items() if isinstance(k, str) and isinstance(v, dict)}
+        except (OSError, ValueError):
+            pass
+        cached[cache_key] = {"media_id": media_id, "expires_at": time.time() + 30 * 86400}
+        cache_file.write_text(json.dumps(cached), encoding="utf-8")
         os.chmod(cache_file, 0o600)
     except OSError:
         pass
@@ -203,7 +258,7 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
     content = article_html(payload, date, blog_post_url(date))
     log(f"{date}：正文 {len(content)} 字符")
     token = get_access_token()
-    thumb = upload_cover(token, cover)
+    thumb = upload_cover(token, cover or card_cover(date))
     draft_id = add_draft(token, title=title, content=content, digest=one[:120],
                          source_url=blog_post_url(date), thumb_media_id=thumb)
     log(f"{date}：已写入草稿箱 {draft_id}")
