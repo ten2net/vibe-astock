@@ -32,8 +32,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 # 运行期仍需要 node：AI 引擎由 runtime/bridge 拉起，不是构建完就不用了。
 # git 供博客发布（blog_publish 要 clone Pages 仓库再 push）。
+# fonts-noto-cjk：情绪卡片图（emotion_card）指定用 Noto Sans CJK SC（ttc index=2），
+# 容器里没有它每日复盘的情绪卡片/公众号封面图会整体跳过。
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl xz-utils ca-certificates git \
+ && apt-get install -y --no-install-recommends curl xz-utils ca-certificates git fonts-noto-cjk \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1 \
  && node --version && npm --version \
