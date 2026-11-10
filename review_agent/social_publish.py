@@ -1,8 +1,12 @@
-"""社媒自动分发（设计文档 §7）—— X / Telegram 默认自动，雪球半自动。
+"""社媒分发（设计文档 §7，2026-11-09 修订）—— 面向国内用户，小红书为主。
 
-链路：复盘发布 → 生成平台 caption（含 UTM 短链）→ 合规闸门 → 台账去重 → 发帖。
-- **X / TG 默认自动发**（凭据未配 / 接口失败则跳过记日志，不阻断主发布）
-- **雪球只生成图文包**到目录，人工复制粘贴（无官方发帖 API，不做浏览器自动化）
+链路：复盘发布 → 生成平台 caption → 合规闸门 → 台账去重 → 半自动图文包 / 发帖。
+- **小红书为主**（用户确认）：目标用户在国内，小红书无官方开放发帖 API，且正文
+  外链/二维码会被限流或判营销 → **半自动图文包**（程序生成竖图 + 文案 + 话题标签，
+  人工在 App 粘贴发布），文案**不放任何 URL/二维码/引流 CTA**。
+- **雪球**：同样是半自动图文包（无官方发帖 API，不做浏览器自动化）。
+- **X / Telegram 停用但保留代码**：默认分发不再触发（``DEFAULT_PLATFORMS`` 不含），
+  显式传 ``platforms=("x","tg")`` 仍可用自动发帖 sender，便于日后恢复。
 - **合规硬约束**：caption 与原始复盘都过不荐股闸门；产品政策不因社媒放宽
 - **幂等**：``~/.duanxian-agents/social-posts.json`` 按 ``date:platform`` 记账，
   已发帖跳过（帖子不可撤回重发）；失败不写成功标记，下次可重试
@@ -27,8 +31,13 @@ from . import emotion_card, social_links
 from .blog_publish import DISCLAIMER, check_public_text
 from .product_policy import has_trade_recommendation
 
-PLATFORMS = ("x", "tg", "xueqiu")
-# 会被自动发帖的平台（雪球是半自动，只出图文包）
+PLATFORMS = ("x", "tg", "xueqiu", "xiaohongshu")
+# 默认分发集合：面向国内，小红书为主 + 雪球，两者都半自动出图文包。
+# X/TG 从默认集合移除（停用但保留代码），显式指定 platforms 仍可触发自动发帖。
+DEFAULT_PLATFORMS = ("xiaohongshu", "xueqiu")
+# 半自动图文包平台（程序生成素材、人工发布）
+PACK_PLATFORMS = ("xiaohongshu", "xueqiu")
+# 会被自动发帖的平台（X/TG 保留，仅显式指定时生效）
 AUTO_PLATFORMS = ("x", "tg")
 
 
@@ -47,9 +56,10 @@ class Caption:
 
 def build_caption(platform: str, metrics: "emotion_card.CardMetrics",
                   go_url: str) -> Caption:
-    """平台专属 caption：日期 + 档位 + 三读数 + 免责声明 + 短链。
+    """平台专属 caption：日期 + 档位 + 三读数 + 免责声明（+ 短链，小红书除外）。
 
-    X 限 280 字符，故用紧凑版；TG 可长；雪球偏长并带数据口径。
+    X 限 280 字符，故用紧凑版；TG 可长；雪球偏长并带数据口径；小红书干货数据向，
+    **不放任何 URL/二维码/引流 CTA**（平台限流/营销判定），只留话题标签。
     **只陈述已统计读数，不写任何操作/点位/预测**（合规红线）。
     """
     head = f"{metrics.date} A股情绪档位：{metrics.phase}"
@@ -63,6 +73,16 @@ def build_caption(platform: str, metrics: "emotion_card.CardMetrics",
                 f"全文 {go_url}\n#A股复盘 #情绪周期")
     elif platform == "tg":
         text = (f"{head}\n{stats}\n\n{DISCLAIMER}\n\n全文：{go_url}")
+    elif platform == "xiaohongshu":
+        # 干货数据向：标题 + 读数 + 口径 + 免责声明 + 话题标签，全文不出现 URL，
+        # 也不写任何「看主页/简介」等导流话术，规避小红书对站外引流的限流与违规判定。
+        text = (f"{head}\n\n"
+                f"当日读数\n{stats}\n\n"
+                f"数据来源：公开榜单与程序统计。\n"
+                "情绪档位是分析框架，非客观事实。\n\n"
+                f"{DISCLAIMER}\n\n"
+                "#A股复盘 #情绪周期 #市场情绪 #复盘笔记 #数据复盘")
+        return Caption(platform=platform, text=text, go_url="")
     else:  # xueqiu
         text = (f"{head}\n\n{stats} {source}\n\n"
                 f"{DISCLAIMER}\n\n全文：{go_url}\n"
@@ -207,21 +227,37 @@ class DistResult:
     outcomes: dict[str, str]   # platform -> posted|skipped|failed|dry-run|pack
 
 
+def _pack_card(cards_dir: Path, date: str, platform: str) -> Path:
+    """半自动图文包用的竖版卡片路径：小红书用无码/无外链的 ``-xhs.png``，
+    其余（雪球）沿用带二维码的 ``-vertical.png``。"""
+    name = f"{date}-xhs.png" if platform == "xiaohongshu" else f"{date}-vertical.png"
+    return cards_dir / name
+
+
+def _pack_dir(packs_dir: Path, date: str, platform: str) -> Path:
+    """图文包目录。雪球保持既有 ``packs/<date>/`` 契约；小红书单独分目录避免覆盖。"""
+    if platform == "xiaohongshu":
+        return packs_dir / "xiaohongshu" / date
+    return packs_dir / date
+
+
 def distribute(date: str, payload: dict, *, reviews_dir: Path | str,
                cards_dir: Path | str, packs_dir: Path | str,
-               dry_run: bool = False, platforms: tuple[str, ...] = PLATFORMS,
+               dry_run: bool = False, platforms: tuple[str, ...] = DEFAULT_PLATFORMS,
                ledger_home: Path | str | None = None,
                sender: Callable[..., str] | None = None,
                log: Callable[[str], None] = lambda _m: None) -> DistResult:
     """分发一篇复盘到各平台。**任何失败只记台账/日志并返回，不抛异常到调用方**。
 
+    默认 ``DEFAULT_PLATFORMS``（小红书 + 雪球）都只写半自动图文包、人工发布；
+    X/TG 代码保留但需显式传 ``platforms`` 才会走自动发帖 sender。
     ``sender`` 注入便于离线测试；缺省 ``None`` 时用真实实现（凭据从 env 读）。
-    雪球（xueqiu）永远只写图文包，不发帖。
     """
     metrics = emotion_card.extract_metrics(payload, date)
     ledger_file = ledger_path(ledger_home)
     ledger = _load_ledger(ledger_file)
-    vertical = Path(cards_dir) / f"{date}-vertical.png"
+    cards = Path(cards_dir)
+    vertical = cards / f"{date}-vertical.png"
     outcomes: dict[str, str] = {}
 
     for platform in platforms:
@@ -243,13 +279,14 @@ def distribute(date: str, payload: dict, *, reviews_dir: Path | str,
                 log(f"社媒 {key}：已发过，跳过")
                 continue
 
-            # 3) 雪球：只出图文包（半自动）
-            if platform == "xueqiu":
-                pack = Path(packs_dir) / date
+            # 3) 半自动图文包（小红书 / 雪球）：只出素材，人工发布
+            if platform in PACK_PLATFORMS:
+                pack = _pack_dir(Path(packs_dir), date, platform)
                 pack.mkdir(parents=True, exist_ok=True)
                 (pack / "caption.md").write_text(caption.text, encoding="utf-8")
-                if vertical.is_file():
-                    (pack / "card.png").write_bytes(vertical.read_bytes())
+                card = _pack_card(cards, date, platform)
+                if card.is_file():
+                    (pack / "card.png").write_bytes(card.read_bytes())
                 if not dry_run:
                     record(ledger, date, platform, status="pack", url=str(pack))
                 outcomes[platform] = "pack"

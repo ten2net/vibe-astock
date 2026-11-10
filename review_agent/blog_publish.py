@@ -1684,7 +1684,8 @@ def publish(
 
         cards_dir = Path(site_dir) / "static" / "cards"
         all_dates = emotion_card.iter_review_dates(reviews)
-        emotion_card.generate(reviews, cards_dir, dates=all_dates, log=log)
+        # xhs=True：默认分发含小红书，需同时出无码/无外链的 -xhs.png 竖图
+        emotion_card.generate(reviews, cards_dir, dates=all_dates, xhs=True, log=log)
         # UTM 跳页：同样按全部已发布文章生成，站上历史文章的短链也要可用
         social_links.go_pages(Path(site_dir) / "static" / "go", all_dates, log=log)
     except Exception as exc:  # noqa: BLE001  增强项失败不阻断主流程
@@ -1741,8 +1742,9 @@ def publish(
             _run(["git", "push", "origin", f"HEAD:{branch}"], cwd=tmp)
             result.pushed = True
 
-        # 社媒分发放在 Pages 推送成功之后：文章/短链已上线，帖子里的链接才不会 404。
-        # 只发最新一篇（避免首次接入把全部历史重发一遍）；X/TG 默认自动、雪球出图文包；
+        # 社媒分发放在 Pages 推送成功之后。默认分发小红书 + 雪球（都只出半自动图文包，
+        # 人工发布，面向国内用户；小红书文案无外链，故不依赖短链上线）。只发最新一篇
+        # （避免首次接入把全部历史重发一遍）；X/TG 代码保留但默认停用。
         # 合规/台账/失败跳过都在 distribute() 内部处理。增强项，任何意外都不阻断主流程。
         try:
             from . import social_publish  # 函数内 import，避免模块级循环

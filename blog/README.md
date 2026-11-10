@@ -63,30 +63,41 @@ cd <仓库根>
   文件名 `<date>-vertical.png` / `latest-vertical.png`。缺 qrcode 库只跳过二维码、不报错。
 - 回归：`tests/test_emotion_card.py`（抽数/横竖渲染/二维码/批量/发布钩子/同步清单）。
 
-## 社媒自动分发（X / Telegram / 雪球）
+## 社媒分发（小红书为主 / 雪球 / X / TG）
 
-设计文档：`docs/superpowers/specs/2026-11-09-social-distribution-design.md`。
+设计文档：`docs/superpowers/specs/2026-11-09-social-distribution-design.md`（含 2026-11-09
+「面向国内、改用小红书」修订记录）。
 
-- **X / TG 默认自动发帖**，**雪球半自动**（无官方发帖 API，只生成图文包人工粘贴，
-  不做浏览器自动化）。凭据未配 / 接口失败 / 限流一律记日志跳过，**不阻断博客发布**。
+目标用户主要在国内，故**以小红书为主**，X / Telegram 停用但保留代码。
+
+- **小红书半自动图文包（主）**：小红书无官方开放发帖 API，且正文外链 / 二维码会被
+  限流或判营销 → 程序生成 `1080×1350` 无码竖图 + 干货数据向文案（标题 + 三读数 +
+  口径 + 免责声明 + 话题标签，**全文不放任何 URL/二维码/引流 CTA**），人工在 App 粘贴
+  发布。图文包 `static/social/packs/xiaohongshu/<date>/`（`caption.md` + `card.png`）。
+- **雪球半自动图文包**：无官方发帖 API，只生成图文包 `static/social/packs/<date>/`
+  人工粘贴，不做浏览器自动化；沿用带 UTM 短链 + 二维码的 `-vertical.png` 竖图。
+- **X / TG 停用保留**：默认分发集合 `DEFAULT_PLATFORMS` 不含它们；显式传
+  `--platform x --platform tg` 或 `distribute(platforms=("x","tg"))` 仍可触发自动发帖
+  sender（凭据从 env 读、不进日志）。不做浏览器自动化。
 - **UTM 短链**：`review_agent/social_links.py` 生成 `/go/<platform>/<date>/` 跳页
   （meta refresh → 带 `utm_source` / `utm_medium=social` / `utm_campaign=<date>` 的文章
   URL）。零外部服务、可离线验证。`OWNED_DIRS` 含 `go`，跳页才会同步到 Pages。
+  小红书文案不使用跳页，跳页产物仅给雪球 / X / TG 与运营留 UTM 入口。
 - **分发模块**：`review_agent/social_publish.py` + `scripts/social_daily.py`
-  （`--dry-run` / `--date` / `--platform`）。平台专属 caption（X ≤280 字符）、
-  合规闸门、发帖台账 `~/.duanxian-agents/social-posts.json`（`date:platform` 幂等，
-  帖子不可撤回重发）、雪球图文包 `static/social/packs/<date>/`。
+  （`--dry-run` / `--date` / `--platform`）。合规闸门、台账
+  `~/.duanxian-agents/social-posts.json`（`date:platform` 幂等）。
+- **竖图两种**：`emotion_card.render_card_vertical(show_qr=...)`。`show_qr=True`
+  出 `<date>-vertical.png`（带短链 + 二维码，雪球/X/TG）；`show_qr=False` 出
+  `<date>-xhs.png`（小红书，底部只留品牌落款 + 数据口径 + 免责声明）。
+  `generate(..., xhs=True)` 才生成小红书竖图（发布管道已开启）。
 - **合规红线**：caption 与原始复盘都过不荐股闸门（`check_public_text` +
   `has_trade_recommendation`）。注意 `has_trade_recommendation(DISCLAIMER)` 会命中
   「不推荐个股」等产品口径词，所以扫 caption 时**必须先剔除免责声明**再扫。
-- **凭据**（只从 env 读、不进日志）：`TG_BOT_TOKEN` / `TG_CHAT_ID`；
-  `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_SECRET`。
-  缺哪个平台就跳过哪个。雪球不需要凭据。
-- **发布顺序**：`publish()` 在 Pages **推送成功之后**才分发（文章/短链已上线，
-  帖子里的链接才不会 404），只发最新一篇（避免首次接入把历史全发一遍）。
-  dry-run 只生成跳页/竖图/合规检查，**不调任何平台 API、不写成功台账**。
-- 回归：`tests/test_social_distribution.py`（跳页 UTM、竖图二维码、caption 合规、
-  台账幂等、dry-run 零 API、失败不阻断、发布钩子）。
+- **发布顺序**：`publish()` 在 Pages **推送成功之后**才分发，只发最新一篇。小红书文案
+  无外链，不依赖短链上线；雪球 / X / TG 的链接则在推送后才可用。dry-run 只生成跳页/
+  竖图/合规检查，**不调任何平台 API、不写成功台账**。
+- 回归：`tests/test_social_distribution.py`（跳页 UTM、竖图二维码、小红书无码竖图、
+  caption 合规、台账幂等、dry-run 零 API、失败不阻断、发布钩子）。
 
 ## SEO / 社交分享元数据
 

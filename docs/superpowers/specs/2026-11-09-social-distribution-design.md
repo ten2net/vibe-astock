@@ -1,7 +1,7 @@
 # 社媒自动分发设计 — 设计文档
 
 日期：2026-11-09
-状态：已定稿（用户确认）
+状态：已定稿（用户确认）；§3 的「X/TG 默认自动发」已被 §13 末条「面向国内、改用小红书」修订推翻，以修订记录为准。
 
 ## 1. 背景与目标
 
@@ -180,6 +180,41 @@ blog/static/cards/*-vertical.png 竖版卡片（生成物）
 
 ## 13. 修订记录
 
+### 2026-11-09（面向国内用户，改用小红书替代 X/TG）
+
+**背景**：用户明确「用户主要是国内用户，想通过小红书发布，而不是 X 或 TG」。这推翻了
+§3 里「X/TG 默认自动发」的决策。四项新决策（用户确认）：
+
+| 决策点 | 新结论 |
+|---|---|
+| 发布方式 | **小红书半自动图文包**：无官方开放发帖 API、第三方 RPA 有封号/违规风险，与雪球「不做浏览器自动化」既有口径一致 → 程序生成竖图 + 文案 + 话题标签，人工在 App 粘贴发布 |
+| 外链/二维码 | **小红书版去掉**：正文外链 / 二维码会被限流或判营销 → 文案不含任何 URL，竖图不带二维码 / 扫码 CTA，底部只留品牌落款 + 数据口径 + 免责声明 |
+| X/TG | **停用但保留代码**：默认分发集合不含，显式传 `platforms` 仍可触发自动发帖 sender |
+| 文案风格 | **干货数据向**：标题（日期 + 情绪档位）+ 三读数 + 口径 + 免责声明 + 话题标签，克制不标题党，严守不荐股红线 |
+
+**现实约束（写进设计依据）**：
+- 小红书没有面向「自动发笔记」的官方开放 API；企业号/开放平台也不提供代发个人笔记。
+- 小红书正文放站外链接、二维码、导流 CTA 会触发限流甚至违规判定。这使得 §5 的
+  UTM 跳页与 §6 的二维码对小红书**反而是减分项**。
+- 但小红书是竖版图文（3:4）的天然主场，`1080×1350` 竖版卡片完全可复用，只需去掉码/链。
+
+**落地改动**：
+- `social_links.py`：`PLATFORMS` 增 `xiaohongshu`（保留 x/tg/xueqiu），跳页产物一致，
+  但小红书 caption 不使用跳页 URL。
+- `emotion_card.py`：`render_card_vertical(show_qr=False)` 出小红书版（无码/无链/无 CTA）；
+  `generate(xhs=True)` 产出 `<date>-xhs.png` + `latest-xhs.png`，默认关闭以保旧产物契约。
+- `social_publish.py`：`DEFAULT_PLATFORMS = ("xiaohongshu","xueqiu")`；
+  `PACK_PLATFORMS` 泛化图文包（小红书用 `-xhs.png`、独立目录 `packs/xiaohongshu/<date>/`，
+  雪球沿用 `packs/<date>/` + `-vertical.png`）；新增小红书 caption（无 URL，干货数据向）。
+  X/TG 的 `build_caption` / `tg_send` / `x_send` / `_credentials` 全部保留不动。
+- `blog_publish.publish()`：`generate(xhs=True)`；`distribute()` 默认走小红书 + 雪球。
+- `scripts/social_daily.py`：默认平台改 `DEFAULT_PLATFORMS`，按需要生成 `-xhs.png`。
+- 文档：`blog/README.md` / `docker-compose.yml` 口径更新；`tests/test_social_distribution.py`
+  补小红书用例（无 URL/合规、无码竖图、图文包、默认不含 X/TG 自动发帖、X/TG 显式仍可用）。
+
+**不变**：合规双闸门、台账幂等、dry-run 零 API、失败不阻断、Pages 推送后再分发、
+横版 OG 契约、X/TG 自动发帖代码。
+
 ### 2026-11-09（骨架落地）
 
 按本设计完成实现，**未接真实凭据、未真发帖**：
@@ -196,7 +231,7 @@ blog/static/cards/*-vertical.png 竖版卡片（生成物）
 - 实测坑：`has_trade_recommendation(DISCLAIMER)` 返回 True（「不推荐个股」等产品口径词），
   故 caption 合规扫描必须先剔除免责声明；已写进测试与文档。
 
-待运营侧：在 `.env` 配好 X/TG 凭据后首次实发；本轮不执行。
+（后续已改为小红书为主，见上一条修订；本条保留为历史记录。）
 
 ### 2026-11-09（初稿并定稿）
 

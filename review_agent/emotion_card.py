@@ -255,15 +255,20 @@ def _qr_image(url: str, size: int) -> "object | None":
 
 
 def render_card_vertical(metrics: CardMetrics, out_path: Path | str,
-                         *, go_url: str | None = None) -> Path:
+                         *, go_url: str | None = None,
+                         show_qr: bool = True) -> Path:
     """画一张 1080×1350 竖版社媒图（信息流发图用）。
 
-    与横版区别：档位更大、三读数竖排、底部带短链文字 + 二维码 +「扫码看全文」CTA。
-    二维码指向 ``go_url``（缺省用 tg 平台的 /go/ 跳页）；缺 qrcode 库时跳过二维码。
+    与横版区别：档位更大、三读数竖排。底部两种形态：
+
+    - ``show_qr=True``（默认，X/TG/雪球）：短链文字 + 二维码 +「扫码看全文」CTA。
+      二维码指向 ``go_url``（缺省用 tg 平台的 /go/ 跳页）；缺 qrcode 库时跳过二维码。
+    - ``show_qr=False``（**小红书**）：正文外链/二维码会被平台限流或判营销，故底部
+      改为纯品牌落款 + 数据口径 + 免责声明，无任何 URL/二维码/引流 CTA。
     """
     from PIL import Image, ImageDraw
 
-    if go_url is None:
+    if go_url is None and show_qr:
         from . import social_links  # 局部 import，避免模块级循环
         go_url = social_links.go_url("tg", metrics.date)
 
@@ -305,22 +310,30 @@ def render_card_vertical(metrics: CardMetrics, out_path: Path | str,
         d.text((pad + 32, y0 + 54), value, font=font_value, fill=VALUE_COLOR)
         d.text((pad + 32, y0 + 140), sub, font=font_note, fill=NOTE_COLOR)
 
-    # 底部：二维码 + 短链 + CTA
-    qr_size = 180
-    qr = _qr_image(go_url, qr_size)
+    # 底部：二维码 + 短链 + CTA（默认）/ 纯品牌落款（小红书）
     cta_y = 1090
-    if qr is not None:
-        img.paste(qr, (V_WIDTH - pad - qr_size, cta_y))
-        d = ImageDraw.Draw(img)  # paste 后重建 draw
-    text_x = pad
-    text_w = V_WIDTH - 2 * pad - (qr_size + 24 if qr is not None else 0)
-    d.text((text_x, cta_y + 16), "扫码看全文", font=font_cta, fill=ACCENT)
-    short = go_url.replace("https://", "")
-    short_lines = _wrap(d, short, font_note, text_w)[:2]
-    sy = cta_y + 62
-    for ln in short_lines:
-        d.text((text_x, sy), ln, font=font_note, fill=LABEL_COLOR)
-        sy += 30
+    if show_qr:
+        qr_size = 180
+        qr = _qr_image(go_url or "", qr_size)
+        if qr is not None:
+            img.paste(qr, (V_WIDTH - pad - qr_size, cta_y))
+            d = ImageDraw.Draw(img)  # paste 后重建 draw
+        text_x = pad
+        text_w = V_WIDTH - 2 * pad - (qr_size + 24 if qr is not None else 0)
+        d.text((text_x, cta_y + 16), "扫码看全文", font=font_cta, fill=ACCENT)
+        short = (go_url or "").replace("https://", "")
+        short_lines = _wrap(d, short, font_note, text_w)[:2]
+        sy = cta_y + 62
+        for ln in short_lines:
+            d.text((text_x, sy), ln, font=font_note, fill=LABEL_COLOR)
+            sy += 30
+    else:
+        # 小红书：不放二维码/短链/扫码 CTA，只留品牌与数据口径，避免限流
+        d.line([(pad, cta_y), (V_WIDTH - pad, cta_y)], fill=ACCENT, width=3)
+        d.text((pad, cta_y + 30), "揽宝.复盘 · 每日 A 股情绪复盘",
+               font=font_cta, fill=ACCENT)
+        d.text((pad, cta_y + 82), "数据来源：公开榜单与程序统计",
+               font=font_note, fill=LABEL_COLOR)
     # 免责声明（最多 2 行）
     lines = _wrap(d, DISCLAIMER, font_disclaimer, V_WIDTH - 2 * pad)[:2]
     y = V_HEIGHT - 32 - len(lines) * 28
@@ -339,12 +352,15 @@ def render_card_vertical(metrics: CardMetrics, out_path: Path | str,
 def generate(reviews_dir: Path | str, out_dir: Path | str,
              *, dates: list[str] | None = None,
              vertical: bool = True,
+             xhs: bool = False,
              log: Callable[[str], None] = lambda _m: None) -> list[Path]:
     """按日期批量生成卡片。
 
     横版（OG 用，文件名契约不变）：``<date>.png`` + ``latest.png``。
-    竖版（社媒发图用）：``<date>-vertical.png`` + ``latest-vertical.png``。
+    带码竖版（X/TG/雪球发图）：``<date>-vertical.png`` + ``latest-vertical.png``。
+    小红书竖版（无码/无外链，``xhs=True`` 时）：``<date>-xhs.png`` + ``latest-xhs.png``。
 
+    ``xhs`` 默认关闭，避免改变既有产物契约；发布管道在需要小红书图文包时显式开启。
     返回成功写出的路径列表。**任何单篇/单形态失败只记 log 并跳过**，不让整个发布
     失败（缺字体/缺 Pillow/缺 qrcode/坏 json 都属增强项故障）；竖版失败不影响横版。
     """
@@ -386,10 +402,17 @@ def generate(reviews_dir: Path | str, out_dir: Path | str,
                 written.append(out / f"{date}-vertical.png")
             except (OSError, CardError, ValueError) as exc:
                 log(f"情绪卡片：{date} 竖版生成失败，跳过（{exc}）")
+        # 小红书竖版（无二维码/外链，独立降级）
+        if xhs:
+            try:
+                render_card_vertical(metrics, out / f"{date}-xhs.png", show_qr=False)
+                written.append(out / f"{date}-xhs.png")
+            except (OSError, CardError, ValueError) as exc:
+                log(f"情绪卡片：{date} 小红书竖版生成失败，跳过（{exc}）")
         if date > latest_date:
             latest_date, latest_metrics = date, metrics
 
-    # latest：取最新一天，横竖各一张
+    # latest：取最新一天，横版 + 各竖版
     if latest_metrics is not None:
         try:
             render_card(latest_metrics, out / "latest.png")
@@ -402,5 +425,11 @@ def generate(reviews_dir: Path | str, out_dir: Path | str,
                 written.append(out / "latest-vertical.png")
             except (OSError, CardError, ValueError) as exc:
                 log(f"情绪卡片：latest-vertical.png 生成失败（{exc}）")
+        if xhs:
+            try:
+                render_card_vertical(latest_metrics, out / "latest-xhs.png", show_qr=False)
+                written.append(out / "latest-xhs.png")
+            except (OSError, CardError, ValueError) as exc:
+                log(f"情绪卡片：latest-xhs.png 生成失败（{exc}）")
     log(f"情绪卡片：生成 {len(written)} 张到 {out}")
     return written

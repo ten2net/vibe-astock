@@ -226,9 +226,11 @@ services:
       VR_DATA_DIR: /data/market
       # GitHub Pages 仓库写权限令牌；没配就在这里由 .env 提供，配错了发布直接失败并打印原因
       ASTOCK_PAGES_TOKEN: ${ASTOCK_PAGES_TOKEN:-}
-      # 社媒分发凭据也走 .env（TG_BOT_TOKEN / TG_CHAT_ID / X_API_KEY / X_API_SECRET /
-      # X_ACCESS_TOKEN / X_ACCESS_SECRET）。publish_review.py 在 Pages 推送成功后自动分发；
-      # 哪个平台凭据没配就跳过哪个，不影响博客/卡片发布；雪球只出图文包不发帖。
+      # 面向国内用户：社媒默认分发小红书 + 雪球，都只生成半自动图文包（人工在 App
+      # 粘贴发布），无需任何平台凭据。X / TG 代码保留但默认停用，若要恢复自动发帖，
+      # 在 .env 配 TG_BOT_TOKEN / TG_CHAT_ID / X_API_KEY / X_API_SECRET /
+      # X_ACCESS_TOKEN / X_ACCESS_SECRET 并显式 --platform x --platform tg 触发。
+      # 哪个平台失败都跳过并记日志，不影响博客/卡片发布。
       # 容器里直连 github.com:443 会被拦（连接超时），必须走代理；git 认的是小写
       # https_proxy，所以这里按 compose 的默认展开规则取宿主环境里的代理地址。
       # 部署机代理不同时改这两行即可。

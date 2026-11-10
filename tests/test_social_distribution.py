@@ -56,7 +56,7 @@ def test_go_pages_writes_all_platforms_and_is_idempotent(tmp_path):
     out = tmp_path / "go"
     dates = ["2026-11-06", "2026-11-05"]
     w = sl.go_pages(out, dates, log=lambda _m: None)
-    assert len(w) == 6
+    assert len(w) == 2 * len(sl.PLATFORMS)  # × 平台数（含 xiaohongshu）
     for plat in sl.PLATFORMS:
         for d in dates:
             html = (out / plat / d / "index.html").read_text(encoding="utf-8")
@@ -97,9 +97,24 @@ def test_captions_contain_link_and_disclaimer():
     m = ec.extract_metrics(payload(), DATE)
     for plat in sp.PLATFORMS:
         cap = sp.build_caption(plat, m, sl.go_url(plat, DATE))
-        assert cap.go_url in cap.text
         assert "不构成投资建议" in cap.text or "不推荐个股" in cap.text
         assert m.phase in cap.text and "32" in cap.text
+        # 小红书文案不放任何 URL（平台限流/营销判定）；其余平台带各自短链
+        if plat == "xiaohongshu":
+            assert cap.go_url == "" and "http" not in cap.text
+        else:
+            assert cap.go_url in cap.text
+
+
+def test_xhs_caption_is_data_style_without_url_or_cta():
+    """小红书：干货数据向，无外链/二维码/扫码 CTA，带口径与话题标签。"""
+    m = ec.extract_metrics(payload(), DATE)
+    cap = sp.build_caption("xiaohongshu", m, sl.go_url("xiaohongshu", DATE))
+    assert "http" not in cap.text and "扫码" not in cap.text and "二维码" not in cap.text
+    assert cap.go_url == ""
+    assert "数据来源" in cap.text and "分析框架" in cap.text
+    assert "#A股复盘" in cap.text and bp.DISCLAIMER in cap.text
+    assert m.phase in cap.text and "32" in cap.text
 
 
 def test_x_caption_within_280_chars():
@@ -159,10 +174,12 @@ def _cards(tmp_path):
     cards = tmp_path / "cards"
     cards.mkdir()
     Image.new("RGB", (1080, 1350), (20, 20, 28)).save(cards / f"{DATE}-vertical.png")
+    Image.new("RGB", (1080, 1350), (24, 24, 32)).save(cards / f"{DATE}-xhs.png")
     return cards
 
 
-def test_dry_run_never_calls_sender(tmp_path):
+def test_dry_run_default_platforms_never_calls_sender(tmp_path):
+    """默认分发小红书 + 雪球（都出图文包），不触发任何自动发帖 sender。"""
     calls = []
     r = sp.distribute(DATE, payload(), reviews_dir=tmp_path,
                       cards_dir=_cards(tmp_path), packs_dir=tmp_path / "packs",
@@ -170,8 +187,19 @@ def test_dry_run_never_calls_sender(tmp_path):
                       sender=lambda *a: calls.append(a) or "id",
                       log=lambda _m: None)
     assert calls == []
-    assert r.outcomes["x"] == "dry-run" and r.outcomes["tg"] == "dry-run"
-    assert r.outcomes["xueqiu"] == "pack"
+    assert r.outcomes == {"xiaohongshu": "pack", "xueqiu": "pack"}
+
+
+def test_dry_run_x_tg_explicit_still_zero_api(tmp_path):
+    """X/TG 显式指定时 dry-run 仍零 API（代码保留可用的回归）。"""
+    calls = []
+    r = sp.distribute(DATE, payload(), reviews_dir=tmp_path,
+                      cards_dir=_cards(tmp_path), packs_dir=tmp_path / "packs",
+                      dry_run=True, platforms=("x", "tg"), ledger_home=tmp_path,
+                      sender=lambda *a: calls.append(a) or "id",
+                      log=lambda _m: None)
+    assert calls == []
+    assert r.outcomes == {"x": "dry-run", "tg": "dry-run"}
 
 
 def test_dry_run_does_not_write_success_ledger(tmp_path):
@@ -191,6 +219,7 @@ def test_auto_post_with_credentials_and_idempotency(tmp_path, monkeypatch):
     calls = []
     kw = dict(reviews_dir=tmp_path, cards_dir=_cards(tmp_path),
               packs_dir=tmp_path / "packs", ledger_home=tmp_path,
+              platforms=("x", "tg", "xueqiu"),  # X/TG 代码保留，显式指定才自动发帖
               sender=lambda p, *_a: calls.append(p) or "id-" + p,
               log=lambda _m: None)
     r1 = sp.distribute(DATE, payload(), **kw)
@@ -209,6 +238,7 @@ def test_missing_credentials_skips_without_error(tmp_path, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     r = sp.distribute(DATE, payload(), reviews_dir=tmp_path,
                       cards_dir=_cards(tmp_path), packs_dir=tmp_path / "packs",
+                      platforms=("x", "tg"),  # 显式指定才走到 X/TG 凭据检查
                       ledger_home=tmp_path, sender=lambda *a: "id",
                       log=lambda _m: None)
     assert r.outcomes["x"] == "skipped" and r.outcomes["tg"] == "skipped"
@@ -249,6 +279,52 @@ def test_xueqiu_writes_pack_with_caption_and_card(tmp_path):
     assert "/go/xueqiu/" in (pack / "caption.md").read_text(encoding="utf-8")
 
 
+# ---------------------------------------------------------------- 小红书
+
+def test_default_platforms_are_xhs_and_xueqiu_not_x_tg():
+    assert sp.DEFAULT_PLATFORMS == ("xiaohongshu", "xueqiu")
+    assert "x" not in sp.DEFAULT_PLATFORMS and "tg" not in sp.DEFAULT_PLATFORMS
+    assert "xiaohongshu" in sp.PACK_PLATFORMS and "xueqiu" in sp.PACK_PLATFORMS
+    assert sp.AUTO_PLATFORMS == ("x", "tg")  # 代码保留，仅显式触发
+
+
+def test_xhs_pack_uses_no_qr_card_and_separate_dir(tmp_path):
+    """小红书图文包：用 -xhs.png（无码）、独立目录、文案无 URL。"""
+    r = sp.distribute(DATE, payload(), reviews_dir=tmp_path,
+                      cards_dir=_cards(tmp_path), packs_dir=tmp_path / "packs",
+                      platforms=("xiaohongshu",), ledger_home=tmp_path,
+                      log=lambda _m: None)
+    assert r.outcomes == {"xiaohongshu": "pack"}
+    pack = tmp_path / "packs" / "xiaohongshu" / DATE
+    assert (pack / "caption.md").is_file() and (pack / "card.png").is_file()
+    # 用的是无码竖图（_cards 里 -xhs.png 与 -vertical.png 颜色不同）
+    assert (pack / "card.png").read_bytes() == (tmp_path / "cards" / f"{DATE}-xhs.png").read_bytes()
+    cap = (pack / "caption.md").read_text(encoding="utf-8")
+    assert "http" not in cap and "扫码" not in cap and "#A股复盘" in cap
+
+
+def test_xhs_vertical_card_renders_without_calling_qr(tmp_path, monkeypatch):
+    """show_qr=False 时不应触碰二维码库（小红书竖图无码）。"""
+    calls = []
+    monkeypatch.setattr(ec, "_qr_image", lambda *a, **k: calls.append(a) or None)
+    out = tmp_path / "xhs.png"
+    ec.render_card_vertical(ec.extract_metrics(payload(), DATE), out, show_qr=False)
+    assert out.is_file() and calls == []
+    from PIL import Image
+    with Image.open(out) as im:
+        assert im.size == (1080, 1350)
+
+
+def test_generate_with_xhs_flag_produces_xhs_variant(tmp_path):
+    reviews, out = tmp_path / "reviews", tmp_path / "cards"
+    reviews.mkdir()
+    (reviews / f"{DATE}.json").write_text(json.dumps(payload()), encoding="utf-8")
+    w = ec.generate(reviews, out, dates=[DATE], xhs=True, log=lambda _m: None)
+    names = {p.name for p in w}
+    assert f"{DATE}-xhs.png" in names and "latest-xhs.png" in names
+    assert f"{DATE}.png" in names and f"{DATE}-vertical.png" in names  # 旧契约不变
+
+
 # ---------------------------------------------------------------- 发布管道接线
 
 def test_owned_dirs_include_go_and_social():
@@ -282,5 +358,7 @@ def test_publish_dry_run_generates_go_pages_and_vertical_cards(tmp_path):
     (reviews / f"{DATE}.json").write_text(json.dumps(payload()), encoding="utf-8")
     bp.publish(site, reviews, dry_run=True, log=lambda _m: None)
     assert (site / "static" / "go" / "x" / DATE / "index.html").is_file()
+    assert (site / "static" / "go" / "xiaohongshu" / DATE / "index.html").is_file()
     assert (site / "static" / "cards" / f"{DATE}-vertical.png").is_file()
+    assert (site / "static" / "cards" / f"{DATE}-xhs.png").is_file()
     assert (site / "static" / "cards" / f"{DATE}.png").is_file()

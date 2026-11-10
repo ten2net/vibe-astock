@@ -42,6 +42,7 @@ tushare>=1.4
 # 三个读数渲染成 1200×630 PNG，作社交平台 OG 头图。用系统中文字体，无浏览器依赖。
 Pillow>=10
 
-# 社媒自动分发：竖版卡片右下角的二维码（review_agent/emotion_card.py 的 vertical 变体）。
+# 社媒分发：带码竖版卡片（show_qr=True，雪球 / X / TG）右下角的二维码。
+# 小红书竖版（show_qr=False）不用二维码，故缺此库只影响带码竖版、不影响小红书。
 # 纯 Python，复用上面的 Pillow 出图。
 qrcode[pil]>=7
