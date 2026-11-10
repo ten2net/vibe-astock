@@ -3,11 +3,12 @@
 # 凭据文件由 ~/.cloudflared/ 挂载进来，勿提交到仓库。
 tunnel: 17642bd5-1db7-49b1-aa12-f45d92c5a121
 credentials-file: /etc/cloudflared/creds.json
-# 传输协议:quic 是 Cloudflare 默认的 UDP 通道,边缘到本机的长请求(历史回放要几十秒)
-# 比 http2 更不容易在边缘侧被判超时。曾经因为 QUIC 抖动改回 http2,2026-11 实测两者都会
-# 偶发 530(边缘失联),真正起作用的是下面的重连参数,所以回到默认 QUIC。
-# 若某段时间 UDP 被网络掐断(日志大量 "no recent network activity"),把它改回 http2 即可。
-protocol: quic
+# 传输协议:**http2(TCP 443)**。与旧版 config.yml 保持一致。
+# 🔴 2026-11-10 实测:本机没有 IPv6 默认路由(只有 link-local / tailscale ULA),
+#    cloudflared 的 QUIC(UDP 7844)会优先拨 [::]:7844 → "sendmsg: network is unreachable",
+#    4 条连接全挂、隧道起不来,公网 530。IPv4 TCP 443 到 CF edge 实测是通的,
+#    故固定用 http2,不再依赖 UDP/IPv6。长请求由下面的重连参数兜底。
+protocol: http2
 # 边缘链路抖动时快速重连:4 条连接 × 最长 15 秒退避,避免短时丢包就把请求扔给 530。
 retries: 10
 grace-period: 30s
