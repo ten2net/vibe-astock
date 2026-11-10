@@ -15,7 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from .blog_publish import PublishError, check_public_text, load_review, post_title
 from .wechat_render import article_html
@@ -34,8 +34,27 @@ THUMB_RATIO = 2.35
 # 默认直连，避免通用代理改变微信校验的出口 IP；需要固定出口时只走 WECHAT_PROXY。
 def _build_opener() -> urllib.request.OpenerDirector:
     proxy = os.environ.get("WECHAT_PROXY", "").strip()
-    proxies = {"http": proxy, "https": proxy} if proxy else {}
-    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+    if not proxy:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    class _NoBypassProxyHandler(urllib.request.ProxyHandler):
+        """微信 API 必须走固定出口。容器 no_proxy 含 .qq.com（给行情接口用），
+        urllib 的 bypass 检查会把 api.weixin.qq.com 误判成直连，这里禁掉 bypass。"""
+
+        def proxy_open(self, req, proxy, type):
+            orig = urllib.request.proxy_bypass
+
+            def no_bypass(_host: str, _proxies: "Mapping[str, str] | None" = None) -> bool:
+                return False
+
+            urllib.request.proxy_bypass = no_bypass  # type: ignore[assignment]  # 签名兼容，收窄返回类型
+            try:
+                return super().proxy_open(req, proxy, type)
+            finally:
+                urllib.request.proxy_bypass = orig
+
+    return urllib.request.build_opener(
+        _NoBypassProxyHandler({"http": proxy, "https": proxy}))
 
 
 _OPENER = _build_opener()

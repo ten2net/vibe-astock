@@ -122,6 +122,17 @@ class TestProxy:
                         if isinstance(h, urllib.request.ProxyHandler)), {})
         assert proxies == {}
 
+    def test_no_proxy_env_does_not_bypass_wechat_api(self, monkeypatch):
+        # 容器 no_proxy 含 .qq.com（行情接口用），urllib 默认 bypass 会误伤
+        # api.weixin.qq.com 导致微信请求直连、被 IP 白名单拒
+        monkeypatch.setenv("WECHAT_PROXY", "http://127.0.0.1:13128")
+        monkeypatch.setenv("no_proxy", "localhost,127.0.0.1,.qq.com")
+        opener = wp._build_opener()
+        handler = next(h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler))
+        req = urllib.request.Request("https://api.weixin.qq.com/cgi-bin/token")
+        handler.proxy_open(req, "http://127.0.0.1:13128", "https")
+        assert req.host == "127.0.0.1:13128"
+
 
 class TestGuard:
     def test_missing_credentials(self, tmp_path, monkeypatch):
