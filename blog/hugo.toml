@@ -70,6 +70,9 @@ summaryLength = 60
   last_posts = true
   last_posts_count = 5
   reward = false
+  # 文章末尾的静态赞赏区（支付宝 / 微信收款码，见 _partials/sponsor.html）；
+  # 与上面按金额切换的 reward 弹窗互不影响。
+  sponsor = true
   friends = false
   bookmarks = false
   upstreamAttribution = false

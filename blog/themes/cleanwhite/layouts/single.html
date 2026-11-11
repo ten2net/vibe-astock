@@ -80,6 +80,8 @@
                 -->
                 {{ .Content }}
 
+                {{ partial "sponsor.html" . }}
+
                 {{ if .Site.Params.reward }}
                 {{ partial "reward.html" . }}
                 {{ end }}

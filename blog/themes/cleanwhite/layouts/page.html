@@ -27,7 +27,9 @@
             {{ else }}
                 {{ .Content }}
             {{ end }}
-             
+
+            {{ partial "sponsor.html" . }}
+
             {{ partial "comments.html" . }}
             
             </div>
