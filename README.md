@@ -26,6 +26,7 @@
   <a href="#从旧版v1x升级">从旧版升级</a> ·
   <a href="#安全与隐私">隐私</a> ·
   <a href="#开发与测试">开发</a> ·
+  <a href="#支持本项目">支持</a> ·
   <a href="CHANGELOG.md">更新日志</a>
 </p>
 
@@ -761,6 +762,27 @@ npm run build --prefix desktop
 </table>
 
 </details>
+
+## 支持本项目
+
+如果这套工具帮你省了点时间，可以请作者喝杯咖啡。纯自愿，不影响任何功能：项目完全开源、免费，也不含付费版或解锁内容。
+
+<table>
+<tr>
+<td align="center" width="50%" valign="top">
+<img src="assets/bmc-qr.png" alt="支付宝赞赏码" width="240"><br>
+<b>支付宝</b><br>
+<span>扫码赞赏</span>
+</td>
+<td align="center" width="50%" valign="top">
+<img src="assets/wx-bmc-qr.png" alt="微信赞赏码" width="240"><br>
+<b>微信</b><br>
+<span>扫码赞赏</span>
+</td>
+</tr>
+</table>
+
+> 赞赏只是对已公开成果的鼓励，不构成任何服务承诺、技术支持约定或投资相关往来。本项目不提供投资决策、买卖建议或仓位指令。
 
 ## 免责声明
 
