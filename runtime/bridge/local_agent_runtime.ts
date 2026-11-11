@@ -821,15 +821,37 @@ export function parseClaudeOutput(stdout: string): string {
   throw new LocalAgentError("agent_empty_output", "Claude Code 没有返回可见回答");
 }
 
+/**
+ * `--output-format json` 在长任务 / 多轮工具调用下可能不是「单个 JSON 值」：
+ * 实测 2.183.0 会逐行输出 NDJSON 事件，或在 JSON 前夹插件刷新、限流等纯文本行。
+ * 整段 JSON.parse 会直接失败，界面只看到一句「无法解析的结果」，查不出原因。
+ * ⇒ 先按整段解析；失败再逐行收集所有合法 JSON 值（跳过噪声行）合并成候选集。
+ */
+function parseCodeBuddyValues(stdout: string): unknown[] {
+  try {
+    const whole = JSON.parse(stdout) as unknown;
+    return Array.isArray(whole) ? whole : [whole];
+  } catch { /* 落到逐行兜底 */ }
+  const values: unknown[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || (t[0] !== "{" && t[0] !== "[")) continue;   // 纯文本诊断行跳过
+    try {
+      const v = JSON.parse(t) as unknown;
+      values.push(...(Array.isArray(v) ? v : [v]));
+    } catch { /* 跨行的格式化 JSON 由整段解析覆盖；半截行忽略 */ }
+  }
+  return values;
+}
+
 /** CodeBuddy 当前 JSON 输出兼容 result / response，并优先返回结构化产物。 */
 export function parseCodeBuddyOutput(stdout: string): string {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    throw new LocalAgentError("agent_bad_output", "CodeBuddy 返回了无法解析的结果");
+  const candidates = parseCodeBuddyValues(stdout);
+  if (!candidates.length) {
+    const snippet = stdout.trim().slice(0, 200);
+    throw new LocalAgentError("agent_bad_output",
+      `CodeBuddy 返回了无法解析的结果:${snippet ? `开头「${snippet}」` : "(stdout 为空)"}`);
   }
-  const candidates = Array.isArray(parsed) ? parsed : [parsed];
   for (const item of [...candidates].reverse()) {
     if (!item || typeof item !== "object") continue;
     const value = item as { result?: unknown; response?: unknown; structured_output?: unknown; is_error?: unknown };

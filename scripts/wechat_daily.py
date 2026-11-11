@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log = lambda m: print(m, file=sys.stderr, flush=True)  # noqa: E731
     reviews = Path(args.reviews)
-    date = args.date.strip()
+    date = (args.date or "").strip()
     if not date:
         dates = bp.iter_dates(reviews, limit=1)
         if not dates:
