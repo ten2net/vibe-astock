@@ -6,14 +6,16 @@
 */}}
 {{ if site.Params.sponsor }}
 <style>
-  .va-sponsor { margin: 2.5rem 0 1.5rem; padding: 1.5rem 1rem; border-top: 1px solid #e9e9e9; text-align: center; }
-  .va-sponsor-title { font-size: 1.05rem; font-weight: 600; margin: 0 0 .4rem; }
-  .va-sponsor-desc { font-size: .9rem; color: #777; margin: 0 0 1.2rem; line-height: 1.7; }
-  .va-sponsor-codes { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; }
+  /* 字号对齐 astock.css 的正文体系：正文 16px、导语 .va-leadline 17~18px、
+     辅助说明 .va-mini 13px。以前用 .8~.9rem(≈13~14px) 比正文小一圈，读着像脚注。 */
+  .va-sponsor { margin: 36px 0 24px; padding: 22px 18px; border: 1px solid var(--va-border, #e4e6ea); border-radius: var(--va-radius, 8px); text-align: center; }
+  .va-sponsor-title { font-size: 18px; font-weight: 600; line-height: 1.7; color: var(--va-fg, #16171a); margin: 0 0 8px; }
+  .va-sponsor-desc { font-size: 16px; line-height: 1.85; color: var(--va-muted-fg, #5b606a); margin: 0 0 20px; }
+  .va-sponsor-codes { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; }
   .va-sponsor-code { flex: 0 1 200px; max-width: 200px; }
-  .va-sponsor-code img { width: 100%; height: auto; display: block; border: 1px solid #eee; border-radius: 6px; }
-  .va-sponsor-code b { display: block; font-size: .95rem; margin-top: .5rem; }
-  .va-sponsor-note { font-size: .8rem; color: #999; margin: 1.2rem 0 0; line-height: 1.6; }
+  .va-sponsor-code img { width: 100%; height: auto; display: block; border: 1px solid var(--va-border, #e4e6ea); border-radius: 6px; }
+  .va-sponsor-code b { display: block; font-size: 16px; font-weight: 600; margin-top: 10px; }
+  .va-sponsor-note { font-size: 13.5px; line-height: 1.7; color: var(--va-muted-fg, #5b606a); margin: 20px 0 0; }
   @media (max-width: 480px) { .va-sponsor-code { flex-basis: 42%; } }
 </style>
 <section class="va-sponsor" aria-label="支持本项目">
