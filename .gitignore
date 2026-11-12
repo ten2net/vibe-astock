@@ -27,6 +27,9 @@ dist/
 *.key
 *.pem
 
+# 迁移私有文件包（含真实凭据，绝不入库；见 docs/迁移方案/迁移方案.md）
+docs/迁移方案/vibe-astock-secrets-*.zip
+
 # 系统与日志
 .DS_Store
 *.log
