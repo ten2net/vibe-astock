@@ -1,10 +1,11 @@
 {{/*
   文章末尾的赞赏区（支付宝 / 微信）。独立于旧的按金额打赏弹窗（reward.html）：
   那套弹窗默认关闭（hugo.toml 的 reward = false），这里只做静态两张收款码。
-  开关：hugo.toml [params] 里的 sponsor = true / false。
+  开关：hugo.toml [params] 里的 sponsor = true / false（全站）；
+  单篇文章可在 front matter 写 sponsor: false 单独关闭（如纯介绍性的公告文）。
   图片放在站点 static/img/sponsor/ 下，由 OWNED_DIRS 的 img 同步到 Pages。
 */}}
-{{ if site.Params.sponsor }}
+{{ if and (site.Params.sponsor) (ne .Params.sponsor false) }}
 <style>
   /* 字号对齐 astock.css 的正文体系：正文 16px、导语 .va-leadline 17~18px、
      辅助说明 .va-mini 13px。以前用 .8~.9rem(≈13~14px) 比正文小一圈，读着像脚注。 */
