@@ -1468,18 +1468,30 @@ def write_sources(site_dir: Path | str, reviews_dir: Path | str, dates: list[str
 
 
 def _run(cmd: list[str], cwd: Path | str | None = None, timeout: float | None = None) -> str:
-    env = dict(os.environ)
     # git 网络操作限时：容器里不通时默认会挂两分钟以上，定时任务应快速失败
-    if cmd and cmd[0] == "git":
-        env.setdefault("GIT_TERMINAL_PROMPT", "0")
-        env.setdefault("GIT_HTTP_LOW_SPEED_LIMIT", "1000")
-        env.setdefault("GIT_HTTP_LOW_SPEED_TIME", "20")
-    proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True,
-                          text=True, timeout=timeout, env=env)
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-5:]
-        raise PublishError(f"{cmd[0]} 执行失败：{' '.join(tail)}")
-    return proc.stdout
+    is_git = bool(cmd) and cmd[0] == "git"
+    # git clone/fetch/push 对 github.com 的连通性在本网络是间歇性的（直连被注入 RST，
+    # 代理机也可能挂掉），失败时在「无代理」与「带代理」两种环境间交替重试。
+    is_git_net = is_git and len(cmd) > 1 and cmd[1] in {"clone", "fetch", "push"}
+    no_proxy_env = {k: v for k, v in os.environ.items()
+                    if k.lower() not in ("http_proxy", "https_proxy", "all_proxy")}
+    env_candidates = [no_proxy_env, dict(os.environ)] if no_proxy_env != os.environ \
+        else [dict(os.environ)]
+    tries = 5 if is_git_net else 1
+    proc = None
+    for i in range(tries):
+        env = dict(env_candidates[i % len(env_candidates)])
+        if is_git:
+            env.setdefault("GIT_TERMINAL_PROMPT", "0")
+            env.setdefault("GIT_HTTP_LOW_SPEED_LIMIT", "1000")
+            env.setdefault("GIT_HTTP_LOW_SPEED_TIME", "20")
+        proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True,
+                              text=True, timeout=timeout, env=env)
+        if proc.returncode == 0:
+            return proc.stdout
+    assert proc is not None
+    tail = (proc.stderr or proc.stdout or "").strip().splitlines()[-5:]
+    raise PublishError(f"{cmd[0]} 执行失败：{' '.join(tail)}")
 
 
 def find_hugo(explicit: str | None = None) -> str:
@@ -1706,7 +1718,18 @@ def publish(
     owned = not persistent
     try:
         reuse = (tmp / ".git").is_dir()
-        if auth_mode() == "gh":
+        if os.environ.get("ASTOCK_PAGES_SSH", "").strip() in ("1", "true"):
+            # SSH over 443：本网络对 github.com:443 的 TLS 有间歇性注入封锁，且 clash
+            # 代理与 git https 助手用的 libcurl-gnutls 握手不兼容；SSH（OpenSSL）是
+            # 唯一稳定通道。密钥挂载与 GIT_SSH_COMMAND 由部署侧（compose）注入。
+            url = f"ssh://git@ssh.github.com:443/{repo}.git"
+            if reuse:
+                _run(["git", "remote", "set-url", "origin", url], cwd=tmp)
+                _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=tmp)
+                _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)
+            else:
+                _run(["git", "clone", "--depth", "1", "--branch", branch, url, str(tmp)])
+        elif auth_mode() == "gh":
             if reuse:
                 _run(["git", "fetch", "--depth", "1", "origin", branch], cwd=tmp)
                 _run(["git", "reset", "--hard", "FETCH_HEAD"], cwd=tmp)

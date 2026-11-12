@@ -15,8 +15,11 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # 构建期下载 hugo 要过 GitHub，本网络直连被拦，走代理
-        BUILD_PROXY: ${https_proxy:-http://192.168.200.24:7890}
+        # 境外源直连被 RST、代理带宽受限，构建期统一走国内镜像；其他部署不传则用官方源
+        APT_MIRROR: http://mirrors.tuna.tsinghua.edu.cn/debian
+        NODE_MIRROR: https://registry.npmmirror.com/-/binary/node
+        HUGO_MIRROR: https://ghfast.top/https://github.com/gohugoio/hugo/releases/download
+        PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
     image: vibe-astock:local
     container_name: vibe-astock
     restart: unless-stopped
@@ -238,7 +241,12 @@ services:
       HTTPS_PROXY: ${https_proxy:-http://192.168.200.24:7890}
       no_proxy: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
       NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
-      # 要跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
+      # GitHub Pages 推送走 SSH over 443（ASTOCK_PAGES_SSH=1）：本网络对 github.com:443
+      # 的 TLS 有间歇性封锁，且 clash 代理与 git https（libcurl-gnutls）握手不兼容；
+      # ssh.github.com:443 用 OpenSSL，稳定。密钥是仓库 deploy key（vibe-astock-deploy）。
+      ASTOCK_PAGES_SSH: "1"
+      GIT_SSH_COMMAND: ssh -i /run/secrets/pages-deploy -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+      # 跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
       REVIEW_BASE: http://127.0.0.1:8910
       # 仅微信请求走固定 IP 隧道（wechat-proxy 已改为独立网络+发布到宿主机回环，
       # compose 内用服务名访问；宿主机脚本用 127.0.0.1:13128）；其他数据源仍沿用通用代理
@@ -253,6 +261,8 @@ services:
     # 复用网页容器的网络（服务在它里面监听 8910），但不共享它的进程与数据卷
     network_mode: "service:vibe-astock"
     volumes:
+      # Pages 推送 deploy key（SSH over 443，见上方 ASTOCK_PAGES_SSH）
+      - /root/.ssh/vibe_pages_deploy:/run/secrets/pages-deploy:ro
       - astock-duanxian:/data/duanxian
       - astock-agent:/data/agent
       - astock-market:/data/market
@@ -285,11 +295,18 @@ services:
       # 容器里直连 github.com:443 会被拦（连接超时），必须走代理；git 认的是小写
       # https_proxy，所以这里按 compose 的默认展开规则取宿主环境里的代理地址。
       # 部署机代理不同时改这两行即可。
+      # Pages 推送走 SSH over 443（ASTOCK_PAGES_SSH=1）：本网络对 github.com:443 的
+      # TLS 有间歇性封锁，且 clash 代理与 git https（libcurl-gnutls）握手不兼容；
+      # ssh.github.com:443 用 OpenSSL，稳定。
+      ASTOCK_PAGES_SSH: "1"
+      GIT_SSH_COMMAND: ssh -i /run/secrets/pages-deploy -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
       https_proxy: ${https_proxy:-http://192.168.200.24:7890}
       HTTPS_PROXY: ${https_proxy:-http://192.168.200.24:7890}
       http_proxy: ${http_proxy:-http://192.168.200.24:7890}
       HTTP_PROXY: ${http_proxy:-http://192.168.200.24:7890}
     volumes:
+      # Pages 推送 deploy key（SSH over 443，见环境变量 ASTOCK_PAGES_SSH）
+      - /root/.ssh/vibe_pages_deploy:/run/secrets/pages-deploy:ro
       # 只读挂业务数据：发布只读复盘 JSON 与归档，不写
       - astock-duanxian:/data/duanxian:ro
       - astock-agent:/data/agent:ro

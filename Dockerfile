@@ -30,41 +30,65 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONUTF8=1 \
     PYTHONIOENCODING=utf-8
 
+# 构建期出网：本网络对境外源有两种不稳定性——直连被注入 RST、代理带宽被限到几十 KB/s。
+# 所以 apt 与 nodejs 下载都做成可配置镜像（compose 传国内镜像，其他部署不传则用官方源）。
+ARG APT_MIRROR=""
+ARG NODE_MIRROR="https://nodejs.org/dist"
+# 构建期出网代理：需要时由 compose build.args 显式传入；不传的部署为空值、等于直连。
+ARG HTTP_PROXY=""
+ARG HTTPS_PROXY=""
+ARG http_proxy=""
+ARG https_proxy=""
+ARG NO_PROXY=""
+ARG no_proxy=""
+
 # 运行期仍需要 node：AI 引擎由 runtime/bridge 拉起，不是构建完就不用了。
-# git 供博客发布（blog_publish 要 clone Pages 仓库再 push）。
+# git 供博客发布（blog_publish 要 clone Pages 仓库再 push）；
+# openssh-client：ASTOCK_PAGES_SSH=1 时走 ssh.github.com:443 推送（见 docker-compose.yml），
+# git 的 https 助手链 libcurl-gnutls，与本网络代理不兼容，SSH 是唯一稳定通道。
 # fonts-noto-cjk：情绪卡片图（emotion_card）指定用 Noto Sans CJK SC（ttc index=2），
 # 容器里没有它每日复盘的情绪卡片/公众号封面图会整体跳过。
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl xz-utils ca-certificates git fonts-noto-cjk \
- && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
-    | tar -xJ -C /usr/local --strip-components=1 \
- && node --version && npm --version \
- && rm -rf /var/lib/apt/lists/*
-
-# hugo（extended，博客发布用）：构建时按固定版本号下载，不把 60M 二进制塞进仓库。
-# 版本与已发布文章的一致，升级时只改 HUGO_VERSION 这一个 ARG。
-# 走代理（构建环境直连 GitHub 会被拦），成功后把 hugo 挪到 /usr/local/bin。
-ARG HUGO_VERSION=0.169.0
-# 构建期代理：本网络直连 github.com 会被拦，必须显式给。默认与部署机一致。
-ARG BUILD_PROXY=http://192.168.200.24:7890
-RUN https_proxy="$BUILD_PROXY" http_proxy="$BUILD_PROXY" \
-    curl -fsSL --retry 3 --connect-timeout 20 \
-      "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz" \
-    | tar -xz -C /usr/local/bin hugo \
- && chmod +x /usr/local/bin/hugo && hugo version \
- && apt-get purge -y --auto-remove xz-utils \
- && rm -rf /var/lib/apt/lists/*
-# curl 保留：容器内排查外部数据源（Tushare / GitHub）时要用
+RUN set -e; \
+    if [ -n "$APT_MIRROR" ]; then \
+        rm -f /etc/apt/sources.list.d/debian.sources; \
+        echo "deb $APT_MIRROR bookworm main" > /etc/apt/sources.list.d/mirror.list \
+        && echo "deb $APT_MIRROR bookworm-updates main" >> /etc/apt/sources.list.d/mirror.list \
+        && echo "deb $APT_MIRROR-security bookworm-security main" >> /etc/apt/sources.list.d/mirror.list; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl xz-utils ca-certificates git openssh-client fonts-noto-cjk; \
+    curl -fsSL "${NODE_MIRROR}/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+    | tar -xJ -C /usr/local --strip-components=1; \
+    node --version && npm --version; \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt ./
-RUN https_proxy="$BUILD_PROXY" http_proxy="$BUILD_PROXY" \
-    pip install --no-cache-dir -r requirements.txt
+# pip 源同样可配置：本网络走清华镜像，其他部署不传则用官方 PyPI。
+ARG PIP_INDEX_URL="https://pypi.org/simple"
+RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" -r requirements.txt
 
 COPY . .
 # 这两个目录已被 .dockerignore 排除（避免把宿主机的构建产物带进来），从构建阶段取
 COPY --from=build /build/runtime ./runtime
 COPY --from=build /build/frontend/dist ./frontend/dist
+
+# hugo（extended，博客发布用）：优先用构建上下文里宿主机已下载好的 .local/bin/hugo
+# （.dockerignore 只放行这一个文件，见该文件）；没有时再按固定版本号从 HUGO_MIRROR
+# 下载。不把二进制塞进仓库，也不强依赖某个境外地址的可用性。
+# 版本与已发布文章的一致，升级时只改 HUGO_VERSION 这一个 ARG。
+ARG HUGO_VERSION=0.169.0
+ARG HUGO_MIRROR="https://github.com/gohugoio/hugo/releases/download"
+RUN if [ -f .local/bin/hugo ]; then \
+        echo "hugo: 使用构建上下文的 .local/bin/hugo"; \
+        install -m 755 .local/bin/hugo /usr/local/bin/hugo; \
+    else \
+        curl -fsSL --retry 3 --connect-timeout 20 \
+            --speed-limit 20000 --speed-time 30 \
+            "${HUGO_MIRROR}/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz" \
+        | tar -xz -C /usr/local/bin hugo && chmod +x /usr/local/bin/hugo; \
+    fi; \
+    hugo version
 
 # 业务数据全部重定向到 /data，由 compose 的命名卷持久化；默认是在 home 下，
 # 容器重建会丢。
