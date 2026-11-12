@@ -168,15 +168,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # 微信固定出口：SSH 隧道只监听主容器回环，不暴露公网代理端口。
-  # 云上 Squid 也只监听回环；首次启动前需由使用者手动 SSH 验证主机指纹。
+  # 微信固定出口：SSH 隧道到云上 Squid（固定 IP 43.167.156.156，已在公众号白名单）。
+  # 2026-11-12 起改独立网络 + 端口只发布到宿主机回环：宿主机脚本可直接用
+  # WECHAT_PROXY=http://127.0.0.1:13128（此前只存在于主容器 netns，宿主机不可用）；
+  # compose 内（review 服务）用服务名 http://wechat-proxy:13128。
   wechat-proxy:
     build:
       context: .
       dockerfile: scripts/wechat-proxy/Dockerfile
     image: vibe-astock-wechat-proxy:local
     container_name: vibe-astock-wechat-proxy
-    network_mode: service:vibe-astock
+    ports:
+      - "127.0.0.1:13128:13128"
     depends_on:
       vibe-astock:
         condition: service_healthy
@@ -193,7 +196,8 @@ services:
       - -N
       - -T
       - -L
-      - 13128:127.0.0.1:3128
+      # 显式绑 0.0.0.0:ssh -L 默认只绑回环，docker 端口发布到 eth0 连进来会被拒
+      - 0.0.0.0:13128:127.0.0.1:3128
       - -i
       - /root/.ssh/id_rsa
       - -o
@@ -236,8 +240,9 @@ services:
       NO_PROXY: localhost,127.0.0.1,192.168.15.131,192.168.200.24,.eastmoney.com,.qq.com,.baidu.com,.gtimg.cn,.tencent.com,.tencentbuddy.com,.tushare.pro
       # 要跟常驻容器进同一个网络命名空间才能连它的 8910（见 network_mode）
       REVIEW_BASE: http://127.0.0.1:8910
-      # 仅微信请求走固定 IP 隧道；其他数据源仍沿用上面的通用代理口径
-      WECHAT_PROXY: http://127.0.0.1:13128
+      # 仅微信请求走固定 IP 隧道（wechat-proxy 已改为独立网络+发布到宿主机回环，
+      # compose 内用服务名访问；宿主机脚本用 127.0.0.1:13128）；其他数据源仍沿用通用代理
+      WECHAT_PROXY: http://wechat-proxy:13128
       # 微信只进草稿箱、后台人工点群发:本账号群发接口被微信拒(48001 api unauthorized),
       # 不要设 WECHAT_AUTOPUBLISH=1(设了每天会在群发这步报错,草稿其实已写好)。
       # 重试用模型清单。镜像里 scripts/review_daily.py 的默认清单会过期
