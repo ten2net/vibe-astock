@@ -44,10 +44,17 @@ const NO_STORE = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"
 
 const DENY_HTML = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
   + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>需要访问链接</title>'
-  + '<style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:560px;margin:15vh auto;padding:0 20px;color:#1f2328;line-height:1.7}</style>'
+  + "<style>body{font-family:-apple-system,\"PingFang SC\",\"Microsoft YaHei\",sans-serif;max-width:560px;margin:12vh auto;padding:0 20px;color:#1f2328;line-height:1.8}"
+  + "h1{font-size:22px}code{background:#f3f4f6;padding:1px 5px;border-radius:4px}"
+  + ".qr{display:block;width:200px;max-width:70%;margin:20px auto;border:1px solid #e4e6ea;border-radius:12px}"
+  + "ol{padding-left:22px}li{margin:8px 0}.muted{color:#6a737d;font-size:13px}</style>"
   + "</head><body><h1>需要访问链接</h1>"
-  + "<p>这个 Vibe AStock 页面只对拿到访问链接的人开放。请用部署者发给你的<strong>完整链接</strong>打开(链接里带 <code>access=…</code>)。</p>"
-  + "<p>以前能打开、现在打不开:多半是部署者换了新链接,请向对方要新的。</p></body></html>";
+  + "<p>揽宝投研 V2 版只对拿到访问链接的人开放。按下面两步获取属于你的首次访问链接:</p>"
+  + '<img class="qr" src="https://ten2net.github.io/img/lanbao.png" alt="揽宝投研 微信公众号二维码">'
+  + "<ol><li>微信扫码(或搜索)关注<strong>揽宝投研</strong>公众号;</li>"
+  + "<li>在公众号里发私信,关键词:<code>访问码</code>;</li>"
+  + "<li>收到回复的带 <code>access=…</code> 的完整链接后,用它打开本页即可。</li></ol>"
+  + '<p class="muted">以前能打开、现在打不开:多半是访问码已失效,在公众号里重新发一次「访问码」即可。</p></body></html>';
 
 function deny(req: IncomingMessage, res: ServerResponse): void {
   if (String(req.url ?? "").startsWith("/api/")) {
