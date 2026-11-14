@@ -6,9 +6,13 @@
     python scripts/review_daily.py --publish          # 生成成功后顺手发布博客
     python scripts/review_daily.py --wait 3600        # 单次等待上限（秒），默认 5400
     python scripts/review_daily.py --force            # 那天已复盘也重跑
+    python scripts/review_daily.py --trading-day-only # 今天非交易日则直接跳过（cron 用）
 
 日期默认取「最近已收盘交易日」（trade_calendar.latest_session），所以周末、节假日、
 还没收盘时跑都只会落到上一个真正收盘的交易日，不会为没收盘的今天开跑。
+宿主 cron 只在周一到周五触发，遇到法定节假日仍会空跑一次；加 --trading-day-only
+后，明确判定今天不是真实交易日就直接退出，连空跑都不做。取不到交易日历（网络故障）
+时不拦截，交回脚本原有逻辑，避免因守卫误判而漏发。
 
 失败重试：订阅侧偶尔会出现「思考了很久但没出正文」被上游中断（CLI 日志里是
 Empty stream / finish_reason=error）。这种情况换一个模型重跑通常能过，所以
@@ -159,6 +163,21 @@ def _publish(log, date: str) -> int:
     return 0
 
 
+def _is_trading_day_today() -> bool | None:
+    """今天是否为真实 A 股交易日。
+
+    True=是 / False=明确不是（节假日等）/ None=取不到交易日历（网络故障）。
+    判据走全系统唯一入口 trade_calendar 的真实交易日序列，不靠 weekday 猜。
+    """
+    from duanxian import trade_calendar
+    from duanxian.util import china_today
+
+    dates = trade_calendar.last_trade_dates(1)
+    if not dates:
+        return None
+    return dates[-1] == china_today()
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="提交并等待当日复盘")
     ap.add_argument("--base", default=os.environ.get("REVIEW_BASE", "http://127.0.0.1:8910"),
@@ -172,8 +191,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--wait", type=int, default=5400, help="单次等待上限秒数")
     ap.add_argument("--poll", type=float, default=20.0, help="轮询间隔秒数")
     ap.add_argument("--publish", action="store_true", help="复盘成功后顺带发布博客")
+    ap.add_argument("--trading-day-only", action="store_true",
+                    help="今天非交易日则直接跳过（供宿主 cron 精确到交易日使用）")
     ap.add_argument("--dry-run", action="store_true", help="只打印将要提交的内容")
     args = ap.parse_args(argv)
+
+    def log(m: str) -> None:
+        print(m, file=sys.stderr, flush=True)
+
+    if args.trading_day_only:
+        verdict = _is_trading_day_today()
+        if verdict is False:
+            log("今天非交易日，按 --trading-day-only 跳过本次生成与发布")
+            return 0
+        # verdict 为 True 或 None（判不出）都继续；取不到日历时不拦截，避免漏发
 
     date = args.date.strip()
     if not date:
@@ -182,9 +213,6 @@ def main(argv: list[str] | None = None) -> int:
     if not date:
         print("判不出最近已收盘交易日，放弃", file=sys.stderr)
         return 2
-
-    def log(m: str) -> None:
-        print(m, file=sys.stderr, flush=True)
 
     if args.dry_run:
         print(json.dumps({"date": date, "provider": args.provider, "model": args.model,

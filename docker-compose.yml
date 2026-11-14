@@ -219,10 +219,11 @@ services:
       - ExitOnForwardFailure=yes
       - ${WECHAT_PROXY_SSH_USER:-root}@43.167.156.156
 
-  # 一次性「生成当日复盘」容器：跑完就退，不常驻。由宿主 cron 每天收盘后拉起：
+  # 一次性「生成当日复盘」容器：跑完就退，不常驻。由宿主 cron 每个交易日 19:30 拉起：
   #   docker compose run --rm review
   # 它向常驻的 vibe-astock 后端提交 /api/review-agent/daily 并等任务跑完；
   # 日期取「最近已收盘交易日」，周末/节假日/没收盘时只会落到上一场。
+  # --trading-day-only 让法定节假日（cron 的 1-5 仍会触发）直接跳过、连空跑都不做。
   review:
     image: vibe-astock:local
     profiles: ["review"]
@@ -271,7 +272,8 @@ services:
     # 不再另起固定时刻的发布任务；失败自动换模型重试（REVIEW_FALLBACK_MODELS）。
     # 微信凭据走 env_file 注入的 WECHAT_APPID / WECHAT_SECRET，未配置则跳过微信步骤。
     # 微信只进草稿箱、后台人工点群发（本账号无群发 API 权限，48001）。
-    command: ["--wait", "5400", "--poll", "20", "--publish"]
+    # --trading-day-only：非交易日（含法定节假日）直接退出，配合宿主 cron 精确到交易日。
+    command: ["--wait", "5400", "--poll", "20", "--publish", "--trading-day-only"]
 
   # 一次性发布容器：跑完就退，不常驻。由宿主 cron 每天盘后拉起：
   #   docker compose run --rm publish --recent 3

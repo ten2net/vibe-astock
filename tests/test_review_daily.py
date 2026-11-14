@@ -102,3 +102,54 @@ def test_bark_failure_keeps_publish_success(fake_publish, monkeypatch):
     monkeypatch.setenv("BARK_DEVICE_KEY", "test-device-key")
     monkeypatch.setattr(rd, "_api", lambda *a, **k: (_ for _ in ()).throw(OSError("network down")))
     assert rd._publish(lambda m: None, "2026-11-04") == 0
+
+
+class TestTradingDayOnly:
+    """宿主 cron 精确到交易日：--trading-day-only 的跳过/放行逻辑。"""
+
+    def test_is_trading_day_true(self, monkeypatch):
+        # 真·实现：拿真实交易日序列末位与今天比较
+        import duanxian.trade_calendar as tc
+        import duanxian.util as u
+        monkeypatch.setattr(tc, "last_trade_dates", lambda n: ["2026-11-14"])
+        monkeypatch.setattr(u, "china_today", lambda: "2026-11-14")
+        assert rd._is_trading_day_today() is True
+
+    def test_is_trading_day_false_on_holiday(self, monkeypatch):
+        import duanxian.trade_calendar as tc
+        import duanxian.util as u
+        monkeypatch.setattr(tc, "last_trade_dates", lambda n: ["2026-11-13"])
+        monkeypatch.setattr(u, "china_today", lambda: "2026-11-14")
+        assert rd._is_trading_day_today() is False
+
+    def test_is_trading_day_none_when_calendar_unavailable(self, monkeypatch):
+        import duanxian.trade_calendar as tc
+        monkeypatch.setattr(tc, "last_trade_dates", lambda n: [])
+        assert rd._is_trading_day_today() is None
+
+    def test_main_skips_on_non_trading_day(self, monkeypatch):
+        """非交易日：连后端状态都不查，直接 0 退出。"""
+        called = []
+        monkeypatch.setattr(rd, "_is_trading_day_today", lambda: False)
+        monkeypatch.setattr(rd, "_status", lambda base: called.append("status") or {})
+        rc = rd.main(["--publish", "--trading-day-only"])
+        assert rc == 0
+        assert called == []          # 没提交复盘、没发布
+
+    def test_main_continues_on_trading_day_or_unknown(self, monkeypatch):
+        """交易日 / 判不出日历：不拦截，继续走原有流程（dry-run 到此为止）。"""
+        monkeypatch.setattr(rd, "_is_trading_day_today", lambda: True)
+        monkeypatch.setattr("duanxian.trade_calendar.latest_session", lambda: "2026-11-14")
+        rc = rd.main(["--trading-day-only", "--dry-run"])
+        assert rc == 0
+        monkeypatch.setattr(rd, "_is_trading_day_today", lambda: None)
+        rc = rd.main(["--trading-day-only", "--date", "2026-11-14", "--dry-run"])
+        assert rc == 0
+
+    def test_without_flag_never_checks_calendar(self, monkeypatch):
+        """不加 flag：行为完全不变，不去查交易日历。"""
+        def boom():
+            raise AssertionError("不该查交易日历")
+        monkeypatch.setattr(rd, "_is_trading_day_today", boom)
+        monkeypatch.setattr("duanxian.trade_calendar.latest_session", lambda: "2026-11-14")
+        assert rd.main(["--date", "2026-11-14", "--dry-run"]) == 0
