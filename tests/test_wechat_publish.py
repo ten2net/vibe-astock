@@ -73,6 +73,37 @@ class TestRender:
         assert "情绪面" in html and "接力转弱。" in html
         assert "板块与宏观" in html and "AI 算力无匹配概念板块" in html
 
+    def test_up_down_color_on_percentages(self):
+        """涨跌幅按涨红跌绿：正红、负绿；比率（晋级率）不着色。"""
+        p = payload()
+        p["emotion_metrics"]["money_effect"]["avg"] = 2.34   # 正 → 红
+        html = wr.article_html(p, DATE, "")
+        assert f'<span style="color:{wr.C_UP};">2.34%</span>' in html
+        p["emotion_metrics"]["money_effect"]["avg"] = -0.37  # 负 → 绿
+        html = wr.article_html(p, DATE, "")
+        assert f'<span style="color:{wr.C_DOWN};">-0.37%</span>' in html
+        assert "19.0%" in html                                 # 晋级率是比率，不上色
+        assert f'<span style="color:{wr.C_UP};">19.0%</span>' not in html
+
+    def test_event_ret_colored_red_and_green(self):
+        """事件串当日涨跌：+9.98% 红、-3.20% 绿，且仍是微信安全 HTML。"""
+        p = payload(market_facts={"event_ledger": {"events": [
+            {"name": "甲", "tag": "最高标", "note": "4 连板", "ret": 9.98},
+            {"name": "乙", "tag": "高标跌停", "note": "断板", "ret": -3.20},
+        ]}})
+        html = wr.article_html(p, DATE, "")
+        assert f'<span style="color:{wr.C_UP};">(+9.98%)</span>' in html
+        assert f'<span style="color:{wr.C_DOWN};">(-3.20%)</span>' in html
+        assert 'class=' not in html
+
+    def test_read_original_cta_is_prominent(self):
+        """结尾醒目引导块：明确提示点「阅读原文」看图文版与交互式复盘。"""
+        html = wr.article_html(payload(), DATE, "https://ten2net.github.io/post/x/")
+        assert "点击左下角「阅读原文」" in html
+        assert "完整图文版" in html and "交互式复盘工作台" in html
+        assert wr.S_CTA in html                     # 醒目卡片样式确实被套上
+        assert "background:#fff8e6" in html        # 浅橙底 + 橙色粗边，非灰色小字
+
 
 class TestDraftPayload:
     def test_multipart_body(self):
