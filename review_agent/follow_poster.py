@@ -189,6 +189,56 @@ def render_poster_png(out_path: Path | str, *,
     return out
 
 
+# ---------------------------------------------------------------- 横版头图（草稿封面）
+# 微信头条封面按 2.35:1（1080×460）展示，天生就是这个比例、不需要再裁。
+H_WIDTH, H_HEIGHT = 1080, 460
+
+
+def render_header_png(out_path: Path | str, *,
+                      log: Callable[[str], None] = lambda _m: None) -> Path:
+    """画一张 1080×460 横版头图，给「寻找同频的投研人」这类拉关注图文当封面。
+
+    含蓄主题：只讲「同频、慢慢看清楚」，不喊关注、不带数字。品牌暗底 + 暖橙，
+    与竖版贴图 / 情绪卡片同一套字体与配色。
+    """
+    from PIL import Image, ImageDraw
+
+    f_kicker = _load_font(22, bold=False)
+    f_head = _load_font(58, bold=True)
+    f_sub = _load_font(26, bold=False)
+    f_sign = _load_font(22, bold=False)
+
+    img = _gradient((H_WIDTH, H_HEIGHT))
+    d = ImageDraw.Draw(img)
+    pad = 64
+
+    # 左侧一条暖橙竖线作视觉锚点
+    d.rounded_rectangle([(pad, 96), (pad + 6, 300)], radius=3, fill=ACCENT)
+
+    tx = pad + 34
+    d.text((tx, 74), f"{BRAND} · 写给同路的人", font=f_kicker, fill=LABEL_COLOR)
+    # 主标：一行放得下就一行，超了自动折成两行
+    head = "同频的人，终会走到一起"
+    lines = _wrap(d, head, f_head, H_WIDTH - 2 * pad - 34)[:2]
+    y = 128
+    for ln in lines:
+        d.text((tx, y), ln, font=f_head, fill=PHASE_COLOR)
+        y += 76
+    d.text((tx, y + 12), "不催、不喊，只把公开的数据摊开，慢慢看",
+           font=f_sub, fill=NOTE_COLOR)
+
+    # 右下角落款
+    sign = f"{BRAND} · 数字由程序核对"
+    sw = d.textlength(sign, font=f_sign)
+    d.text((H_WIDTH - pad - sw, H_HEIGHT - 52), sign, font=f_sign, fill=ACCENT)
+
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, format="PNG", optimize=True)
+    log(f"头图已生成：{out}（{H_WIDTH}×{H_HEIGHT}）")
+    return out
+
+
 # ---------------------------------------------------------------- 公众号图文正文
 def _esc(t: str) -> str:
     return html.escape(t)

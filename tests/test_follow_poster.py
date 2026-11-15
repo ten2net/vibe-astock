@@ -87,6 +87,50 @@ class TestWechatPoster:
         with pytest.raises(wp.WechatError):
             wp.upload_content_image("tk", img)
 
+    def test_header_png_written_with_expected_size(self, tmp_path):
+        out = fp.render_header_png(tmp_path / "h" / "header.png")
+        assert out.is_file() and out.stat().st_size > 5_000
+        from PIL import Image
+        with Image.open(out) as im:
+            assert im.size == (fp.H_WIDTH, fp.H_HEIGHT)
+            assert im.size[0] / im.size[1] > 2.3   # 2.35:1，不用再裁
+
+    def test_set_draft_cover_preserves_all_other_fields(self, monkeypatch):
+        """只改 thumb_media_id：正文/标题/评论开关/只读字段都不能丢或回传。"""
+        original = {
+            "title": "寻找 100 位同频的投研人", "author": "揽宝", "digest": "",
+            "content": "<section>手工编辑的长正文</section>", "content_source_url": "",
+            "thumb_media_id": "", "need_open_comment": 1, "only_fans_can_comment": 0,
+            "show_cover_pic": 0,
+            "url": "http://mp.weixin.qq.com/s?x", "thumb_url": "", "article_type": "news",
+        }
+        seen = {}
+
+        def fake_post(path, payload, token, timeout=20.0):
+            if path.endswith("/draft/get"):
+                return {"news_item": [original]}
+            seen["path"] = path
+            seen["payload"] = payload
+            return {}
+
+        monkeypatch.setattr(wp, "_post_json", fake_post)
+        title = wp.set_draft_cover("tk", "MID", "THUMB1")
+        assert title == "寻找 100 位同频的投研人"
+        assert seen["path"] == "/cgi-bin/draft/update"
+        art = seen["payload"]["articles"]
+        assert art["thumb_media_id"] == "THUMB1"
+        assert art["content"] == original["content"]      # 手工正文原样保留
+        assert art["title"] == original["title"]
+        assert art["need_open_comment"] == 1
+        for readonly in ("url", "thumb_url", "article_type"):
+            assert readonly not in art                     # 只读字段不回传
+        assert seen["payload"]["media_id"] == "MID" and seen["payload"]["index"] == 0
+
+    def test_get_draft_article_missing_index_raises(self, monkeypatch):
+        monkeypatch.setattr(wp, "_post_json", lambda *a, **k: {"news_item": []})
+        with pytest.raises(wp.WechatError):
+            wp.get_draft_article("tk", "MID")
+
     def test_publish_follow_poster_draft_only(self, monkeypatch, tmp_path):
         """全链路 mock：只进草稿箱，阅读原文指向揽宝系统，不群发。"""
         png = tmp_path / "poster.png"

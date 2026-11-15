@@ -239,6 +239,39 @@ def add_draft(token: str, *, title: str, content: str, digest: str,
     return str(media_id)
 
 
+# draft/update 只认这些可写字段；draft/get 还会返回 url / thumb_url /
+# article_type 等只读字段，回传它们会被拒，所以这里显式白名单。
+_DRAFT_WRITABLE = (
+    "title", "author", "digest", "content", "content_source_url",
+    "thumb_media_id", "need_open_comment", "only_fans_can_comment",
+    "show_cover_pic",
+)
+
+
+def get_draft_article(token: str, media_id: str, *, index: int = 0) -> dict:
+    """读回草稿里的一篇图文（含完整正文），供「只改封面」这类局部更新用。"""
+    data = _post_json("/cgi-bin/draft/get", {"media_id": media_id}, token)
+    items = data.get("news_item") or []
+    if index >= len(items):
+        raise WechatError(f"草稿 {media_id} 没有第 {index} 篇图文")
+    return dict(items[index])
+
+
+def set_draft_cover(token: str, media_id: str, thumb_media_id: str,
+                    *, index: int = 0) -> str:
+    """给已有草稿补/换头图，**保留其余全部字段原样**（不破坏后台手工编辑的正文）。
+
+    draft/update 会整体替换这一篇，所以先 draft/get 拿完整内容，只覆盖
+    thumb_media_id，再用可写字段白名单回传，绝不丢正文/标题/评论开关。
+    """
+    article = get_draft_article(token, media_id, index=index)
+    article["thumb_media_id"] = thumb_media_id
+    payload = {"media_id": media_id, "index": index,
+               "articles": {k: article[k] for k in _DRAFT_WRITABLE if k in article}}
+    _post_json("/cgi-bin/draft/update", payload, token)
+    return str(article.get("title") or "")
+
+
 def freepublish(token: str, draft_media_id: str, *, wait: bool = True,
                 timeout_s: float = 120.0) -> str:
     """提交发布并轮询结果；返回 publish_id。发布失败抛 WechatError。"""
