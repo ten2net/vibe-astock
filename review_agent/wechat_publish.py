@@ -286,3 +286,67 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
         result["publish_id"] = freepublish(token, draft_id)
         log(f"{date}：已提交发布 {result['publish_id']}")
     return result
+
+
+def upload_content_image(token: str, image: Path) -> str:
+    """上传一张图供**图文正文**里的 <img> 用，返回微信侧 URL。
+
+    与 ``upload_cover`` 不同：add_material 返回的是 media_id，正文 <img src>
+    不能直接用；这里走 ``/cgi-bin/media/uploadimg``，返回可直接嵌进正文的
+    http://mmbiz.qpic.cn/... URL（不占永久素材库、不返回 media_id）。
+    """
+    image = Path(image)
+    if not image.exists():
+        raise WechatError(f"正文贴图不存在：{image}")
+    body, boundary = _multipart_body("media", image.name, image.read_bytes())
+    url = f"{API}/cgi-bin/media/uploadimg?access_token={urllib.parse.quote(token)}"
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    try:
+        with _OPENER.open(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise WechatError(f"正文贴图上传失败：{type(exc).__name__}") from exc
+    img_url = data.get("url")
+    if not img_url:
+        raise WechatError(f"正文贴图上传被拒：{data.get('errcode')} {data.get('errmsg')}")
+    return str(img_url)
+
+
+def publish_follow_poster(*, poster: Path | None = None,
+                          cover: Path | None = None,
+                          draft_only: bool = True,
+                          log: Callable[[str], None] = lambda _m: None) -> dict:
+    """把「长期拉关注」贴图发成一篇公众号图文（默认只进草稿箱，不群发）。
+
+    贴图 PNG 用 ``follow_poster`` 生成到数据区；正文内嵌它的 URL，
+    「阅读原文」指向揽宝系统线上入口。微信侧失败抛 WechatError。
+    """
+    from . import follow_poster as fp
+
+    fp.check_copy()
+    if poster:
+        png = Path(poster)
+    else:
+        out_dir = Path(data_path("reviews")).parent / "wechat-posters"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        png = fp.render_poster_png(out_dir / "follow-poster.png", log=log)
+    if not png.is_file():
+        raise WechatError(f"贴图文件不存在：{png}")
+    log(f"贴图：{png}")
+
+    token = get_access_token()
+    img_url = upload_content_image(token, png)
+    log(f"正文贴图 URL：{img_url[:60]}…")
+    # 封面用品牌徽章：竖长贴图被裁成 2.35:1 横条会难看
+    thumb = upload_cover(token, cover or DEFAULT_COVER)
+    content = fp.article_html(image_url=img_url)
+    draft_id = add_draft(
+        token, title=fp.COPY.title, content=content, digest=fp.COPY.digest,
+        source_url=fp.READ_ORIGINAL_URL, thumb_media_id=thumb)
+    log(f"贴图图文已写入草稿箱 {draft_id}")
+    result = {"draft_id": draft_id, "publish_id": "", "image_url": img_url}
+    if not draft_only:
+        result["publish_id"] = freepublish(token, draft_id)
+        log(f"贴图图文已提交发布 {result['publish_id']}")
+    return result
