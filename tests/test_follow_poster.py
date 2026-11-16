@@ -95,6 +95,23 @@ class TestWechatPoster:
             assert im.size == (fp.H_WIDTH, fp.H_HEIGHT)
             assert im.size[0] / im.size[1] > 2.3   # 2.35:1，不用再裁
 
+    def test_header_uses_shared_asset(self, tmp_path):
+        """通用头图与默认封面都指向仓库里那张专属素材，不再各自另画。"""
+        assert fp.HEADER_ASSET.is_file()
+        assert fp.HEADER_ASSET.name == "头图1.jpg"
+        assert wp.DEFAULT_COVER == fp.HEADER_ASSET
+        from PIL import Image, ImageChops
+        out = fp.render_header_png(tmp_path / "header.png")
+        with Image.open(fp.HEADER_ASSET) as src, Image.open(out) as got:
+            # 产物就是素材等比缩放后的像素（不是空白/另画的通用图）
+            expect = src.convert("RGB").resize((fp.H_WIDTH, fp.H_HEIGHT), Image.LANCZOS)
+            assert ImageChops.difference(expect, got.convert("RGB")).getbbox() is None
+
+    def test_header_missing_asset_raises(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fp, "HEADER_ASSET", tmp_path / "missing.jpg")
+        with pytest.raises(fp.PosterError):
+            fp.render_header_png(tmp_path / "x.png")
+
     def test_set_draft_cover_preserves_all_other_fields(self, monkeypatch):
         """只改 thumb_media_id：正文/标题/评论开关/只读字段都不能丢或回传。"""
         original = {

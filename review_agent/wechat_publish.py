@@ -19,13 +19,14 @@ from typing import Callable, Mapping
 
 from .blog_publish import PublishError, check_public_text, load_review, post_title
 from .wechat_render import article_html
+from .follow_poster import HEADER_ASSET
 from duanxian.paths import data_path  # noqa: E402
 
 API = "https://api.weixin.qq.com"
 PRODUCT_NAME = "揽宝投研"
-# 卡片图缺失时退回的默认封面（仓库里的硬币徽章）；卡片见 card_cover()
-# 草稿接口里 thumb_media_id 必填，必须给一张
-DEFAULT_COVER = Path(__file__).resolve().parents[1] / "blog" / "static" / "img" / "avatar.png"
+# 默认封面统一用仓库里的专属头图素材（2.35:1，与 render_header_png 同源）。
+# 卡片图缺失时退回它；草稿接口 thumb_media_id 必填，必须给一张。
+DEFAULT_COVER = HEADER_ASSET
 
 # 公众号头条封面按 2.35:1（1080×460）展示，thumb_media_id 也按这个比例给，
 # 否则后台/分享时会被上下裁切。情绪卡片是 1.9:1，上传前居中裁一刀。
