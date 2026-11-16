@@ -126,6 +126,54 @@ class TestWechatPoster:
             assert readonly not in art                     # 只读字段不回传
         assert seen["payload"]["media_id"] == "MID" and seen["payload"]["index"] == 0
 
+    def test_set_draft_source_url_preserves_content_and_cover(self, monkeypatch):
+        """补「阅读原文」只改 content_source_url，头图与手工正文都保留。"""
+        original = {
+            "title": "寻找 100 位同频的投研人", "author": "揽宝", "digest": "",
+            "content": "<section>手工编辑的长正文</section>", "content_source_url": "",
+            "thumb_media_id": "THUMB1", "need_open_comment": 1, "only_fans_can_comment": 0,
+            "show_cover_pic": 0, "url": "http://mp.weixin.qq.com/s?x",
+        }
+        seen = {}
+
+        def fake_post(path, payload, token, timeout=20.0):
+            if path.endswith("/draft/get"):
+                return {"news_item": [original]}
+            seen["payload"] = payload
+            return {}
+
+        monkeypatch.setattr(wp, "_post_json", fake_post)
+        wp.set_draft_source_url("tk", "MID", wp.BLOG_POSTS_URL)
+        art = seen["payload"]["articles"]
+        assert art["content_source_url"] == wp.BLOG_POSTS_URL
+        assert art["thumb_media_id"] == "THUMB1"            # 上次加的头图没被抹掉
+        assert art["content"] == original["content"]
+        assert art["need_open_comment"] == 1
+        assert "url" not in art
+        assert wp.BLOG_POSTS_URL == "https://ten2net.github.io/post/"
+
+    def test_patch_skips_empty_thumb_to_avoid_40007(self, monkeypatch):
+        """草稿本来没头图时改别的字段：不能回传空 thumb_media_id，否则微信报 40007。"""
+        original = {
+            "title": "x", "author": "揽宝", "digest": "", "content": "<p>正文</p>",
+            "content_source_url": "", "thumb_media_id": "",
+            "need_open_comment": 1, "only_fans_can_comment": 0, "show_cover_pic": 0,
+        }
+        seen = {}
+
+        def fake_post(path, payload, token, timeout=20.0):
+            if path.endswith("/draft/get"):
+                return {"news_item": [original]}
+            seen["payload"] = payload
+            return {}
+
+        monkeypatch.setattr(wp, "_post_json", fake_post)
+        wp.set_draft_source_url("tk", "MID", wp.BLOG_POSTS_URL)
+        art = seen["payload"]["articles"]
+        assert "thumb_media_id" not in art
+        assert art["content_source_url"] == wp.BLOG_POSTS_URL
+        assert art["content"] == "<p>正文</p>"
+
     def test_get_draft_article_missing_index_raises(self, monkeypatch):
         monkeypatch.setattr(wp, "_post_json", lambda *a, **k: {"news_item": []})
         with pytest.raises(wp.WechatError):

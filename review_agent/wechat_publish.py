@@ -257,19 +257,34 @@ def get_draft_article(token: str, media_id: str, *, index: int = 0) -> dict:
     return dict(items[index])
 
 
-def set_draft_cover(token: str, media_id: str, thumb_media_id: str,
-                    *, index: int = 0) -> str:
-    """给已有草稿补/换头图，**保留其余全部字段原样**（不破坏后台手工编辑的正文）。
+def _patch_draft(token: str, media_id: str, changes: dict, *, index: int = 0) -> str:
+    """局部更新草稿：先读回完整 article，只覆盖 changes 里的字段再整体回传。
 
-    draft/update 会整体替换这一篇，所以先 draft/get 拿完整内容，只覆盖
-    thumb_media_id，再用可写字段白名单回传，绝不丢正文/标题/评论开关。
+    draft/update 是整体替换，所以必须用可写字段白名单拼 payload，
+    保证后台手工编辑的正文 / 标题 / 评论开关 / 只读字段都不丢。
     """
     article = get_draft_article(token, media_id, index=index)
-    article["thumb_media_id"] = thumb_media_id
-    payload = {"media_id": media_id, "index": index,
-               "articles": {k: article[k] for k in _DRAFT_WRITABLE if k in article}}
+    article.update(changes)
+    writable = {k: article[k] for k in _DRAFT_WRITABLE if k in article}
+    # 空 thumb_media_id 回传会被微信判 40007 invalid media_id（草稿本来就没头图时
+    # 改别的字段会踩这个坑）。没封面就别回传这个字段，让其余字段照常更新。
+    if not writable.get("thumb_media_id"):
+        writable.pop("thumb_media_id", None)
+    payload = {"media_id": media_id, "index": index, "articles": writable}
     _post_json("/cgi-bin/draft/update", payload, token)
     return str(article.get("title") or "")
+
+
+def set_draft_cover(token: str, media_id: str, thumb_media_id: str,
+                    *, index: int = 0) -> str:
+    """给已有草稿补/换头图，其余字段原样保留。"""
+    return _patch_draft(token, media_id, {"thumb_media_id": thumb_media_id}, index=index)
+
+
+def set_draft_source_url(token: str, media_id: str, source_url: str,
+                         *, index: int = 0) -> str:
+    """给已有草稿补/换「阅读原文」跳转，其余字段原样保留。"""
+    return _patch_draft(token, media_id, {"content_source_url": source_url}, index=index)
 
 
 def freepublish(token: str, draft_media_id: str, *, wait: bool = True,
@@ -292,6 +307,10 @@ def freepublish(token: str, draft_media_id: str, *, wait: bool = True,
         if status >= 2:
             raise WechatError(f"发布失败（status={status}）: {st.get('fail_msg') or st}")
     raise WechatError("发布状态轮询超时")
+
+
+# 博客「图文版」归档页：按交易日排列的全部复盘图文，长期稳定、不指向会过时的单篇
+BLOG_POSTS_URL = "https://ten2net.github.io/post/"
 
 
 def blog_post_url(date: str) -> str:
