@@ -266,10 +266,12 @@ def _patch_draft(token: str, media_id: str, changes: dict, *, index: int = 0) ->
     article = get_draft_article(token, media_id, index=index)
     article.update(changes)
     writable = {k: article[k] for k in _DRAFT_WRITABLE if k in article}
-    # 空 thumb_media_id 回传会被微信判 40007 invalid media_id（草稿本来就没头图时
-    # 改别的字段会踩这个坑）。没封面就别回传这个字段，让其余字段照常更新。
+    # draft/update 要求 payload 里必须有一个**有效的** thumb_media_id，
+    # 缺失或空都会被判 40007 invalid media_id（哪怕只是改阅读原文）。
+    # 后台手工草稿的 thumb_media_id 可能被清空（只剩 thumb_url），这时
+    # 补上传一次默认封面，保证局部更新能可靠完成、封面也不丢。
     if not writable.get("thumb_media_id"):
-        writable.pop("thumb_media_id", None)
+        writable["thumb_media_id"] = upload_cover(token, DEFAULT_COVER)
     payload = {"media_id": media_id, "index": index, "articles": writable}
     _post_json("/cgi-bin/draft/update", payload, token)
     return str(article.get("title") or "")
@@ -309,8 +311,8 @@ def freepublish(token: str, draft_media_id: str, *, wait: bool = True,
     raise WechatError("发布状态轮询超时")
 
 
-# 博客「图文版」归档页：按交易日排列的全部复盘图文，长期稳定、不指向会过时的单篇
-BLOG_POSTS_URL = "https://ten2net.github.io/post/"
+# 博客「图文版」入口：站点首页，长期稳定、不指向会过时的单篇
+BLOG_HOME_URL = "https://ten2net.github.io"
 
 
 def blog_post_url(date: str) -> str:

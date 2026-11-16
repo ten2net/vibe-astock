@@ -143,17 +143,17 @@ class TestWechatPoster:
             return {}
 
         monkeypatch.setattr(wp, "_post_json", fake_post)
-        wp.set_draft_source_url("tk", "MID", wp.BLOG_POSTS_URL)
+        wp.set_draft_source_url("tk", "MID", wp.BLOG_HOME_URL)
         art = seen["payload"]["articles"]
-        assert art["content_source_url"] == wp.BLOG_POSTS_URL
+        assert art["content_source_url"] == wp.BLOG_HOME_URL
         assert art["thumb_media_id"] == "THUMB1"            # 上次加的头图没被抹掉
         assert art["content"] == original["content"]
         assert art["need_open_comment"] == 1
         assert "url" not in art
-        assert wp.BLOG_POSTS_URL == "https://ten2net.github.io/post/"
+        assert wp.BLOG_HOME_URL == "https://ten2net.github.io"
 
-    def test_patch_skips_empty_thumb_to_avoid_40007(self, monkeypatch):
-        """草稿本来没头图时改别的字段：不能回传空 thumb_media_id，否则微信报 40007。"""
+    def test_patch_fills_valid_thumb_when_draft_has_none(self, monkeypatch):
+        """草稿 thumb 被清空时改别的字段：必须补一个有效 thumb_media_id，否则 40007。"""
         original = {
             "title": "x", "author": "揽宝", "digest": "", "content": "<p>正文</p>",
             "content_source_url": "", "thumb_media_id": "",
@@ -168,11 +168,32 @@ class TestWechatPoster:
             return {}
 
         monkeypatch.setattr(wp, "_post_json", fake_post)
-        wp.set_draft_source_url("tk", "MID", wp.BLOG_POSTS_URL)
+        monkeypatch.setattr(wp, "upload_cover", lambda *a, **k: "FALLBACK_THUMB")
+        wp.set_draft_source_url("tk", "MID", wp.BLOG_HOME_URL)
         art = seen["payload"]["articles"]
-        assert "thumb_media_id" not in art
-        assert art["content_source_url"] == wp.BLOG_POSTS_URL
+        assert art["thumb_media_id"] == "FALLBACK_THUMB"       # 补上了有效封面
+        assert art["content_source_url"] == wp.BLOG_HOME_URL
         assert art["content"] == "<p>正文</p>"
+
+    def test_patch_keeps_existing_valid_thumb(self, monkeypatch):
+        """草稿已有头图：不重复上传，原样保留。"""
+        original = {
+            "title": "x", "author": "揽宝", "digest": "", "content": "<p>正文</p>",
+            "content_source_url": "", "thumb_media_id": "EXISTING",
+            "need_open_comment": 1, "only_fans_can_comment": 0, "show_cover_pic": 0,
+        }
+        seen = {}
+
+        def fake_post(path, payload, token, timeout=20.0):
+            if path.endswith("/draft/get"):
+                return {"news_item": [original]}
+            seen["payload"] = payload
+            return {}
+
+        monkeypatch.setattr(wp, "_post_json", fake_post)
+        monkeypatch.setattr(wp, "upload_cover", lambda *a, **k: pytest.fail("不该重复上传封面"))
+        wp.set_draft_source_url("tk", "MID", wp.BLOG_HOME_URL)
+        assert seen["payload"]["articles"]["thumb_media_id"] == "EXISTING"
 
     def test_get_draft_article_missing_index_raises(self, monkeypatch):
         monkeypatch.setattr(wp, "_post_json", lambda *a, **k: {"news_item": []})
