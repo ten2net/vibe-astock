@@ -44,7 +44,7 @@ services:
       # 值都在 .env(已 gitignore)。容器重建自动注入。
       CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
       CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
-      CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-deepseek-v4.1-flash}
+      CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-hy4flash-free}
       # 博客发布只看 /data/duanxian/reviews（源码在 /app/blog，随镜像更新；Pages 仓库克隆
       # 每次都是新的临时目录）。hugo 在镜像构建时按 HUGO_VERSION 下载到 /usr/local/bin。
       #   docker compose exec vibe-astock python scripts/publish_review.py --recent 3
@@ -66,6 +66,10 @@ services:
       - astock-duanxian:/data/duanxian  # 复盘、版本、交易日志、原始归档
       - astock-market:/data/market      # 市场资料、盯盘缓存、研报
       # CodeBuddy 登录走 .env 的 API Key，CLI 构建期已装入镜像，无需再挂登录态/CLI 卷。
+      # 云配置(含 Hy4 系列模型)只由订阅 authorization 下发；API Key 模式拉不到，故挂一份
+      # 预生成的 disk cache(按 anonymous userId 索引)，让 /model list 列出完整模型。
+      # 换 API Key 后 anonymous userId 会变，需重新生成该文件(见 README「容器内登录 CodeBuddy」)。
+      - ./.local/codebuddy/cloud-product-cache.json:/root/.codebuddy/local_storage/entry_d43e96994f944cfb77961c2ea7d04605.info:ro
 
     healthcheck:
       test: ["CMD", "python", "-c",
@@ -242,7 +246,7 @@ services:
       # 复盘任务调用 codebuddy CLI，显式注入 API Key 认证与默认模型（同主服务）
       CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
       CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
-      CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-deepseek-v4.1-flash}
+      CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-hy4flash-free}
       # 与网页容器同一套代理口径（Tushare 直连，其余境外源走代理）
       http_proxy: ${http_proxy:-http://192.168.200.24:7890}
       https_proxy: ${https_proxy:-http://192.168.200.24:7890}
@@ -275,6 +279,8 @@ services:
       - astock-duanxian:/data/duanxian
       - astock-agent:/data/agent
       - astock-market:/data/market
+      # 与主服务共用云配置缓存(只读)，CLI 模型列表一致
+      - ./.local/codebuddy/cloud-product-cache.json:/root/.codebuddy/local_storage/entry_d43e96994f944cfb77961c2ea7d04605.info:ro
     entrypoint: ["python", "scripts/review_daily.py"]
     # 跑完当天复盘后立刻发布（--publish）：博客（最近 3 篇增量）+ 微信公众号，
     # 不再另起固定时刻的发布任务；失败自动换模型重试（REVIEW_FALLBACK_MODELS）。

@@ -484,12 +484,16 @@ Use an API key instead. Put it in `.env` (gitignored) and let `docker-compose.ym
 # .env (do not commit)
 CODEBUDDY_API_KEY=your-key
 CODEBUDDY_INTERNET_ENVIRONMENT=internal
-CODEBUDDY_MODEL=deepseek-v4.1-flash
+CODEBUDDY_MODEL=hy4flash-free
 ```
 
 The `vibe-astock` and `review` services reference these via `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` / `${CODEBUDDY_MODEL:-...}` in `environment`. The China edition key **requires** `CODEBUDDY_INTERNET_ENVIRONMENT=internal`; do **not** set `CODEBUDDY_BASE_URL` for a personal key (it redirects the gateway and causes 405). `CODEBUDDY_MODEL` sets the default model and takes precedence over `settings.json`.
 
-The CLI binary is installed into the image at build time by the `Dockerfile` (`npm install -g @tencent-ai/codebuddy-code@CODEBUDDY_VERSION`), so no login-state or CLI volume is needed — the key is in `.env`, the CLI in the image, and the injection rules in compose; all survive rebuilds. Change the key/model by editing `.env` and running `docker compose up -d` (no image rebuild); upgrade the CLI only by bumping `CODEBUDDY_VERSION` and rebuilding. Verify with `docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json` (expect `"subtype": "success"`).
+The CLI binary is installed into the image at build time by the `Dockerfile` (`npm install -g @tencent-ai/codebuddy-code@CODEBUDDY_VERSION`), so no login-state or CLI volume is needed — the key is in `.env`, the CLI in the image, and the injection rules in compose; all survive rebuilds. Change the key/model by editing `.env` and running `docker compose up -d` (no image rebuild); upgrade the CLI only by bumping `CODEBUDDY_VERSION` and rebuilding.
+
+The Hy4 models (`hy4flash-free` / `hy4flash` / `hy4std` / `hy4-preview-x`) are tagged `enterprise:selfhost` and shipped only via the cloud config, not in the static product bundle. API-key mode has no subscription `authorization`, so the cloud config fetch fails (`Fetch remote configuration failed ... disk cache missed`) and `/model list` falls back to the older built-in set. To fix this, `.local/codebuddy/cloud-product-cache.json` holds a pre-generated cloud-config cache (all 36 models), mounted read-only to the container's `~/.codebuddy/local_storage/entry_d43e96994f944cfb77961c2ea7d04605.info` so it gets a `disk cache hit`. **Changing the API key changes the `anonymous_<id>`, so regenerate that cache from a CLI that can fetch the cloud config** (copy its `entry_d43e...info`, set `userId` to the container's `anonymous_*` from the logs, save as the same-named JSON under `.local/codebuddy/`). The cache file is gitignored.
+
+Verify with `docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json` (expect `"subtype": "success"`).
 
 ### Upgrading from v1.x
 

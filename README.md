@@ -536,7 +536,7 @@ sh scripts/docker-v2-rebuild.sh --no-verify
 # .env（不要提交）
 CODEBUDDY_API_KEY=你的key
 CODEBUDDY_INTERNET_ENVIRONMENT=internal
-CODEBUDDY_MODEL=deepseek-v4.1-flash
+CODEBUDDY_MODEL=hy4flash-free
 ```
 
 `docker-compose.yml` 的 `vibe-astock` 与 `review` 服务 `environment` 里用 `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` / `${CODEBUDDY_MODEL:-...}` 引用它们。`review`（每日复盘）也调 CLI，所以要一起注入；`publish` 不调，不用配。
@@ -547,6 +547,7 @@ CODEBUDDY_MODEL=deepseek-v4.1-flash
 - `CODEBUDDY_MODEL` 设默认模型，优先级高于容器内 `settings.json` 的 `model` 字段；换模型只改 `.env`。
 - **不要设 `CODEBUDDY_BASE_URL`**——个人 key 走平台默认端点，设了会把登录网关地址带偏，请求返回 405。它只用于 OpenRouter 这类第三方模型服务。
 - CLI 本体由 `Dockerfile` 在构建期用固定版本（`CODEBUDDY_VERSION`）装进镜像 `/usr/local/bin`，**不再挂登录态/CLI 卷**——登录走 API Key，没有跨机迁移的登录态要保。这样重建不丢：key 与模型在 `.env`，CLI 在镜像，注入规则在 compose。换 key/模型只改 `.env` 再 `docker compose up -d`，不用重建镜像；升级 CLI 才改 `CODEBUDDY_VERSION` 重建。
+- **Hy4 系列模型（`hy4flash-free`/`hy4flash`/`hy4std`/`hy4-preview-x`）带 `enterprise:selfhost` 标签，只由云端配置下发**，随包静态配置里没有。API Key 模式没有订阅 `authorization`，拉不到云配置（日志 `Fetch remote configuration failed ... disk cache missed`），`/model list` 就只剩旧的一批。为此在 `.local/codebuddy/cloud-product-cache.json` 放了一份预生成的云配置缓存（含完整 36 模型），由 compose 只读挂到容器 `~/.codebuddy/local_storage/entry_d43e96994f944cfb77961c2ea7d04605.info`，让 `disk cache hit`。**换 API Key 后 `anonymous_<id>` 会变，这份缓存要按新 id 重新生成**（从一台能拉到云配置的 CLI 的 `local_storage` 里取 `entry_d43e...info`，把 `userId` 换成容器内日志里的 `anonymous_*`、写成本项目录的同名 json）。缓存文件被 gitignore。
 
 验证（容器内，交互与非交互都应成功）：
 
