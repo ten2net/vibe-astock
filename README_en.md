@@ -484,11 +484,12 @@ Use an API key instead. Put it in `.env` (gitignored) and let `docker-compose.ym
 # .env (do not commit)
 CODEBUDDY_API_KEY=your-key
 CODEBUDDY_INTERNET_ENVIRONMENT=internal
+CODEBUDDY_MODEL=deepseek-v4.1-flash
 ```
 
-The `vibe-astock` and `review` services reference these via `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` in `environment`. The China edition key **requires** `CODEBUDDY_INTERNET_ENVIRONMENT=internal`; do **not** set `CODEBUDDY_BASE_URL` for a personal key (it redirects the gateway and causes 405). Because the key lives in `.env` and the injection rules in compose — neither in the image layer — this survives container rebuilds.
+The `vibe-astock` and `review` services reference these via `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` / `${CODEBUDDY_MODEL:-...}` in `environment`. The China edition key **requires** `CODEBUDDY_INTERNET_ENVIRONMENT=internal`; do **not** set `CODEBUDDY_BASE_URL` for a personal key (it redirects the gateway and causes 405). `CODEBUDDY_MODEL` sets the default model and takes precedence over `settings.json`.
 
-The CLI binary lives in the persistent volume `/root/.local/bin`, which is not on the image `PATH`. Compose also injects `PATH` and `CODEBUDDY_BIN` explicitly, so `codebuddy` works after `docker exec -it vibe-astock bash`. A login shell (`bash -l`) resets `PATH` from the image `/etc/profile`; use the absolute path `/root/.local/bin/codebuddy` there. Verify with `docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json` (expect `"subtype": "success"`).
+The CLI binary is installed into the image at build time by the `Dockerfile` (`npm install -g @tencent-ai/codebuddy-code@CODEBUDDY_VERSION`), so no login-state or CLI volume is needed — the key is in `.env`, the CLI in the image, and the injection rules in compose; all survive rebuilds. Change the key/model by editing `.env` and running `docker compose up -d` (no image rebuild); upgrade the CLI only by bumping `CODEBUDDY_VERSION` and rebuilding. Verify with `docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json` (expect `"subtype": "success"`).
 
 ### Upgrading from v1.x
 

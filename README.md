@@ -536,15 +536,17 @@ sh scripts/docker-v2-rebuild.sh --no-verify
 # .env（不要提交）
 CODEBUDDY_API_KEY=你的key
 CODEBUDDY_INTERNET_ENVIRONMENT=internal
+CODEBUDDY_MODEL=deepseek-v4.1-flash
 ```
 
-`docker-compose.yml` 的 `vibe-astock` 与 `review` 服务 `environment` 里用 `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` 引用它们。`review`（每日复盘）也调 CLI，所以要一起注入；`publish` 不调，不用配。
+`docker-compose.yml` 的 `vibe-astock` 与 `review` 服务 `environment` 里用 `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` / `${CODEBUDDY_MODEL:-...}` 引用它们。`review`（每日复盘）也调 CLI，所以要一起注入；`publish` 不调，不用配。
 
 要点：
 
 - 中国版 key **必须**带 `CODEBUDDY_INTERNET_ENVIRONMENT=internal`，否则认证链路不完整。
+- `CODEBUDDY_MODEL` 设默认模型，优先级高于容器内 `settings.json` 的 `model` 字段；换模型只改 `.env`。
 - **不要设 `CODEBUDDY_BASE_URL`**——个人 key 走平台默认端点，设了会把登录网关地址带偏，请求返回 405。它只用于 OpenRouter 这类第三方模型服务。
-- 这样配置后容器重建不会丢：key 在 `.env`，注入规则在 compose 文件，都不在会被重建覆盖的镜像层里。代理、数据卷同理（见 `docker-compose.yml` 注释）。换 key 只改 `.env`，`docker compose up -d` 即重新注入，不用重建镜像。
+- CLI 本体由 `Dockerfile` 在构建期用固定版本（`CODEBUDDY_VERSION`）装进镜像 `/usr/local/bin`，**不再挂登录态/CLI 卷**——登录走 API Key，没有跨机迁移的登录态要保。这样重建不丢：key 与模型在 `.env`，CLI 在镜像，注入规则在 compose。换 key/模型只改 `.env` 再 `docker compose up -d`，不用重建镜像；升级 CLI 才改 `CODEBUDDY_VERSION` 重建。
 
 验证（容器内，交互与非交互都应成功）：
 
@@ -552,8 +554,6 @@ CODEBUDDY_INTERNET_ENVIRONMENT=internal
 docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json | grep '"subtype"'
 # 期望 "subtype": "success"
 ```
-
-CLI 本体在持久卷 `/root/.local/bin`，镜像的 `PATH` 不含它；compose 已显式注入 `PATH` 与 `CODEBUDDY_BIN`，所以 `docker exec -it vibe-astock bash` 后能直接用 `codebuddy`。注意 `bash -l`（登录 shell）会被镜像 `/etc/profile` 重置 `PATH`，若用登录 shell 请用绝对路径 `/root/.local/bin/codebuddy`。
 
 ### 从旧版（v1.x）升级
 

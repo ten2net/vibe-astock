@@ -62,6 +62,16 @@ RUN set -e; \
     node --version && npm --version; \
     rm -rf /var/lib/apt/lists/*
 
+# CodeBuddy Code CLI（受控 AI 引擎）：构建期装进镜像，运行期不依赖任何持久卷。
+# 订阅登录态无法跨机迁移(机器密钥加密)，容器内改用 .env 的 CODEBUDDY_API_KEY，
+# 所以这里只需 CLI 本体。npm 包是 JS 启动器、用 node 跑，不依赖 ~/.local 下的 native
+# 二进制(实测隐藏 native 后仍可用)，因此不用挂卷、重建也不会重新下载 180MB。
+# 固定版本便于复现；升级只改 CODEBUDDY_VERSION。用国内镜像源(registry.npmjs.org 在本网络慢)。
+ARG CODEBUDDY_VERSION=2.184.0
+ARG NPM_REGISTRY="https://registry.npmmirror.com"
+RUN npm install -g "@tencent-ai/codebuddy-code@${CODEBUDDY_VERSION}" --registry="${NPM_REGISTRY}" \
+    && codebuddy --version
+
 WORKDIR /app
 COPY requirements.txt ./
 # pip 源同样可配置：本网络走清华镜像，其他部署不传则用官方 PyPI。
