@@ -45,6 +45,8 @@ services:
       CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
       CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
       CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-hy4flash-free}
+      # 容器内订阅卡改用 API Key 认证(订阅态跨机不可迁移);显式 opt-in 让 bridge 探针/执行保留 key
+      CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION: "1"
       # 博客发布只看 /data/duanxian/reviews（源码在 /app/blog，随镜像更新；Pages 仓库克隆
       # 每次都是新的临时目录）。hugo 在镜像构建时按 HUGO_VERSION 下载到 /usr/local/bin。
       #   docker compose exec vibe-astock python scripts/publish_review.py --recent 3
@@ -247,6 +249,8 @@ services:
       CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
       CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
       CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-hy4flash-free}
+      # 容器内订阅卡改用 API Key 认证(订阅态跨机不可迁移);显式 opt-in 让 bridge 探针/执行保留 key
+      CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION: "1"
       # 与网页容器同一套代理口径（Tushare 直连，其余境外源走代理）
       http_proxy: ${http_proxy:-http://192.168.200.24:7890}
       https_proxy: ${https_proxy:-http://192.168.200.24:7890}

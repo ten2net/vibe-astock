@@ -21,6 +21,13 @@ def bridge_environment(home, agent: str) -> dict:
              'SSL_CERT_FILE', 'NODE_EXTRA_CA_CERTS']
     if agent == 'claude':
         names += ['CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_OAUTH_TOKEN']
+    elif agent == 'codebuddy':
+        # 容器内 CodeBuddy 用 API Key 认证(订阅登录态跨机不可迁移)。默认订阅卡片禁止
+        # API Key 冒充订阅额度；部署者显式设 CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION=1 时，
+        # 透传凭据与 opt-in 开关，让 bridge 的探针/执行识别 API Key 登录。
+        # 只对 codebuddy 透传，不影响 Claude/Codex 的计费隔离。
+        names += ['CODEBUDDY_API_KEY', 'CODEBUDDY_INTERNET_ENVIRONMENT', 'CODEBUDDY_MODEL',
+                  'CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION']
     for name in names:
         if name in os.environ:
             env[name] = os.environ[name]
