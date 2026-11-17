@@ -474,6 +474,22 @@ Once started, the terminal prints a link carrying an access token (`https://…/
 - In remote mode the UI port is never switched automatically, because the platform maps a fixed port: if 5940 is taken, stop whatever holds it, or use `--port` to pick a port the platform exposes.
 - A cloud computer that stays on is a good fit for the close fetch and intraday snapshots, which then never miss a day because your own computer was off.
 
+### CodeBuddy login inside Docker
+
+When running in Docker, the review job calls the local CodeBuddy Code CLI. Do **not** use `codebuddy login` (OAuth) inside a container: the login callback targets `127.0.0.1`, which is not reachable from the host browser, and the SSO endpoint rejects the container's client TLS (it hangs on `Generating login URL...` or reports `Failed to login ... Socket is closed`). Subscription login state also cannot be copied from the host — the token is encrypted with a machine-bound key and fails to decrypt in a different container.
+
+Use an API key instead. Put it in `.env` (gitignored) and let `docker-compose.yml` inject it at container start:
+
+```bash
+# .env (do not commit)
+CODEBUDDY_API_KEY=your-key
+CODEBUDDY_INTERNET_ENVIRONMENT=internal
+```
+
+The `vibe-astock` and `review` services reference these via `${CODEBUDDY_API_KEY:-}` / `${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}` in `environment`. The China edition key **requires** `CODEBUDDY_INTERNET_ENVIRONMENT=internal`; do **not** set `CODEBUDDY_BASE_URL` for a personal key (it redirects the gateway and causes 405). Because the key lives in `.env` and the injection rules in compose — neither in the image layer — this survives container rebuilds.
+
+The CLI binary lives in the persistent volume `/root/.local/bin`, which is not on the image `PATH`. Compose also injects `PATH` and `CODEBUDDY_BIN` explicitly, so `codebuddy` works after `docker exec -it vibe-astock bash`. A login shell (`bash -l`) resets `PATH` from the image `/etc/profile`; use the absolute path `/root/.local/bin/codebuddy` there. Verify with `docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json` (expect `"subtype": "success"`).
+
 ### Upgrading from v1.x
 
 The old v1.x was a Python app (data in `~/.duanxian-agents`, page on port 8910); the new version is a different program and cannot be upgraded in place:

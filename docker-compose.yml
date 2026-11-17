@@ -38,6 +38,15 @@ services:
       VR_DATA_DIR: /data/market
       # 容器内必须监听全部网卡，只绑 127.0.0.1 的话宿主机的端口映射连不进来
       VIBE_HOST: 0.0.0.0
+      # CodeBuddy CLI 订阅接入：登录态跨机不可迁移(机器密钥加密)，容器内改用 API Key。
+      # 中国版必须同时设 INTERNET_ENVIRONMENT=internal，且不要设 BASE_URL(会把网关带偏→405)。
+      # 值在 .env(已 gitignore)。容器重建自动注入，不依赖镜像层的 wrapper/env 文件。
+      CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
+      CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
+      # CLI 本体在持久卷 /root/.local(卷 astock-codebuddy-cli)；镜像 PATH 不含它，
+      # 且 .bashrc 的 PATH 只对交互 shell 生效，故显式钉死路径与 bin，重建后仍可用。
+      PATH: /root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      CODEBUDDY_BIN: /root/.local/bin/codebuddy
       # 博客发布只看 /data/duanxian/reviews（源码在 /app/blog，随镜像更新；Pages 仓库克隆
       # 每次都是新的临时目录）。hugo 在镜像构建时按 HUGO_VERSION 下载到 /usr/local/bin。
       #   docker compose exec vibe-astock python scripts/publish_review.py --recent 3
@@ -235,6 +244,12 @@ services:
       ASTOCK_AGENT_HOME: /data/agent
       ASTOCK_DATA_HOME: /data/duanxian
       VR_DATA_DIR: /data/market
+      # 复盘任务调用 codebuddy CLI，显式注入 API Key 认证（同主服务，不依赖 wrapper）
+      CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
+      CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
+      # CLI 本体在持久卷 /root/.local；非交互调用需显式 PATH + bin
+      PATH: /root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      CODEBUDDY_BIN: /root/.local/bin/codebuddy
       # 与网页容器同一套代理口径（Tushare 直连，其余境外源走代理）
       http_proxy: ${http_proxy:-http://192.168.200.24:7890}
       https_proxy: ${https_proxy:-http://192.168.200.24:7890}
