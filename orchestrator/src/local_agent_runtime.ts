@@ -700,11 +700,26 @@ function codeBuddySubscriptionEnv(
   const env = localSubscriptionEnv(base, "codebuddy");
   // 这一张卡承诺复用本机登录账号。API key、临时 OAuth token、自定义端点和模型覆盖
   // 都可能让非交互调用静默换成另一套计费来源，因此在探针与执行两条路径同时移除。
+  // 例外：容器部署里订阅登录态跨机不可迁移(机器密钥加密)，只能用 API Key 认证；
+  // 部署者显式设 CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION=1 时保留 API Key/环境/模型
+  // (明确承担按量计费)，与旧版 runtime/bridge 的同一开关语义一致。桌面版默认仍全部移除。
+  const allowApiKey = base.CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION === "1";
   for (const key of [
     "CODEBUDDY_API_KEY", "CODEBUDDY_AUTH_TOKEN", "CODEBUDDY_BASE_URL", "CODEBUDDY_CUSTOM_HEADERS",
     "CODEBUDDY_MODEL", "CODEBUDDY_SMALL_FAST_MODEL", "CODEBUDDY_BIG_SLOW_MODEL",
     "CODEBUDDY_CODE_SUBAGENT_MODEL", "MAX_THINKING_TOKENS",
-  ]) delete env[key];
+  ]) {
+    if (allowApiKey && ["CODEBUDDY_API_KEY", "CODEBUDDY_MODEL"].includes(key) && base[key] !== undefined) {
+      env[key] = base[key]!;
+    } else {
+      delete env[key];
+    }
+  }
+  // CODEBUDDY_INTERNET_ENVIRONMENT 不在 localSubscriptionEnv 白名单里，allowApiKey 时单独透传：
+  // 中国版 API Key 必须带 internal，否则认证链路不完整。
+  if (allowApiKey && base.CODEBUDDY_INTERNET_ENVIRONMENT !== undefined) {
+    env.CODEBUDDY_INTERNET_ENVIRONMENT = base.CODEBUDDY_INTERNET_ENVIRONMENT;
+  }
   const isolated: NodeJS.ProcessEnv = {
     ...env,
     DISABLE_AUTOUPDATER: "1",

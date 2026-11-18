@@ -230,14 +230,15 @@ CODEBUDDY_MODEL=hy4flash-free
 - 中国版 key **必须**带 `CODEBUDDY_INTERNET_ENVIRONMENT=internal`，否则认证链路不完整。
 - `CODEBUDDY_MODEL` 设默认模型，优先级高于容器内 `settings.json`；换模型只改 `.env`。
 - **不要设 `CODEBUDDY_BASE_URL`**——个人 key 走平台默认端点，设了会把登录网关带偏、请求返回 405；它只用于 OpenRouter 这类第三方服务。
-- CLI 由 `Dockerfile` 构建期以固定版本（`CODEBUDDY_VERSION`）装进镜像 `/usr/local/bin`，不挂登录态/CLI 卷；换 key/模型只改 `.env` 再 `docker compose up -d`，不用重建镜像，升级 CLI 才改 `CODEBUDDY_VERSION` 重建。
-- Hy4 系列模型带 `enterprise:selfhost` 标签，API Key 模式拉不到云配置时，用 `.local/codebuddy/cloud-product-cache.json` 预生成缓存（含完整模型列表）由 compose 只读挂入容器实现 `disk cache hit`；**换 API Key 后 `anonymous_<id>` 会变，缓存需按新 id 重新生成**（文件已 gitignore）。
-- Web「接入 AI」的 CodeBuddy 订阅卡默认禁止 API Key，容器里显式设 `CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION=1`（`.env` + compose 两处）让订阅探针与复盘保留 API Key；这意味着容器内按 API Key 计费，不是订阅额度。
+- CLI 由 `Dockerfile` / `Dockerfile.v2` 在构建期以固定版本（`CODEBUDDY_VERSION`）装进镜像 `/usr/local/bin`，**两个容器都不挂登录态/CLI 卷、都不设 `CODEBUDDY_BIN`**；换 key/模型只改 `.env` 再 `docker compose up -d`，不用重建镜像，升级 CLI 才改 `CODEBUDDY_VERSION` 重建。
+- Hy4 系列模型带 `enterprise:selfhost` 标签，API Key 模式拉不到云配置时，用 `.local/codebuddy/cloud-product-cache.json` 预生成缓存（含完整模型列表）由 compose 只读挂入**两个容器**实现 `disk cache hit`；两边共用同一份 `.env` 的 key、anonymous id 相同，缓存可共享。**换 API Key 后 `anonymous_<id>` 会变，缓存需按新 id 重新生成**（文件已 gitignore）。
+- Web「接入 AI」的 CodeBuddy 订阅卡默认禁止 API Key，容器里显式设 `CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION=1`（`.env` + compose 两处）让订阅探针与复盘/研究保留 API Key；这意味着容器内按 API Key 计费，不是订阅额度。
 
-验证（容器内，交互与非交互都应成功）：
+验证（两个容器内，交互与非交互都应成功）：
 
 ```bash
 docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json | grep '"subtype"'
+docker compose exec vibe-astock-v2 codebuddy -p "reply OK" --output-format json | grep '"subtype"'
 # 期望 "subtype": "success"
 ```
 
@@ -247,7 +248,7 @@ docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json | g
 
 - 交易日志、持仓和自选只存在本机。成交、持仓、成本和盈亏**不发给 AI**；自选、笔记、论点和判据可以发给 AI。例外是你主动选的「从截图或表格识别」（会把选中文件发给当前 AI）。
 - 原始研报文件只保存在本机，模型只接收服务端检索命中的正文片段；AI 读取公开网页可能经第三方 Jina Reader 转发，不要提交含私密令牌的网址。
-- API key：后端默认 provider 的 key 只走环境变量；浏览器填的 key 只存当前 `localStorage`，调用时经本机后端转给模型服务商。
+- API key：后端默认 provider 的 key 只走环境变量；浏览器里填写的 API key 只保存在当前浏览器 `localStorage`，仅在调用时经本机后端转给所选模型服务商。
 - 研究阶段没有网络、只能用 5 个受控工具；取数由编排器用受控脚本完成，原始响应落盘并记录哈希；资料引用 `[资料:<id> p.<页码>]` 由机器校验漏引/错引。
 - 本机 API 默认只绑定 `127.0.0.1`，写请求必须鉴权并用 JSON。
 - 隐私模式（右上角眼睛图标）：录屏截图前打开，金额、股数、成本价和自写价位显示成 ••••；只遮屏幕显示，不影响计算。
@@ -262,6 +263,8 @@ docker compose exec vibe-astock codebuddy -p "reply OK" --output-format json | g
 ## 开发与测试
 
 代码结构：`desktop/`（React + Vite 浏览器 UI）、`orchestrator/`（编排、validator、API、MCP、对话、报告归档）、`orchestrator/src/finance/shortline/`（短线读数、盯盘、AI 复盘与周报、明日验证）、`orchestrator/src/finance/journal/`（交易日志）、`backtest/`（回测引擎）、`calc/`（确定性计算）、`datasources/`（数据端点注册表）、`methodology/`（研究宪法）、`scripts/`（安装启动体检）、`.local/`（私有数据与运行产物，已 gitignore）。产品名、仓库地址和端口集中在 `orchestrator/src/brand.ts`。
+
+AI 接入分两层：**Local Agent Runtime**（本机订阅 CLI：Claude Code / Codex / WorkBuddy-CodeBuddy）与 **Model Provider**（模型 API：DeepSeek / 通义千问 / 智谱 / Kimi / OpenAI 兼容接口）。按使用者所选来源路由，不是串联运行，也不互相回落；v2.0.0 起不再内置 Codex Harness（已移除）。
 
 常用检查：
 

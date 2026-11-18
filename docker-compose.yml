@@ -93,6 +93,8 @@ services:
         # npm 直连 registry.npmmirror.com 在本网络会 ECONNRESET，构建期走代理
         https_proxy: http://192.168.200.24:7890
         http_proxy: http://192.168.200.24:7890
+        # pip 直连 PyPI 会读超时，走清华镜像（与旧版 Dockerfile 一致）
+        PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
     image: vibe-astock-v2:local
     container_name: vibe-astock-v2
     restart: unless-stopped
@@ -101,6 +103,10 @@ services:
       # 与旧服务同款：对局域网开放。只想本机访问时改成 "127.0.0.1:5940:5940"
       - "5940:5940"
 
+    env_file:
+      # 与旧版容器一致：CodeBuddy API Key、模型、INTERNET_ENVIRONMENT 等凭据都在 .env
+      - .env
+
     environment:
       # 拼「发给使用者的链接」用的公网根地址（只用于拼链接，不是监听地址）
       VRA_PUBLIC_URL: https://a2.luckybrother.cc
@@ -108,9 +114,15 @@ services:
       # 到期拒绝页/错误里指路 VRA_RENEW_URL(面包多/爱发电商品页,先留空则提示联系部署者)。
       VRA_ACCESS_TOKENS_FILE: /app/.local/access.tokens.json
       VRA_RENEW_URL: ""
-      # CodeBuddy 订阅大脑：远程模式下页面不能改 CLI 位置，用环境变量钉死。
-      # 指向下面挂进来的 v2 专用持久化 CLI（与旧版容器的卷已分开，互不影响）。
-      CODEBUDDY_BIN: /root/.local/bin/codebuddy
+      # CodeBuddy CLI 在构建期已装进镜像 /usr/local/bin（Dockerfile.v2），在 PATH 里，
+      # 不再用 CODEBUDDY_BIN 指向旧卷、也不挂登录态/CLI 卷。登录改用 .env 的 API Key：
+      # 订阅登录态机器密钥加密、跨机不可迁移；中国版必须 INTERNET_ENVIRONMENT=internal，
+      # 且不要设 BASE_URL（会把网关带偏→405）。默认值与旧版容器一致。
+      CODEBUDDY_API_KEY: ${CODEBUDDY_API_KEY:-}
+      CODEBUDDY_INTERNET_ENVIRONMENT: ${CODEBUDDY_INTERNET_ENVIRONMENT:-internal}
+      CODEBUDDY_MODEL: ${CODEBUDDY_MODEL:-hy4flash-free}
+      # 容器内订阅卡改用 API Key 认证（订阅态跨机不可迁移）；显式 opt-in 让 bridge 探针/执行保留 key
+      CODEBUDDY_ALLOW_API_KEY_SUBSCRIPTION: "1"
       # 代理：境外数据源与被重置的源走它（fetchEnv 会把代理变量透传给取数子进程）。
       # no_proxy 口径沿用旧容器实测可用的配置；若实测某源容器内直连不通，
       # 把它从 no_proxy 域名列表移除即可改走代理。
@@ -124,12 +136,12 @@ services:
     volumes:
       # 新版私有层：配置、运行产物、对话、台账、知识层档案、访问口令；容器重建不丢
       - astock-v2-local:/app/.local
-      # CodeBuddy 订阅接入：登录态与 CLI 本体各用各的卷,**不再与旧版共用**。
-      # 共用时两边同时跑 CodeBuddy 进程会并发读写同一套登录/会话文件(令牌刷新竞争、
-      # 会话锁互踩 → 间歇性「登录失效/要重新接入」),一边升级 CLI 版本另一边也被迫跟着变。
-      # 初始内容从旧卷整卷复制(登录态 + CLI 2.171.0),此后 v1 / v2 互不影响。
-      - astock-v2-codebuddy:/root/.codebuddy        # OAuth 登录态(v2 专用)
-      - astock-v2-codebuddy-cli:/root/.local        # CLI 本体（版本目录 + bin 软链，v2 专用）
+      # CodeBuddy 登录走 .env 的 API Key，CLI 构建期已装入镜像，无需再挂登录态/CLI 卷。
+      # 云配置(含 Hy4 系列模型)只由订阅 authorization 下发；API Key 模式拉不到，故挂一份
+      # 预生成的 disk cache(按 anonymous userId 索引)，让 /model list 列出完整模型。
+      # 与旧版容器共用同一份缓存：两边用同一个 API Key，anonymous userId 相同，cache hit 生效。
+      # 换 API Key 后 anonymous userId 会变，需重新生成该文件(见 README「容器内登录 CodeBuddy」)。
+      - ./.local/codebuddy/cloud-product-cache.json:/root/.codebuddy/local_storage/entry_d43e96994f944cfb77961c2ea7d04605.info:ro
       # Claude / Codex 本机 CLI 大脑的登录态家目录（~/.claude、CODEX_HOME 缺省
       # ~/.codex）。镜像里还没装这两个 CLI，先挂空卷占位，将来在容器里登录一次
       # 即持久化，不用挂卷迁移。
@@ -337,10 +349,9 @@ volumes:
   astock-agent:
   astock-duanxian:
   astock-market:
-  # v1 的 CodeBuddy 登录态与 CLI 卷已移除：登录走 .env 的 API Key，CLI 构建期装入镜像。
-  # 旧卷数据仍在 /data/docker/volumes/vibe-astock_astock-codebuddy*，确认无用后可手动删除。
-  astock-v2-codebuddy:      # CodeBuddy 登录态（v2 专用，与 v1 分开，互不干扰）
-  astock-v2-codebuddy-cli:  # CodeBuddy CLI 本体（v2 专用，版本与升级独立）
+  # v1 / v2 的 CodeBuddy 登录态与 CLI 卷都已移除：登录走 .env 的 API Key，
+  # CLI 构建期装入镜像（Dockerfile / Dockerfile.v2）。模型列表用只读缓存文件挂载。
+  # 旧卷数据仍在 /data/docker/volumes/vibe-astock_astock-{,v2-}codebuddy*，确认无用后可手动删除。
   astock-v2-local:       # 新版 v2 私有层（配置 / 运行产物 / 访问口令）
   astock-v2-claude:      # Claude CLI 登录态（备用占位）
   astock-v2-codex:       # Codex CLI 登录态（备用占位）
