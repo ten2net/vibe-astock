@@ -311,4 +311,5 @@ node orchestrator/src/run.ts --symbol 300308 --market SZ --provider cli-claude \
 
 Apache-2.0，详见 [LICENSE](LICENSE)。v2.0.0 起的底座来自同一作者的 [Vibe Research](https://github.com/simonlin1212/Vibe-Research)（MIT），原许可声明见 [NOTICE](NOTICE)。
 
-**作者：** Simon 林 · X [@linsizhen](https://x.com/linsizhen) · 邮箱：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
+**贡献者：** Ten2net(https://ten2net.github.io/) · 邮箱：[tennet@gmail.com](mailto:tennet@gmail.com)
+**特别感谢原作者：** Simon 林 · X [@linsizhen](https://x.com/linsizhen) · 邮箱：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
