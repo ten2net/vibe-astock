@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from .blog_publish import PublishError, check_public_text, load_review, post_title
-from .wechat_render import article_html
+from .wechat_render import article_html, seo_title, cn_date
 from .follow_poster import HEADER_ASSET
 from duanxian.paths import data_path  # noqa: E402
 
@@ -328,12 +328,14 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
     check_public_text(payload)                 # 与博客同一道不荐股闸门
     focus = payload.get("focus") or {}
     one = str(focus.get("market_oneliner") or "")
-    title = post_title(payload, date)
+    title = seo_title(payload, date)          # SEO：中文日期 + A股复盘核心词 + 问句钩子
     content = article_html(payload, date, blog_post_url(date))
     log(f"{date}：正文 {len(content)} 字符")
     token = get_access_token()
     thumb = upload_cover(token, cover or card_cover(date))
-    draft_id = add_draft(token, title=title, content=content, digest=one[:120],
+    # 摘要也带核心词，利于搜一搜与分享卡片
+    digest = f"{cn_date(date)}A股复盘：" + (one or str(focus.get("emotion_phase") or "每日复盘"))
+    draft_id = add_draft(token, title=title, content=content, digest=digest[:120],
                          source_url=blog_post_url(date), thumb_media_id=thumb)
     log(f"{date}：已写入草稿箱 {draft_id}")
     result = {"date": date, "draft_id": draft_id, "publish_id": ""}

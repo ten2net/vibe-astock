@@ -48,10 +48,55 @@ S_CTA = ("margin:18px 0 14px;padding:16px 16px 14px;background:#fff8e6;"
 S_CTA_TITLE = ("margin:0 0 10px;font-size:16px;font-weight:bold;color:#c96a00;line-height:1.5;")
 S_CTA_P = ("margin:0 0 8px;font-size:14px;color:#5c4300;line-height:1.75;")
 S_CTA_URL = ("margin:8px 0 0;font-size:12px;color:#a07a2c;line-height:1.6;word-break:break-all;")
+# SEO 导语段：核心词 + 结论 + 通俗读数，首段前 300 字回应搜索意图、降低跳出率
+S_SEO_LEAD = ("margin:0 0 14px;font-size:15px;color:#1d2129;line-height:1.8;")
+S_TAGS = ("margin:14px 0 4px;font-size:13px;color:#1a73e8;line-height:1.7;")
+S_ASK = ("margin:16px 0 8px;padding:12px 14px;background:#f1f6ff;"
+         "border-left:4px solid #1a73e8;border-radius:6px;"
+         "font-size:14px;color:#1d2129;line-height:1.75;font-weight:bold;")
 
 
 def _esc(text) -> str:
     return html.escape(str(text or ""))
+
+
+# ---- SEO：中文日期 / 核心词标题 / 看点钩子 ----
+def cn_date(date: str) -> str:
+    """2026-11-18 → 11月18日：符合搜索话术（用户搜「11月18日复盘」而非 ISO 日期）。"""
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(date or ""))
+    if not m:
+        return str(date or "")
+    return f"{int(m.group(2))}月{int(m.group(3))}日"
+
+
+def _hook_phrase(payload: dict) -> str:
+    """从涨跌家数取一个搜索友好的短钩子：涨多→「个股普涨」；跌多→「个股普跌」；
+    拿不到→退回情绪档位。用于标题「……意味着什么？」前半句（避免强定主线）。"""
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    up, down = breadth.get("up"), breadth.get("down")
+    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
+        return "个股普涨" if up > down else ("个股普跌" if down > up else "涨跌各半")
+    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
+    return f"情绪档位{phase}" if phase else "市场分化"
+
+
+def seo_title(payload: dict, date: str) -> str:
+    """微信公众号标题：核心词前置 + 中文日期 + 问句钩子（范文 SEO 规范）。
+
+    格式：``11月18日A股复盘：情绪修复，个股普跌意味着什么？``
+    - 20 字左右、无震惊体，符合搜索话术；
+    - 「A股复盘 / 每日复盘」是固定核心词，养成算法标签；
+    - 档位（修复/冰点/退潮…）作副标体现专业性，问句「意味着什么」提升点击。
+    仅用于公众号；博客标题仍走 blog_publish.post_title，互不干扰。
+    """
+    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
+    hook = _hook_phrase(payload)
+    title = f"{cn_date(date)}A股复盘"
+    if phase:
+        title += f"：情绪{phase}，{hook}意味着什么？"
+    else:
+        title += f"：{hook}意味着什么？"
+    return title
 
 
 def _tone(value) -> str:
@@ -216,6 +261,101 @@ def _blocks_to_html(md_text: str) -> list[str]:
     return out
 
 
+def _seo_lead(payload: dict, date: str) -> str:
+    """SEO 导语段：核心词 + 一句话结论 + 大白话读数 + 证据链信任提示。
+
+    范文要求核心词在「标题 + 首段」各出现一次，前 300 字回应搜索意图、
+    直接给结论并把术语翻成大白话，降低跳出率、提升完读率。
+    """
+    focus = payload.get("focus") or {}
+    phase = str(focus.get("emotion_phase") or "").strip()
+    one = str(focus.get("market_oneliner") or "").strip()
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    em = payload.get("emotion_metrics") or {}
+    money = em.get("money_effect") or {}
+
+    day = cn_date(date)
+    bits = [f"{day}A股复盘，"]
+    # 结论：优先用一句话；没有就按档位给一个中性结论
+    if one:
+        conclusion = one.rstrip("。；; ")
+        bits.append(f"一句话结论：**{conclusion}**。")
+    elif phase:
+        bits.append(f"一句话结论：**市场情绪档位为{phase}**。")
+    else:
+        bits.append("一句话结论：**当日情绪以分化为主**。")
+
+    # 大白话读数（关键数字加粗）：点出上涨占比、昨日涨停今日表现、翻红率
+    plain: list[str] = []
+    up, down = breadth.get("up"), breadth.get("down")
+    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
+        ratio = _pct(up / (up + down))
+        plain.append(f"全市场上涨 **{up}** 只、下跌 **{down}** 只，上涨占比 **{ratio}**")
+    if money.get("available"):
+        avg = money.get("avg")
+        plain.append(f"昨日涨停股今日平均 **{_num(avg, 2, '%')}**、中位数 **{_sign(money.get('median'), 2, '%')}**")
+        plain.append(f"翻红率 **{_pct(money.get('positive_rate'))}**")
+    if plain:
+        bits.append("，".join(plain) + "。")
+    bits.append(DISCLAIMER)
+
+    text = "".join(bits)
+    text = _esc(text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    return f'<p style="{S_SEO_LEAD}">{text}</p>'
+
+
+def _verification(payload: dict) -> str:
+    """「明日验证条件」清单：范文要求的可收藏、可证伪信号列表。"""
+    items = (payload.get("focus") or {}).get("verification_items") or []
+    valid = [it for it in items if isinstance(it, dict) and it.get("metric")]
+    if not valid:
+        return ""
+    name_map = {
+        "limit_up_count": "涨停家数",
+        "promotion_1to2": "1进2晋级率",
+        "money_effect_median": "昨日涨停样本中位表现",
+        "broken_rate": "炸板率",
+        "market_limit_down": "跌停家数",
+        "highest_board": "最高连板高度",
+    }
+    out = [f'<p style="{S_H}">明日验证条件：三个信号看情绪能否修复</p>']
+    for it in valid:
+        metric = str(it.get("metric"))
+        label = name_map.get(metric, metric)
+        direction = str(it.get("direction") or "").strip()
+        reason = str(it.get("reason") or "").strip()
+        line = f"<strong>{_esc(label)}</strong>（{_esc(metric)}）"
+        if direction:
+            line += f"：看{_esc(direction)}"
+        if reason:
+            line += f" —— {_esc(reason)}"
+        out.append(f'<p style="{S_LINE}">· {line}</p>')
+    out.append(f'<p style="{S_MUTED}">以上为验证条件，不是涨跌预测。</p>')
+    return "\n".join(out)
+
+
+def _seo_analyst_title(title: str) -> str:
+    """分析师栏目标题补长尾词语义，保留原名不丢信息。"""
+    mapping = {
+        "情绪面": "情绪面：市场情绪与赚钱效应",
+        "资金面": "资金面：资金流向与净额",
+        "题材热点": "题材热点：连板梯队与题材结构",
+        "龙虎榜游资": "龙虎榜游资：席位净买额样本",
+        "龙头跟踪": "龙头跟踪：高标与晋级表现",
+    }
+    return mapping.get(title, title)
+
+
+def _interaction_and_tags() -> str:
+    """互动提问 + 话题标签：范文要求的具体评论钩子与 3–5 个精准标签。"""
+    ask = ('<p style="' + S_ASK + '">你复盘时最关注哪个信号——是涨停家数、晋级率，'
+           '还是资金净额？评论区聊聊你的判断依据。</p>')
+    tags = ('<p style="' + S_TAGS + '">#A股复盘 #每日复盘 #情绪档位 '
+            '#连板梯队 #资金流向</p>')
+    return ask + "\n" + tags
+
+
 def article_html(payload: dict, date: str, blog_url: str) -> str:
     """一篇公众号文章正文（HTML）。标题另由调用方传给草稿接口。"""
     focus = payload.get("focus") or {}
@@ -225,42 +365,51 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
     macro = strip_citations(str(payload.get("macro_sector") or ""))
 
     out: list[str] = []
-    # 头：日期 + 情绪档位 + 一句话
+    # 头：SEO 标题（日期中文 + A股复盘核心词 + 问句钩子）+ 一句话副标
     out.append(f'<section style="{S_LEAD}">'
-               f'<p style="{S_LEAD_TITLE}">{_esc(post_title(payload, date))}</p>'
+               f'<p style="{S_LEAD_TITLE}">{_esc(seo_title(payload, date))}</p>'
                + (f'<p style="{S_LEAD_SUB}">{_esc(one)}</p>' if one else "")
                + "</section>")
-    # 四张读数卡
+    # SEO 导语段：核心词 + 结论 + 大白话读数 + 证据链提示（前 300 字回应搜索意图）
+    out.append(_seo_lead(payload, date))
+    # 四张读数卡（情绪档位 / 涨跌家数 / 赚钱效应 / 晋级率）
     out.extend(_cards(payload))
-    # 关键名单（表格的卡片化替代）
+    # 关键名单（表格的卡片化替代）——小标题带长尾搜索词
     liaban = _liaban_lines(payload)
     if liaban:
-        out.append(_heading("连板股名单"))
+        out.append(_heading("连板梯队与晋级率：最高板位怎么看？"))
         out.extend(f'<p style="{S_LINE}">{_esc(ln)}</p>' for ln in liaban)
     themes = _theme_lines(payload)
     if themes:
-        out.append(_heading("题材结构"))
+        out.append(_heading("题材结构：哪些方向在异动？"))
         out.extend(f'<p style="{S_LINE}">{_esc(ln)}</p>' for ln in themes)
     events = _event_lines(payload)
     if events:
-        out.append(_heading("当日事件串"))
+        out.append(_heading("当日事件串：涨停与断板读数"))
         out.extend(f'<p style="{S_LINE}">{ln}</p>' for ln in events)  # ln 已转义、可含着色 span
-    # 汇总研判（程序核对过的正文）
+    # 汇总研判（程序核对过的正文）——小标题带长尾词
     out.append(_rule())
-    out.append(_heading("汇总研判"))
+    out.append(_heading("情绪档位：为什么这样定档？"))
     out.extend(_blocks_to_html(strip_citations(focus_body)) or [_p("该日没有汇总研判正文。")])
-    # 分项观察
+    # 明日验证条件（可收藏、可证伪的信号清单）
+    verification = _verification(payload)
+    if verification:
+        out.append(_rule())
+        out.append(verification)
+    # 分项观察：把分析师标题也补上长尾词语义（保留原标题，避免丢失信息）
     for a in analysts:
-        out.append(_heading(str(a.get("title") or "")))
+        title = str(a.get("title") or "")
+        out.append(_heading(_seo_analyst_title(title)))
         text = re.sub(r"</p>\s*<p[^>]*>", "\n\n", str(a.get("html") or ""))
         text = html.unescape(re.sub(r"<[^>]+>", "", text))
         out.extend(_blocks_to_html(text) or [_p("（本段无正文）")])
-    # 板块与宏观
+    # 板块与宏观（资金流向语义）
     if macro.strip():
-        out.append(_heading("板块与宏观"))
+        out.append(_heading("板块与宏观：资金流向与大赛道跟踪"))
         out.extend(_blocks_to_html(macro))
-    # 尾：免责 + 醒目的「阅读原文」导流（微信正文不放外链，靠底部「阅读原文」跳转）
+    # 尾：互动提问 + 话题标签 → 免责 + 醒目「阅读原文」导流
     out.append(_rule())
+    out.append(_interaction_and_tags())
     out.append(_p(DISCLAIMER, S_MUTED))
     out.append(_cta(blog_url))
     out.append(_p("本页所有数字由揽宝投研计算，文章由它生成后自动发布。", S_GAP))

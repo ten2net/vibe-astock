@@ -16,7 +16,9 @@ from test_blog_publish import payload, lib, DATE  # noqa: E402
 class TestRender:
     def test_lead_and_cards(self):
         html = wr.article_html(payload(), DATE, "https://example.com/post/x/")
-        assert "2026-09-23 每日复盘 · 情绪档位退潮" in html
+        # SEO 标题：中文日期 + A股复盘核心词 + 问句钩子
+        assert "9月23日A股复盘" in html
+        assert "意味着什么？" in html
         assert "情绪档位判为退潮。" in html
         assert "情绪档位" in html and "涨跌家数" in html and "1757 / 3366" in html
 
@@ -61,7 +63,7 @@ class TestRender:
             ]},
         })
         html = wr.article_html(p, DATE, "")
-        assert "连板股名单" in html
+        assert "连板梯队与晋级率" in html          # SEO 长尾小标题
         assert "新华文轩 601811 · 4 板 · 首封 09:30:26 · IP 经济" in html
         assert "浦发银行" not in html          # 首板不进连板名单
         assert "出版 · 涨停 5 只 · 最高 3 板 · 炸板 1" in html
@@ -103,6 +105,58 @@ class TestRender:
         assert "完整图文版" in html and "交互式复盘工作台" in html
         assert wr.S_CTA in html                     # 醒目卡片样式确实被套上
         assert "background:#fff8e6" in html        # 浅橙底 + 橙色粗边，非灰色小字
+
+
+class TestSeoRewrite:
+    """按《揽宝投研-复盘文章SEO范文》改写后的公众号正文规范。"""
+
+    def test_title_core_keyword_cn_date_and_hook(self):
+        title = wr.seo_title(payload(), DATE)
+        assert title.startswith("9月23日A股复盘")      # 核心词前置 + 中文日期
+        assert "2026-09-23" not in title              # 不用 ISO 日期
+        assert "意味着什么？" in title                # 问句钩子
+        assert len(title) <= 64
+
+    def test_lead_has_keyword_conclusion_and_plain_numbers(self):
+        html = wr.article_html(payload(), DATE, "")
+        lead = html.split('<p style="', 1)[0]  # 仅做存在性检查即可
+        # 首段点核心词 + 结论 + 通俗读数（关键数字加粗）+ 证据链提示
+        assert "9月23日A股复盘" in html
+        assert "<strong>" in html                      # 关键数字加粗
+        assert "上涨占比" in html
+        assert "模型输出可能出错" in html              # 建立信任 + 合规
+
+    def test_long_tail_headings(self):
+        p = payload(macro_sector="AI 算力无匹配概念板块", market_facts={
+            "theme_structure": {"themes": [{"sector": "出版", "limit_up": 5, "highest": 3}]},
+            "theme_tree": {"themes": [{"tag": "IP", "members": [
+                {"code": "601811", "name": "新华文轩", "boards": 4, "first_seal": "093026"}]}]},
+        })
+        html = wr.article_html(p, DATE, "")
+        for kw in ("连板梯队与晋级率", "题材结构", "情绪档位", "板块与宏观", "资金流向"):
+            assert kw in html
+
+    def test_verification_checklist(self):
+        p = payload()
+        p["focus"]["verification_items"] = [
+            {"metric": "limit_up_count", "direction": "上升", "reason": "若抬升支持修复"}
+        ]
+        html = wr.article_html(p, DATE, "")
+        assert "明日验证条件" in html
+        assert "涨停家数" in html and "limit_up_count" in html
+        assert "不是涨跌预测" in html
+
+    def test_interaction_question_and_topic_tags(self):
+        html = wr.article_html(payload(), DATE, "")
+        assert "评论区聊聊你的判断依据" in html
+        assert "#A股复盘" in html and "#每日复盘" in html
+        assert "#连板梯队" in html and "#资金流向" in html
+
+    def test_disclaimer_and_read_original_kept(self):
+        html = wr.article_html(payload(), DATE, "https://ten2net.github.io/post/x/")
+        assert "不构成投资建议" in html
+        assert "点击左下角「阅读原文」" in html
+        assert "完整图表版复盘：" in html
 
 
 class TestDraftPayload:

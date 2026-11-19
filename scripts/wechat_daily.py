@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             payload = bp.load_review(reviews, date)
             bp.check_public_text(payload)
             html = wp.article_html(payload, date, wp.blog_post_url(date))
-            print(f"# {bp.post_title(payload, date)}\n")
+            print(f"# {wp.seo_title(payload, date)}\n")
             print(html)
             log(f"dry-run：{date} 正文 {len(html)} 字符，未调微信接口")
             return 0
