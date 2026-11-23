@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T12:50:00+08:00",
+  "title": "回测里最容易骗你的5个地方",
+  "summary": "最后一天卖不掉还硬卖、没填费用当零算——回测骗人的地方都在细节里。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23-series/10",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOa7A9IzMlHpwC125drOQAC3k-Z1cYEUD3kBT-IUnOUnH6",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa2FN45PD6TCbc-8afmBr8gPvFGD3KDsNgfidZfXNJteu",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/mmbiz_png/DtDgjK5ks2qRT02CaRcF9Opp5EcBhW1OZibMG1RtGQChbv2ocHcYUxyzk0PyMNibgiapWZmXj9JZo2YofXVqtmvU3R3ttlP3ib3vsfG1JzOUXtE/0?from=appmsg"
+  },
+  "footer": null,
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "复盘方法论（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "复盘方法论",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 3606
+}

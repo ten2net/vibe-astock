@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T12:48:43+08:00",
+  "title": "一个不荐股的复盘号，是怎么活到今天的",
+  "summary": "立号三年，三条铁律一条没破：不荐股、不编数据、不算命。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23-series/04",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOazZA6Qorw0D29EhM-f5sHvnOeYRDMoqSb7-YZoYIozk4",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa_MxBFE_rLldjWl5HFpWMrAufskr23rZc75nNd_F1UIw",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/mmbiz_png/DtDgjK5ks2rI1239icYAIzfBjpFb4iaDanvaXia88dU8MZUEWoXrACKznQshZOM1FmfksSWyR9tKsiaUcFBr6jnEO742jERH5Y1iaraSiadRtuicvg/0?from=appmsg"
+  },
+  "footer": null,
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "复盘方法论（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "复盘方法论",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 3933
+}

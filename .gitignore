@@ -1,6 +1,12 @@
 # 用户私有层:配置 / 运行产物 / 知识层私有档案,永不入库
 .local/
 
+# CodeBuddy 会话本地状态（定时任务等），不入库
+.codebuddy/
+
+# 头条自动发布运行产物（发布进度），不入库
+wechat-article/publish_state.json
+
 # Python
 # 不带斜杠：`.venv` 可能是符号链接，带斜杠只匹配目录会让符号链接漏网被当成 gitlink。
 .venv

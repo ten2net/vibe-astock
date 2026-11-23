@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T10:43:03+08:00",
+  "title": "AI 真的证明了黎曼猜想吗？",
+  "summary": "Anthropic 数学家宣称借 Claude 证明黎曼猜想，只有代码没有论文。这件事的内核，比\"AI 超过人类\"更值得看清。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOawg5r0X_2bbOMyMAEVJ-U5rqGlQMG7q1YMK6sQhyePPx",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa-SLVn6lrUhsp_hwpq9QO4p5Rdu9Hc8McOBKf_BkGdXg",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/sz_mmbiz_png/DtDgjK5ks2oicXNC0K0c4BqAbkTPDZQyqtsXmiawCz21T427DySXzp4doUkOs9cgCAvwMFZzKmyfWgLGmiaGRnA2oB4oXW6MMcQFuT8mXThyU4/0?from=appmsg"
+  },
+  "footer": {
+    "past_articles": 0,
+    "footer_md": true,
+    "profile_card": true
+  },
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "AI（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "AI",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 5499
+}

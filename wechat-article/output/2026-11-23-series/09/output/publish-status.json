@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T12:49:48+08:00",
+  "title": "散户怎么搭自己的A股数据底座",
+  "summary": "185个端点、多源降级、原始响应落盘留哈希——散户也能有的数据底座思路。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23-series/09",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOawESlw8v0vPN5e_japyNB0gDFZAoCCFg5j3miokg887q",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa6J9iImUwCvR5WAAe-6WrxlH9KDGqvIgCtktq1PdIW6t",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/sz_mmbiz_png/DtDgjK5ks2qkB6Ume27zKtbdIvb1yS7WE91gKKYrrC1icZYtnBoAYoOl5x0H3GWFfBTbeyr7M0Ru1jYL4lOmnNxjTSzDhv6R3Lt7rkw9WZnE/0?from=appmsg"
+  },
+  "footer": null,
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "复盘方法论（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "复盘方法论",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 3701
+}

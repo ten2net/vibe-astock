@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T12:49:35+08:00",
+  "title": "估值只算PE？这3个口径一起看才不踩坑",
+  "summary": "扣非×4、前瞻、TTM 三套 PE 口径一起看，才不会被一个数字带偏。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23-series/08",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOay7DTlj8VQnv-2NIQu5t2919VdKu37zNPqJugajeWZlk",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa_0g6RfXTcsv9LXQQYa73FhXQUC68ycG_QtRjTX05uIk",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/mmbiz_png/DtDgjK5ks2rkScfvJyPCibPmy59PTbaIwZ8CicU1dlhazpIe3Q8q0icIYG19h5dYw21VQVTnkyrXvYsE9icUsPUYVIxW0hUWwtbL0xqEzTlcd2Y/0?from=appmsg"
+  },
+  "footer": null,
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "复盘方法论（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "复盘方法论",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 3935
+}

@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "publish_mode": "draft_only",
+  "status": "draft_only",
+  "approval": null,
+  "timestamp": "2026-11-23T12:48:31+08:00",
+  "title": "昨日涨停表现好，为什么第二天反而亏？",
+  "summary": "晋级率35%和18.8%之间，藏着多数人看复盘时最容易忽略的一个陷阱。",
+  "author": "揽宝投研",
+  "account": "揽宝投研",
+  "account_slug": null,
+  "package_dir": "output/2026-11-23-series/03",
+  "media_id": "Y-lftvwmZhCIGTiwmQNOay4AS2swmhlkA9Tyz3hceDFY17UpwyJKo63RmPwPMBck",
+  "thumb_media_id": "Y-lftvwmZhCIGTiwmQNOa6hnCIzcBS3Q08Ihpfcbf7tIcsVN34NqrLsdxSEhkfX-",
+  "lead_image": {
+    "source": "cover.png",
+    "url": "http://mmbiz.qpic.cn/mmbiz_png/DtDgjK5ks2qKB0cfcW7ZH1ZiauBbYEA8oibcfEK61ho394ZLRsz7oloIm8zh6CIcTLxT3SCicUhcKic2Xo8eD0XNibaEUV9IcpCkRUjXhU9g1qtY/0?from=appmsg"
+  },
+  "footer": null,
+  "post_draft_settings": [
+    {
+      "key": "original",
+      "label": "原创声明",
+      "value": "开启，作者：揽宝投研；允许快捷转载",
+      "api": false
+    },
+    {
+      "key": "reward",
+      "label": "赞赏",
+      "value": "开启，收款账户：揽宝投研",
+      "api": false
+    },
+    {
+      "key": "collection",
+      "label": "合集",
+      "value": "复盘方法论（frontmatter 指定）",
+      "api": false
+    },
+    {
+      "key": "advertisement",
+      "label": "智能插入广告",
+      "value": "开启，最多 2 条",
+      "api": false
+    }
+  ],
+  "collection": "复盘方法论",
+  "content_images": [],
+  "publish_id": null,
+  "article_id": null,
+  "article_url": null,
+  "publish_status": null,
+  "formal_publish": false,
+  "technical_success": true,
+  "operational_success": null,
+  "feishu_draft_notify": null,
+  "error": null,
+  "notes": [
+    "draft_only：草稿已入箱，未发送通知"
+  ],
+  "html_length": 3942
+}
