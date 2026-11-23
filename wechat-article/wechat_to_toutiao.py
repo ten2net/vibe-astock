@@ -25,6 +25,27 @@ from pathlib import Path
 TITLE_MIN = 2
 TITLE_MAX = 30  # 今日头条标题长度限制
 
+# 排版主题：对齐微信公众号文章的 orange 主题（橙色下划线，#ff6a00）。
+# 样式值取自 wechat-article-workflow/lib/markdown.mjs 的 themeStyles('orange')。
+ACCENT = "#ff6a00"
+S = {
+    "h2": (
+        "margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;"
+        f"padding-bottom:6px;border-bottom:2px solid {ACCENT};"
+    ),
+    "h3": f"margin:1.2em 0 0.5em;font-size:16px;font-weight:bold;color:{ACCENT};",
+    "p": "margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;",
+    "ul": "margin:0.8em 0;padding-left:1.4em;",
+    "ol": "margin:0.8em 0;padding-left:1.4em;",
+    "li": "margin-bottom:0.4em;line-height:1.8;font-size:16px;color:#333;",
+    "quote": (
+        "margin:1em 0;padding:0.6em 1em;"
+        f"border-left:3px solid {ACCENT};background:#fafafa;color:#666;line-height:1.8;"
+    ),
+    "strong": f"color:{ACCENT};",
+    "hr": "margin:1.5em 0;border:none;border-top:1px solid #e5e5e5;",
+}
+
 
 # --------------------------------------------------------------------------- #
 # frontmatter
@@ -59,11 +80,20 @@ def inline(text: str) -> str:
     """转换行内 Markdown：加粗、斜体、行内代码，并做 HTML 转义。"""
     # 先转义，避免正文里的 < > & 破坏结构
     text = html_lib.escape(text, quote=False)
-    # 行内代码
-    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
-    # 加粗（**x** 或 __x__）
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
+    # 行内代码（对齐公众号：灰底、红字、圆角）
+    text = re.sub(
+        r"`([^`]+)`",
+        r'<code style="padding:2px 5px;background:#f2f2f2;border-radius:3px;'
+        r'font-size:14px;color:#c7254e;">\1</code>',
+        text,
+    )
+    # 加粗（**x** 或 __x__）—— 关键词用主题橙色，对齐公众号 strong 样式
+    text = re.sub(
+        r"\*\*(.+?)\*\*", f'<strong style="{S["strong"]}">\\1</strong>', text
+    )
+    text = re.sub(
+        r"__(.+?)__", f'<strong style="{S["strong"]}">\\1</strong>', text
+    )
     # 斜体 *x* —— 公众号话题标签用 *#标签* 包裹
     text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
     # 斜体 _x_：只匹配被边界（空白/标点/开头结尾）包围的下划线，
@@ -108,9 +138,7 @@ def convert_body(body: str) -> str:
         # 分隔线
         if is_hr(stripped):
             close_list()
-            out.append(
-                '<hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;">'
-            )
+            out.append(f'<hr style="{S["hr"]}">')
             i += 1
             continue
 
@@ -123,12 +151,8 @@ def convert_body(body: str) -> str:
                 quote_lines.append(inline(q) if q else "")
                 i += 1
             inner = "<br>".join(quote_lines)
-            # 控制引用块样式：风险警示用醒目边框和底色
-            out.append(
-                '<blockquote style="margin:18px 0;padding:12px 16px;'
-                'border-left:4px solid #ff7a45;background:#fff7f2;'
-                f'color:#555;line-height:1.8;">{inner}</blockquote>'
-            )
+            # 引用块（风险警示/数据出处）对齐公众号主题：橙色左边框 + 浅灰底
+            out.append(f'<blockquote style="{S["quote"]}">{inner}</blockquote>')
             continue
 
         # 标题 # / ## / ### ...
@@ -137,12 +161,19 @@ def convert_body(body: str) -> str:
             close_list()
             level = min(len(m.group(1)), 6)
             content = inline(m.group(2).strip())
-            # 正文里常见的 ## 1、xxx 这类小标题，字号适配头条
-            sizes = {1: 22, 2: 19, 3: 17, 4: 16, 5: 16, 6: 16}
-            out.append(
-                f'<h{level} style="font-size:{sizes[level]}px;font-weight:700;'
-                f'margin:22px 0 12px;line-height:1.5;">{content}</h{level}>'
-            )
+            # 对齐公众号主题：h1 大字，h2 橙色下划线，h3 橙色文字
+            if level == 1:
+                st = (
+                    "margin:1.2em 0 0.6em;font-size:22px;font-weight:bold;"
+                    "line-height:1.4;"
+                )
+            elif level == 2:
+                st = S["h2"]
+            elif level == 3:
+                st = S["h3"]
+            else:
+                st = "margin:1em 0 0.4em;font-size:15px;font-weight:bold;"
+            out.append(f'<h{level} style="{st}">{content}</h{level}>')
             i += 1
             continue
 
@@ -151,9 +182,9 @@ def convert_body(body: str) -> str:
         if m:
             if list_type != "ul":
                 close_list()
-                out.append('<ul style="margin:12px 0;padding-left:24px;">')
+                out.append(f'<ul style="{S["ul"]}">')
                 list_type = "ul"
-            out.append(f"<li style=\"margin:6px 0;line-height:1.8;\">{inline(m.group(1))}</li>")
+            out.append(f'<li style="{S["li"]}">{inline(m.group(1))}</li>')
             i += 1
             continue
 
@@ -162,15 +193,15 @@ def convert_body(body: str) -> str:
         if m:
             if list_type != "ol":
                 close_list()
-                out.append('<ol style="margin:12px 0;padding-left:24px;">')
+                out.append(f'<ol style="{S["ol"]}">')
                 list_type = "ol"
-            out.append(f"<li style=\"margin:6px 0;line-height:1.8;\">{inline(m.group(1))}</li>")
+            out.append(f'<li style="{S["li"]}">{inline(m.group(1))}</li>')
             i += 1
             continue
 
         # 普通段落
         close_list()
-        out.append(f'<p style="margin:14px 0;line-height:1.9;">{inline(stripped)}</p>')
+        out.append(f'<p style="{S["p"]}">{inline(stripped)}</p>')
         i += 1
 
     close_list()
@@ -183,10 +214,10 @@ def convert_body(body: str) -> str:
 # 头条对站外导流管控严格：正文里不放二维码图片、不写"微信/公众号"、不留
 # 外链或账号。用中性说法引导读者"主动来找"，关键词"访问码"作为内容钩子。
 PROMO_HTML = (
-    '<p style="margin:18px 0;line-height:1.9;color:#333;">'
+    f'<p style="{S["p"]}">'
     "文中这套复盘口径与验证清单的完整版，放在同名的平台里。"
-    "想看的话，搜一下 <strong>揽宝投研</strong> 就能找到我们，"
-    '报个暗号 <strong>访问码</strong>，在线平台的免费入口地址就发你。</p>'
+    f'想看的话，搜一下 <strong style="{S["strong"]}">揽宝投研</strong> 就能找到我们，'
+    f'报个暗号 <strong style="{S["strong"]}">访问码</strong>，在线平台的免费入口地址就发你。</p>'
 )
 
 

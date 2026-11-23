@@ -1,25 +1,25 @@
-<p style="margin:14px 0;line-height:1.9;">回测报告里漂亮的收益率，有多少是真的？</p>
-<p style="margin:14px 0;line-height:1.9;">我把自己踩过的坑列了五个，每个都改过代码、补过测试。这些细节决定了回测是工具还是自我安慰。</p>
-<h2 style="font-size:19px;font-weight:700;margin:22px 0 12px;line-height:1.5;">1、最后一天卖不掉的，别硬卖</h2>
-<p style="margin:14px 0;line-height:1.9;">原来回测结束时，不管能不能卖，都按收盘价平仓、扣卖出费用、净值换成现金。</p>
-<p style="margin:14px 0;line-height:1.9;">现在能卖的照旧平仓；停牌或数据缺行、当天才买进（T+1 不能卖）、收盘封在跌停价的，都按最后一天收盘价计入期末净值，不扣卖出费用。</p>
-<p style="margin:14px 0;line-height:1.9;">报告里新增 unsettled_positions，写明是哪几只、什么原因。胜率、盈亏比这些指标不含这些持仓。</p>
-<h2 style="font-size:19px;font-weight:700;margin:22px 0 12px;line-height:1.5;">2、真实数据对照：为什么口径要说清</h2>
-<p style="margin:14px 0;line-height:1.9;">11 月 17 日，昨日涨停股平均表现 +0.23%，中位数 -0.45%，晋级率 18.8%，最高 3 板。</p>
-<p style="margin:14px 0;line-height:1.9;">11 月 10 日，平均 5.00%，中位数 +4.60%，晋级率 35.2%。</p>
-<blockquote style="margin:18px 0;padding:12px 16px;border-left:4px solid #ff7a45;background:#fff7f2;color:#555;line-height:1.8;">两组数据均来自揽宝投研当日复盘原文，由程序对公开数据逐项核对。</blockquote>
-<p style="margin:14px 0;line-height:1.9;">同样是"昨日涨停样本"，统计口径不同，结论就不同。回测同理：净值算法不说清，收益率就无法复核。</p>
-<h2 style="font-size:19px;font-weight:700;margin:22px 0 12px;line-height:1.5;">3、没填费用的买卖按 0 算并写明</h2>
-<p style="margin:14px 0;line-height:1.9;">持仓收益率里，没填费用的买卖按 0 算，并写明几笔、费用合计偏少、收益率可能偏高。</p>
-<p style="margin:14px 0;line-height:1.9;">交易日志照旧按费率估费用并标"估"。两种情况分开处理，不混着算。</p>
-<h2 style="font-size:19px;font-weight:700;margin:22px 0 12px;line-height:1.5;">4、规则改动要做变异检查</h2>
-<p style="margin:14px 0;line-height:1.9;">每个关键修复都配测试，然后把修复改回去，确认对应测试会变红。</p>
-<p style="margin:14px 0;line-height:1.9;">测试不红，说明测试没测到点上。这一步能挡住"改了但没验证"的自欺。</p>
-<h2 style="font-size:19px;font-weight:700;margin:22px 0 12px;line-height:1.5;">5、我的判断是</h2>
-<p style="margin:14px 0;line-height:1.9;">回测最容易骗人的，不是策略逻辑，而是那些没人愿意写的边角：停牌、T+1、跌停、缺失费用、最后一天。</p>
-<p style="margin:14px 0;line-height:1.9;"><strong>一个连边角都糊弄的回测，不值得拿来做任何决定。</strong></p>
-<hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0;">
-<p style="margin:14px 0;line-height:1.9;"><strong>你做回测时踩过哪些口径的坑？评论区聊聊。</strong></p>
-<p style="margin:14px 0;line-height:1.9;"><em>#量化回测 #回测陷阱 #研究方法 #数据说话 #复盘方法</em></p>
-<p style="margin:18px 0;line-height:1.9;color:#333;">文中这套复盘口径与验证清单的完整版，放在同名的平台里。想看的话，搜一下 <strong>揽宝投研</strong> 就能找到我们，报个暗号 <strong>访问码</strong>，在线平台的免费入口地址就发你。</p>
-<blockquote style="margin:18px 0;padding:12px 16px;border-left:4px solid #ff7a45;background:#fff7f2;color:#555;line-height:1.8;"><strong>风险警示：</strong> 本工具只产出研究数据、分析框架、待验证条件与裁决点，<strong>不提供投资决策、买卖建议或仓位指令</strong>。情绪分档和周期是分析框架，不是客观事实；涨停样本是市场现象统计，不是策略回测。公开数据、程序计算、个人记录与 AI 解读都可能出错，引用存在不代表推论正确，历史结果不代表未来表现。投资有风险，请独立核实并自行承担决策责任。</blockquote>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">回测报告里漂亮的收益率，有多少是真的？</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">我把自己踩过的坑列了五个，每个都改过代码、补过测试。这些细节决定了回测是工具还是自我安慰。</p>
+<h2 style="margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;padding-bottom:6px;border-bottom:2px solid #ff6a00;">1、最后一天卖不掉的，别硬卖</h2>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">原来回测结束时，不管能不能卖，都按收盘价平仓、扣卖出费用、净值换成现金。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">现在能卖的照旧平仓；停牌或数据缺行、当天才买进（T+1 不能卖）、收盘封在跌停价的，都按最后一天收盘价计入期末净值，不扣卖出费用。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">报告里新增 unsettled_positions，写明是哪几只、什么原因。胜率、盈亏比这些指标不含这些持仓。</p>
+<h2 style="margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;padding-bottom:6px;border-bottom:2px solid #ff6a00;">2、真实数据对照：为什么口径要说清</h2>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">11 月 17 日，昨日涨停股平均表现 +0.23%，中位数 -0.45%，晋级率 18.8%，最高 3 板。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">11 月 10 日，平均 5.00%，中位数 +4.60%，晋级率 35.2%。</p>
+<blockquote style="margin:1em 0;padding:0.6em 1em;border-left:3px solid #ff6a00;background:#fafafa;color:#666;line-height:1.8;">两组数据均来自揽宝投研当日复盘原文，由程序对公开数据逐项核对。</blockquote>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">同样是"昨日涨停样本"，统计口径不同，结论就不同。回测同理：净值算法不说清，收益率就无法复核。</p>
+<h2 style="margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;padding-bottom:6px;border-bottom:2px solid #ff6a00;">3、没填费用的买卖按 0 算并写明</h2>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">持仓收益率里，没填费用的买卖按 0 算，并写明几笔、费用合计偏少、收益率可能偏高。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">交易日志照旧按费率估费用并标"估"。两种情况分开处理，不混着算。</p>
+<h2 style="margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;padding-bottom:6px;border-bottom:2px solid #ff6a00;">4、规则改动要做变异检查</h2>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">每个关键修复都配测试，然后把修复改回去，确认对应测试会变红。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">测试不红，说明测试没测到点上。这一步能挡住"改了但没验证"的自欺。</p>
+<h2 style="margin:1.6em 0 0.6em;font-size:18px;font-weight:bold;line-height:1.5;padding-bottom:6px;border-bottom:2px solid #ff6a00;">5、我的判断是</h2>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">回测最容易骗人的，不是策略逻辑，而是那些没人愿意写的边角：停牌、T+1、跌停、缺失费用、最后一天。</p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;"><strong style="color:#ff6a00;">一个连边角都糊弄的回测，不值得拿来做任何决定。</strong></p>
+<hr style="margin:1.5em 0;border:none;border-top:1px solid #e5e5e5;">
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;"><strong style="color:#ff6a00;">你做回测时踩过哪些口径的坑？评论区聊聊。</strong></p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;"><em>#量化回测 #回测陷阱 #研究方法 #数据说话 #复盘方法</em></p>
+<p style="margin-bottom:1em;line-height:1.8;font-size:16px;color:#333;">文中这套复盘口径与验证清单的完整版，放在同名的平台里。想看的话，搜一下 <strong style="color:#ff6a00;">揽宝投研</strong> 就能找到我们，报个暗号 <strong style="color:#ff6a00;">访问码</strong>，在线平台的免费入口地址就发你。</p>
+<blockquote style="margin:1em 0;padding:0.6em 1em;border-left:3px solid #ff6a00;background:#fafafa;color:#666;line-height:1.8;"><strong style="color:#ff6a00;">风险警示：</strong> 本工具只产出研究数据、分析框架、待验证条件与裁决点，<strong style="color:#ff6a00;">不提供投资决策、买卖建议或仓位指令</strong>。情绪分档和周期是分析框架，不是客观事实；涨停样本是市场现象统计，不是策略回测。公开数据、程序计算、个人记录与 AI 解读都可能出错，引用存在不代表推论正确，历史结果不代表未来表现。投资有风险，请独立核实并自行承担决策责任。</blockquote>
