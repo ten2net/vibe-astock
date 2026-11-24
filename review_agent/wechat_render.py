@@ -347,13 +347,51 @@ def _seo_analyst_title(title: str) -> str:
     return mapping.get(title, title)
 
 
-def _interaction_and_tags() -> str:
-    """互动提问 + 话题标签：范文要求的具体评论钩子与 3–5 个精准标签。"""
+def _dynamic_tags(payload: dict) -> list[str]:
+    """按当日盘面生成 2 个动态话题，与固定基础标签组合成 5 个精准话题。
+
+    固定 3 个锚定账号领域（A股复盘/每日复盘/情绪档位），动态 2 个让系统
+    拿到更细的当日内容信号：一个来自情绪档位，一个来自盘面特征
+    （晋级率 / 连板高度 / 主线题材），便于推荐给对应细分兴趣的读者。
+    """
+    focus = payload.get("focus") or {}
+    em = payload.get("emotion_metrics") or {}
+    phase = str(focus.get("emotion_phase") or "").strip()
+
+    phase_tag = f"情绪{phase}" if phase else "市场分化"
+
+    # 盘面特征优先级：晋级率高 > 连板高度高 > 主线题材 > 资金流向
+    feature_tag = "资金流向"  # 兜底
+    promo = (em.get("promotion") or {}).get("overall") or {}
+    rate = promo.get("rate")
+    highest = (em.get("ladder_gap") or {}).get("highest")
+    if isinstance(rate, (int, float)) and rate >= 0.30:
+        feature_tag = "晋级率"
+    elif isinstance(highest, (int, float)) and highest >= 5:
+        feature_tag = "连板梯队"
+    else:
+        themes = (((payload.get("market_facts") or {}).get("theme_structure") or {}).get("themes") or [])
+        sector = str(themes[0].get("sector") or "").strip() if themes and isinstance(themes[0], dict) else ""
+        if sector:
+            feature_tag = sector
+
+    base = ["A股复盘", "每日复盘", "情绪档位"]
+    # 去重且保序，最多 5 个
+    picked: list[str] = []
+    for t in base + [phase_tag, feature_tag]:
+        if t and t not in picked:
+            picked.append(t)
+        if len(picked) == 5:
+            break
+    return picked
+
+
+def _interaction_and_tags(payload: dict) -> str:
+    """互动提问 + 话题标签：评论钩子 + 固定领域标签 + 当日动态标签。"""
     ask = ('<p style="' + S_ASK + '">你复盘时最关注哪个信号——是涨停家数、晋级率，'
            '还是资金净额？评论区聊聊你的判断依据。</p>')
-    tags = ('<p style="' + S_TAGS + '">#A股复盘 #每日复盘 #情绪档位 '
-            '#连板梯队 #资金流向</p>')
-    return ask + "\n" + tags
+    tags = " ".join(f"#{t}" for t in _dynamic_tags(payload))
+    return ask + "\n" + ('<p style="' + S_TAGS + '">' + tags + '</p>')
 
 
 def article_html(payload: dict, date: str, blog_url: str) -> str:
@@ -409,7 +447,7 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
         out.extend(_blocks_to_html(macro))
     # 尾：互动提问 + 话题标签 → 免责 + 醒目「阅读原文」导流
     out.append(_rule())
-    out.append(_interaction_and_tags())
+    out.append(_interaction_and_tags(payload))
     out.append(_p(DISCLAIMER, S_MUTED))
     out.append(_cta(blog_url))
     out.append(_p("本页所有数字由揽宝投研计算，文章由它生成后自动发布。", S_GAP))

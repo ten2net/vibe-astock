@@ -316,6 +316,32 @@ def freepublish(token: str, draft_media_id: str, *, wait: bool = True,
 BLOG_HOME_URL = "https://ten2net.github.io"
 
 
+def _digest_focus(payload: dict, date: str) -> str:
+    """分享卡片/搜索摘要用的核心词串：日期 + A股复盘 + 当日关键读数。
+
+    微信摘要限制 120 字；这里只放最利于识别领域与当日盘面的核心词，
+    让搜一搜与分享卡片也能带齐信号，而不是只有一句空泛的档位描述。
+    """
+    focus = payload.get("focus") or {}
+    em = payload.get("emotion_metrics") or {}
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    phase = str(focus.get("emotion_phase") or "").strip()
+    up, down = breadth.get("up"), breadth.get("down")
+    rate = ((em.get("promotion") or {}).get("overall") or {}).get("rate")
+
+    bits = [f"{cn_date(date)}A股复盘"]
+    if phase:
+        bits.append(f"情绪{phase}")
+    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
+        bits.append(f"涨停家数{int(up)}")
+    if isinstance(rate, (int, float)):
+        bits.append(f"晋级率{round(rate * 100)}%")
+    one = str(focus.get("market_oneliner") or "").strip()
+    if one:
+        bits.append(one)
+    return "，".join(bits)
+
+
 def blog_post_url(date: str) -> str:
     return f"https://ten2net.github.io/post/{date}-每日复盘/"
 
@@ -351,8 +377,8 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
 
     token = get_access_token()
     thumb = upload_cover(token, cover or card_cover(date))
-    # 摘要也带核心词，利于搜一搜与分享卡片
-    digest = f"{cn_date(date)}A股复盘：" + (one or str(focus.get("emotion_phase") or "每日复盘"))
+    # 摘要也带核心词（日期+档位+关键读数），利于搜一搜与分享卡片
+    digest = _digest_focus(payload, date)
     draft_id = add_draft(token, title=title, content=content, digest=digest[:120],
                          source_url=blog_post_url(date), thumb_media_id=thumb)
     log(f"{date}：已写入草稿箱 {draft_id}")

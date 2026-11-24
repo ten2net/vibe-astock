@@ -106,6 +106,46 @@ class TestRender:
         assert wr.S_CTA in html                     # 醒目卡片样式确实被套上
         assert "background:#fff8e6" in html        # 浅橙底 + 橙色粗边，非灰色小字
 
+    def test_dynamic_tags_default(self):
+        """默认 payload：3 个固定 + 情绪退潮 + 兜底资金流向，共 5 个。"""
+        tags = wr._dynamic_tags(payload())
+        assert len(tags) == 5
+        assert tags[:3] == ["A股复盘", "每日复盘", "情绪档位"]
+        assert "情绪退潮" in tags
+        assert "资金流向" in tags  # rate<30% 且 highest<5 且无题材 → 兜底
+
+    def test_dynamic_tags_high_promotion(self):
+        p = payload()
+        p["emotion_metrics"]["promotion"]["overall"]["rate"] = 0.35
+        tags = wr._dynamic_tags(p)
+        assert "晋级率" in tags
+
+    def test_dynamic_tags_high_ladder(self):
+        p = payload()
+        p["emotion_metrics"]["ladder_gap"]["highest"] = 6
+        tags = wr._dynamic_tags(p)
+        assert "连板梯队" in tags
+
+    def test_dynamic_tags_leading_theme(self):
+        p = payload()
+        p["market_facts"]["theme_structure"] = {"themes": [
+            {"sector": "半导体", "limit_up": 8, "highest": 3},
+        ]}
+        tags = wr._dynamic_tags(p)
+        assert "半导体" in tags
+
+    def test_dynamic_tags_dedup(self):
+        """固定标签与动态标签重名时去重，仍返回至多 5 个。"""
+        p = payload()
+        p["focus"]["emotion_phase"] = "档位"  # 动态 phase_tag = 情绪档位，与固定重名
+        tags = wr._dynamic_tags(p)
+        assert len(tags) == len(set(tags))
+        assert len(tags) <= 5
+
+    def test_tags_rendered_in_html(self):
+        html = wr.article_html(payload(), DATE, "")
+        assert "#A股复盘" in html and "#情绪退潮" in html
+
 
 class TestSeoRewrite:
     """按《揽宝投研-复盘文章SEO范文》改写后的公众号正文规范。"""
@@ -150,7 +190,8 @@ class TestSeoRewrite:
         html = wr.article_html(payload(), DATE, "")
         assert "评论区聊聊你的判断依据" in html
         assert "#A股复盘" in html and "#每日复盘" in html
-        assert "#连板梯队" in html and "#资金流向" in html
+        # 话题按当日盘面动态生成：固定 3 个 + 情绪退潮 + 兜底资金流向
+        assert "#情绪退潮" in html and "#资金流向" in html
 
     def test_disclaimer_and_read_original_kept(self):
         html = wr.article_html(payload(), DATE, "https://ten2net.github.io/post/x/")
@@ -267,3 +308,20 @@ class TestGuard:
         monkeypatch.setattr(wp.time, "time", iter([0, 0, 10]).__next__)
         with pytest.raises(wp.WechatError):
             wp.freepublish("tk", "draft", wait=True)
+
+
+class TestDigestFocus:
+    """分享卡片/搜索摘要的核心词串。"""
+
+    def test_digest_contains_core_terms(self):
+        d = wp._digest_focus(payload(), DATE)
+        assert "A股复盘" in d
+        assert "情绪退潮" in d
+        assert "涨停家数1757" in d
+        assert "晋级率19%" in d
+
+    def test_digest_without_optional_fields(self):
+        p = {"focus": {}, "emotion_metrics": {}, "market_facts": {}}
+        d = wp._digest_focus(p, DATE)
+        assert "A股复盘" in d
+        assert "涨停家数" not in d
