@@ -331,6 +331,24 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
     title = seo_title(payload, date)          # SEO：中文日期 + A股复盘核心词 + 问句钩子
     content = article_html(payload, date, blog_post_url(date))
     log(f"{date}：正文 {len(content)} 字符")
+
+    # 标签校准闸门：确保复盘内容在帮账号打准「A股投研」标签。
+    # 默认开启；设 ASTOCK_TAG_GATE=0 可临时跳过（例如历史数据补发）。
+    if os.environ.get("ASTOCK_TAG_GATE", "1").strip() not in {"0", "false", "False"}:
+        import importlib.util
+
+        _core = Path(__file__).resolve().parent.parent / "wechat-article" / "tag_calibration.py"
+        _spec = importlib.util.spec_from_file_location("astock_tag_calibration", _core)
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        gate = _mod.check_text(_mod.strip_html(content), title=title)
+        for note in gate.notes:
+            log(f"  [标签校准] {note}")
+        if not gate.passed:
+            raise WechatError(
+                f"{date}：标签校准未通过，已阻止发布：{'; '.join(gate.errors)}"
+            )
+
     token = get_access_token()
     thumb = upload_cover(token, cover or card_cover(date))
     # 摘要也带核心词，利于搜一搜与分享卡片
