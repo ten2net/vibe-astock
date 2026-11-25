@@ -1198,9 +1198,12 @@ def _inline_md(text: str) -> str:
 def _split_sentences(text: str) -> list[str]:
     """按中文句号「。」拆成短段，每段保留句末句号（手机阅读友好）。
 
-    只拆正文叙述；小数点的英文句点「.」不受影响。空段丢弃。
+    连续句号（如标题里的「好事将近。。。」）是省略号，不当作分句点。
+    小数点的英文句点「.」不受影响。空段丢弃。
     """
-    parts = str(text or "").split("。")
+    text = str(text or "")
+    # 只拆前后都不是句号的单个「。」，保护「。。。」这类省略号
+    parts = re.split(r"(?<!。)。(?!。)", text)
     out = [p.strip() + "。" for p in parts[:-1] if p.strip()]
     tail = parts[-1].strip()
     if tail:

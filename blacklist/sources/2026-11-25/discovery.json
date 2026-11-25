@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-25",
+  "generated_at": "2026-11-25T13:18:39",
+  "accounts": {
+    "大红好运哥": {
+      "name": "大红好运哥",
+      "status": "rate_limited",
+      "articles": [],
+      "ret": 200013,
+      "msg": "freq control"
+    },
+    "格兰投研": {
+      "name": "格兰投研",
+      "status": "rate_limited",
+      "articles": [],
+      "ret": 200013,
+      "msg": "freq control"
+    }
+  }
+}
