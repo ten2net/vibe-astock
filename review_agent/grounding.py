@@ -482,8 +482,12 @@ def render_markdown(summary, records):
     for direction in summary["focus_directions"]:
         lines += ["## " + direction["direction"], render(direction["logic"]), "风险：" + render(direction["risk"])]
     lines += ["## 风险提示", *[render(f) for f in summary["risk_alerts"]], "## 明日验证条件"]
+    # 指标名用中文标签，不暴露英文 key（与 duanxian.schemas 的口径一致）。
+    from duanxian.verification import METRICS
+    metric_label = {m.key: m.label for m in METRICS}
     for item in summary["verification_items"]:
-        lines.append(item["metric"] + " 预期" + item["direction"] + "：" + render(item["reason"]))
+        name = metric_label.get(item["metric"], item["metric"])
+        lines.append(name + " 预期" + item["direction"] + "：" + render(item["reason"]))
     lines += ["## 本次输入依据", NOTE]
     for eid in dict.fromkeys(used):
         record = by_id[eid]

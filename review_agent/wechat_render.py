@@ -39,13 +39,13 @@ S_LEAD_TITLE = "margin:0 0 8px;font-size:17px;font-weight:bold;color:#f0d78c;"
 S_LEAD_SUB = "margin:0;font-size:13px;color:#9aa4b2;line-height:1.6;"
 S_H = ("margin:22px 0 10px;padding-left:10px;font-size:16px;font-weight:bold;color:#1d2129;"
        "border-left:4px solid #c9a227;line-height:1.4;")
-S_P = "margin:0 0 12px;font-size:15px;color:#1d2129;line-height:1.75;"
+S_P = "margin:0 0 12px;font-size:15px;color:#1d2129;line-height:1.75;text-align:left;"
 S_MUTED = "margin:0 0 12px;font-size:13px;color:#86909c;line-height:1.7;"
 S_CARD = "margin:0 0 8px;padding:10px 14px;background:#f7f8fa;border-radius:8px;"
 S_CARD_K = "margin:0;font-size:12px;color:#86909c;"
 S_CARD_V = "margin:4px 0;font-size:19px;font-weight:bold;color:#1d2129;"
 S_CARD_S = "margin:0;font-size:12px;color:#86909c;"
-S_LINE = "margin:0 0 6px;font-size:14px;color:#1d2129;line-height:1.7;"
+S_LINE = "margin:0 0 6px;font-size:14px;color:#1d2129;line-height:1.7;text-align:left;"
 S_GAP = "margin:0 0 12px;font-size:13px;color:#b0b8c4;"
 S_RULE = ("margin:26px 0 10px;border:none;border-top:1px dashed #e5e6eb;")
 # 结尾「阅读原文」醒目引导块：浅橙底 + 左侧橙色粗边，微信白名单内的内联样式
@@ -235,6 +235,24 @@ def _event_lines(payload: dict, limit: int = 10) -> list[str]:
     return lines
 
 
+def _localize_metrics(text: str) -> str:
+    """把正文里写死的英文指标 key 换成中文名（渲染层兜底）。
+
+    历史 focus_md 由早期 grounding 生成，里面是 ``money_effect_median``
+    这类英文 key；这里统一替换成 METRICS 里的中文 label，避免读者看到英文。
+    按 key 长度倒序替换，防止短 key 先命中干扰长 key。
+    """
+    try:
+        from duanxian.verification import METRICS
+        mapping = {m.key: m.label for m in METRICS}
+    except Exception:  # noqa: BLE001  指标映射是增强项，失败不影响发布
+        return text
+    for key in sorted(mapping, key=len, reverse=True):
+        if key in text:
+            text = text.replace(key, mapping[key])
+    return text
+
+
 def _blocks_to_html(md_text: str) -> list[str]:
     """_text_to_md 风格的块 → 微信段落/小标题。与博客 _md_blocks 同规则。"""
     from .blog_publish import _text_to_md  # 复用博客的块切分约定
@@ -359,11 +377,8 @@ def _stance_checklist(payload: dict) -> str:
     valid = [it for it in items if isinstance(it, dict) and it.get("metric")]
     if not valid:
         return ""
-    name_map = {
-        "limit_up_count": "涨停家数", "promotion_1to2": "1进2晋级率",
-        "money_effect_median": "昨日涨停样本中位表现", "broken_rate": "炸板率",
-        "market_limit_down": "跌停家数", "highest_board": "最高连板高度",
-    }
+    from duanxian.verification import METRICS
+    name_map = {m.key: m.label for m in METRICS}
     rows = []
     for it in valid:
         label = name_map.get(str(it.get("metric")), str(it.get("metric")))
@@ -439,21 +454,15 @@ def _verification(payload: dict) -> str:
     valid = [it for it in items if isinstance(it, dict) and it.get("metric")]
     if not valid:
         return ""
-    name_map = {
-        "limit_up_count": "涨停家数",
-        "promotion_1to2": "1进2晋级率",
-        "money_effect_median": "昨日涨停样本中位表现",
-        "broken_rate": "炸板率",
-        "market_limit_down": "跌停家数",
-        "highest_board": "最高连板高度",
-    }
+    from duanxian.verification import METRICS
+    name_map = {m.key: m.label for m in METRICS}
     out = [f'<p style="{S_H}">明日验证条件：三个信号看情绪能否修复</p>']
     for it in valid:
         metric = str(it.get("metric"))
         label = name_map.get(metric, metric)
         direction = str(it.get("direction") or "").strip()
         reason = str(it.get("reason") or "").strip()
-        line = f"<strong>{_esc(label)}</strong>（{_esc(metric)}）"
+        line = f"<strong>{_esc(label)}</strong>"  # 只显示中文名，不暴露英文 key
         if direction:
             line += f"：看{_esc(direction)}"
         if reason:
@@ -560,7 +569,7 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
     # 汇总研判（程序核对过的正文）——小标题带长尾词
     out.append(_rule())
     out.append(_heading("情绪档位：为什么这样定档？"))
-    out.extend(_blocks_to_html(strip_citations(focus_body)) or [_p("该日没有汇总研判正文。")])
+    out.extend(_blocks_to_html(_localize_metrics(strip_citations(focus_body))) or [_p("该日没有汇总研判正文。")])
     # 观察清单（Seaway 式条件/动作表）+ 原有逐条验证条件说明
     checklist = _stance_checklist(payload)
     if checklist:

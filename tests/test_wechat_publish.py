@@ -183,8 +183,19 @@ class TestSeoRewrite:
         ]
         html = wr.article_html(p, DATE, "")
         assert "明日验证条件" in html
-        assert "涨停家数" in html and "limit_up_count" in html
+        # 条件名称只显示中文，不暴露英文 metric key
+        assert "涨停家数" in html and "limit_up_count" not in html
         assert "不是涨跌预测" in html
+
+    def test_legacy_english_metric_localized(self):
+        """历史 focus_md 里写死的英文 metric key，渲染时兜底换成中文。"""
+        p = payload()
+        p["focus_md"] = ("## 明日验证条件\n\n"
+                         "money_effect_median 预期上升：证据。\n\n"
+                         "deep_loss_count 预期下降：证据。")
+        html = wr.article_html(p, DATE, "")
+        assert "赚钱效应中位数" in html and "money_effect_median" not in html
+        assert "跌超5%家数" in html and "deep_loss_count" not in html
 
     def test_interaction_question_and_topic_tags(self):
         html = wr.article_html(payload(), DATE, "")
