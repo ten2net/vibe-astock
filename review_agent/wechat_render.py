@@ -21,6 +21,12 @@ from .blog_publish import (
     strip_citations,
     _float,
     post_title,
+    stance_title,
+    _PHASE_STANCE,
+    _DEFAULT_STANCE,
+    _split_sentences,
+    RISK_TAG_HTML,
+    _is_risk_sentence,
 )
 
 # 涨红跌绿（A 股习惯）：正/涨=红，负/跌=绿，零或缺失保持深色不着色。
@@ -54,6 +60,21 @@ S_TAGS = ("margin:14px 0 4px;font-size:13px;color:#1a73e8;line-height:1.7;")
 S_ASK = ("margin:16px 0 8px;padding:12px 14px;background:#f1f6ff;"
          "border-left:4px solid #1a73e8;border-radius:6px;"
          "font-size:14px;color:#1d2129;line-height:1.75;font-weight:bold;")
+# Seaway 式「先说结论 / 观察清单」表格样式（微信白名单内联）
+S_TABLE = ("margin:12px 0 16px;width:100%;border-collapse:collapse;font-size:13px;"
+           "color:#1d2129;line-height:1.6;")
+S_TH = ("padding:8px 6px;text-align:left;font-weight:bold;color:#c96a00;"
+        "background:#fff8e6;border-bottom:2px solid #f08c00;")
+S_TD = "padding:8px 6px;border-bottom:1px solid #eef0f3;vertical-align:top;"
+S_TD_B = "padding:8px 6px;border-bottom:1px solid #eef0f3;font-weight:bold;vertical-align:top;"
+S_CHART_CARD = ("margin:12px 0;padding:12px 14px;background:#f7f8fa;border-radius:8px;")
+S_CHART_T = "margin:0 0 4px;font-size:14px;font-weight:bold;color:#1d2129;"
+S_CHART_N = "margin:0 0 10px;font-size:12px;color:#86909c;"
+S_BAR_ROW = "display:flex;align-items:center;margin:0 0 5px;font-size:12px;color:#4e5969;"
+S_BAR_LB = "display:inline-block;width:72px;flex-shrink:0;color:#4e5969;"
+S_BAR_TR = ("display:inline-block;flex:1;height:10px;background:#eef0f3;"
+            "border-radius:5px;overflow:hidden;margin:0 8px;")
+S_BAR_FL = "display:block;height:100%;border-radius:5px;"
 
 
 def _esc(text) -> str:
@@ -69,34 +90,15 @@ def cn_date(date: str) -> str:
     return f"{int(m.group(2))}月{int(m.group(3))}日"
 
 
-def _hook_phrase(payload: dict) -> str:
-    """从涨跌家数取一个搜索友好的短钩子：涨多→「个股普涨」；跌多→「个股普跌」；
-    拿不到→退回情绪档位。用于标题「……意味着什么？」前半句（避免强定主线）。"""
-    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
-    up, down = breadth.get("up"), breadth.get("down")
-    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
-        return "个股普涨" if up > down else ("个股普跌" if down > up else "涨跌各半")
-    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
-    return f"情绪档位{phase}" if phase else "市场分化"
-
-
 def seo_title(payload: dict, date: str) -> str:
-    """微信公众号标题：核心词前置 + 中文日期 + 问句钩子（范文 SEO 规范）。
+    """微信公众号标题：中文日期 + 市况 + 明确态度 + 观察动作（Seaway 式改写）。
 
-    格式：``11月18日A股复盘：情绪修复，个股普跌意味着什么？``
-    - 20 字左右、无震惊体，符合搜索话术；
-    - 「A股复盘 / 每日复盘」是固定核心词，养成算法标签；
-    - 档位（修复/冰点/退潮…）作副标体现专业性，问句「意味着什么」提升点击。
-    仅用于公众号；博客标题仍走 blog_publish.post_title，互不干扰。
+    - 20 字左右、无震惊体，核心词（日期 / 个股普跌 / A股复盘）仍在标题里；
+    - 态度与动作由当日档位驱动，读者一眼看到观点和纪律；
+    - 措辞为观察纪律而非交易指令，符合产品政策。
+    博客标题走 blog_publish.post_title（同样改用 stance_title），两处保持一致。
     """
-    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
-    hook = _hook_phrase(payload)
-    title = f"{cn_date(date)}A股复盘"
-    if phase:
-        title += f"：情绪{phase}，{hook}意味着什么？"
-    else:
-        title += f"：{hook}意味着什么？"
-    return title
+    return stance_title(payload, date)
 
 
 def _tone(value) -> str:
@@ -245,7 +247,8 @@ def _blocks_to_html(md_text: str) -> list[str]:
             continue
         if block.startswith(">"):
             text = " ".join(ln.lstrip("> ").strip() for ln in block.splitlines())
-            out.append(f'<p style="{S_MUTED}">{_esc(text)}</p>')
+            for s in _split_sentences(text):
+                out.append(f'<p style="{S_MUTED}">{_esc(s)}</p>')
             continue
         if block.startswith("```"):
             body = "\n".join(block.splitlines()[1:])
@@ -254,10 +257,11 @@ def _blocks_to_html(md_text: str) -> list[str]:
                 if ln.strip():
                     out.append(f'<p style="margin:0;font-size:12px;color:#4e5969;font-family:monospace;">{_esc(ln)}</p>')
             continue
-        # 行内 **加粗** 转成 <strong>（微信保留 strong）
-        text = _esc(block)
-        text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-        out.append(f'<p style="{S_P}">{text}</p>')
+        # 行内 **加粗** 转成 <strong>（微信保留 strong）；按句号拆成短段
+        for s in _split_sentences(block):
+            text = _esc(s)
+            text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+            out.append(f'<p style="{S_P}">{text}</p>')
     return out
 
 
@@ -302,7 +306,131 @@ def _seo_lead(payload: dict, date: str) -> str:
     text = "".join(bits)
     text = _esc(text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    return f'<p style="{S_SEO_LEAD}">{text}</p>'
+    # 按中文句号拆成短段（与正文同规则），风险提示句加醒目前缀
+    return "\n".join(
+        f'<p style="{S_SEO_LEAD}">{RISK_TAG_HTML if _is_risk_sentence(s) else ""}{s}</p>'
+        for s in _split_sentences(text))
+
+
+def _conclusion_table(payload: dict, date: str) -> str:
+    """Seaway 式「先说结论」表：问题 / 答案 / 依据，全部由当日读数驱动。
+
+    参考 Seaway《高开低走之后：等坑分批，别接飞刀》第一节：把全文判断压成一张
+    可扫读的表格，读者一眼知道\"现在怎么看、该盯什么\"。答案为观察判断，不是
+    买卖建议；依据列引用数据底座的真实读数。
+    """
+    focus = payload.get("focus") or {}
+    phase = str(focus.get("emotion_phase") or "").strip()
+    stance, action = _PHASE_STANCE.get(phase, _DEFAULT_STANCE)
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    up, down = breadth.get("up"), breadth.get("down")
+    ratio = _pct(up / (up + down)) if isinstance(up, int) and isinstance(down, int) and up + down > 0 else "—"
+    em = payload.get("emotion_metrics") or {}
+    money = em.get("money_effect") or {}
+    promo = (em.get("promotion") or {}).get("overall") or {}
+
+    rows: list[tuple[str, str, str]] = []
+    rows.append(("今天怎么看", stance, f"情绪档位「{phase or '—'}」，上涨占比 {ratio}"))
+    if money.get("available"):
+        rows.append(("昨日强势股反馈",
+                     "正反馈" if (money.get("median") or 0) >= 0 else "转弱",
+                     f"昨日涨停样本今日中位 {_sign(money.get('median'), 2, '%')}，翻红率 {_pct(money.get('positive_rate'))}"))
+    rows.append(("接力强不强",
+                 "偏弱" if (promo.get("rate") or 0) < 0.3 else "尚可",
+                 f"整体晋级率 {_pct(promo.get('rate'))}（{promo.get('promoted', '—')}/{promo.get('base', '—')}）"))
+    rows.append(("接下来怎么办", action, "下面是可对照的验证条件，出现才谈延续，未出现就是反证"))
+    body = "".join(
+        "<tr>" + f'<td style="{S_TD_B}">{_esc(q)}</td>'
+        + f'<td style="{S_TD}">{_esc(a)}</td>'
+        + f'<td style="{S_TD}">{_esc(b)}</td></tr>'
+        for q, a, b in rows)
+    return (f'<p style="{S_H}">先说结论：今天怎么看、该盯什么</p>'
+            + f'<table style="{S_TABLE}"><thead><tr>'
+            + f'<th style="{S_TH}">问题</th><th style="{S_TH}">答案</th><th style="{S_TH}">依据</th>'
+            + "</tr></thead><tbody>" + body + "</tbody></table>")
+
+
+def _stance_checklist(payload: dict) -> str:
+    """Seaway 式「操作清单」表：把验证条件做成可逐日对照的条件/动作表。
+
+    动作用「看… / 等… / 若…则反证」的观察纪律措辞，不构成买卖建议。
+    """
+    items = (payload.get("focus") or {}).get("verification_items") or []
+    valid = [it for it in items if isinstance(it, dict) and it.get("metric")]
+    if not valid:
+        return ""
+    name_map = {
+        "limit_up_count": "涨停家数", "promotion_1to2": "1进2晋级率",
+        "money_effect_median": "昨日涨停样本中位表现", "broken_rate": "炸板率",
+        "market_limit_down": "跌停家数", "highest_board": "最高连板高度",
+    }
+    rows = []
+    for it in valid:
+        label = name_map.get(str(it.get("metric")), str(it.get("metric")))
+        direction = str(it.get("direction") or "").strip()
+        reason = str(it.get("reason") or "").strip()
+        rows.append((label, direction, reason))
+    body = "".join(
+        "<tr>" + f'<td style="{S_TD_B}">{_esc(a)}</td>'
+        + f'<td style="{S_TD}">{_esc(b)}</td>'
+        + f'<td style="{S_TD}">{_esc(c)}</td></tr>'
+        for a, b, c in rows)
+    return (f'<p style="{S_H}">观察清单：四个条件，逐日对照</p>'
+            + f'<table style="{S_TABLE}"><thead><tr>'
+            + f'<th style="{S_TH}">盯什么</th><th style="{S_TH}">看什么变化</th><th style="{S_TH}">说明</th>'
+            + "</tr></thead><tbody>" + body + "</tbody></table>"
+            + f'<p style="{S_MUTED}">这是验证条件，不是涨跌预测，也不构成操作建议。</p>')
+
+
+def _seaway_chart(payload: dict) -> str:
+    """用数据底座的真实读数画微信兼容的内联条形图（插图）。
+
+    Seaway 文章配了大量数据图；这里以纯内联 HTML/CSS 的条形图替代外部图片，
+    微信不会剥掉 style，本地预览与公众号里都能显示。三组图：
+    1) 涨跌家数对比；2) 昨日涨停样本今日表现；3) 晋级率。
+    数字全部来自复盘产物，不新增判断。
+    """
+    em = payload.get("emotion_metrics") or {}
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    money = em.get("money_effect") or {}
+    promo = (em.get("promotion") or {}).get("overall") or {}
+
+    def bar(label: str, value: float, text: str, scale: float, positive: bool) -> str:
+        try:
+            pct = max(0.0, min(100.0, abs(float(value)) / scale * 100))
+        except (TypeError, ValueError):
+            pct = 0.0
+        color = C_UP if positive else C_DOWN
+        return (f'<span style="{S_BAR_ROW}"><span style="{S_BAR_LB}">{_esc(label)}</span>'
+                f'<span style="{S_BAR_TR}"><i style="{S_BAR_FL}background:{color};width:{pct:.0f}%"></i></span>'
+                f'<b style="min-width:64px;text-align:right;">{_esc(text)}</b></span>')
+
+    charts: list[str] = []
+    up, down = breadth.get("up"), breadth.get("down")
+    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
+        scale = max(up, down) or 1
+        charts.append(f'<section style="{S_CHART_CARD}"><p style="{S_CHART_T}">涨跌家数（沪深两市）</p>'
+                      f'<p style="{S_CHART_N}">红=上涨、绿=下跌，柱长为家数</p>'
+                      + bar("上涨", up, f"{up} 只", scale, True)
+                      + bar("下跌", down, f"{down} 只", scale, False)
+                      + "</section>")
+    if money.get("available"):
+        med = money.get("median") or 0
+        pos = money.get("positive_rate") or 0
+        charts.append(f'<section style="{S_CHART_CARD}"><p style="{S_CHART_T}">昨日涨停股今天怎么样</p>'
+                      f'<p style="{S_CHART_N}">中位数与翻红率，来自揽宝投研当日复盘</p>'
+                      + bar("中位表现", abs(med), _sign(med, 2, "%"), 10.0, med >= 0)
+                      + bar("翻红率", pos, _pct(pos), 1.0, True)
+                      + "</section>")
+    rate = promo.get("rate")
+    if isinstance(rate, (int, float)):
+        charts.append(f'<section style="{S_CHART_CARD}"><p style="{S_CHART_T}">晋级率：接力强不强</p>'
+                      f'<p style="{S_CHART_N}">昨日涨停 {promo.get("base", "—")} 只 → 今日再涨停 {promo.get("promoted", "—")} 只</p>'
+                      + bar("整体晋级", rate, _pct(rate), 1.0, rate >= 0.3)
+                      + "</section>")
+    if not charts:
+        return ""
+    return "".join(charts)
 
 
 def _verification(payload: dict) -> str:
@@ -410,8 +538,12 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
                + "</section>")
     # SEO 导语段：核心词 + 结论 + 大白话读数 + 证据链提示（前 300 字回应搜索意图）
     out.append(_seo_lead(payload, date))
+    # Seaway 式「先说结论」表：把当天判断压成可扫读的一张表
+    out.append(_conclusion_table(payload, date))
     # 四张读数卡（情绪档位 / 涨跌家数 / 赚钱效应 / 晋级率）
     out.extend(_cards(payload))
+    # 插图：由数据底座真实读数驱动的内联条形图（微信兼容）
+    out.append(_seaway_chart(payload))
     # 关键名单（表格的卡片化替代）——小标题带长尾搜索词
     liaban = _liaban_lines(payload)
     if liaban:
@@ -429,10 +561,13 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
     out.append(_rule())
     out.append(_heading("情绪档位：为什么这样定档？"))
     out.extend(_blocks_to_html(strip_citations(focus_body)) or [_p("该日没有汇总研判正文。")])
-    # 明日验证条件（可收藏、可证伪的信号清单）
+    # 观察清单（Seaway 式条件/动作表）+ 原有逐条验证条件说明
+    checklist = _stance_checklist(payload)
+    if checklist:
+        out.append(_rule())
+        out.append(checklist)
     verification = _verification(payload)
     if verification:
-        out.append(_rule())
         out.append(verification)
     # 分项观察：把分析师标题也补上长尾词语义（保留原标题，避免丢失信息）
     for a in analysts:
@@ -448,7 +583,9 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
     # 尾：互动提问 + 话题标签 → 免责 + 醒目「阅读原文」导流
     out.append(_rule())
     out.append(_interaction_and_tags(payload))
-    out.append(_p(DISCLAIMER, S_MUTED))
+    for s in _split_sentences(DISCLAIMER):
+        out.append(f'<p style="{S_MUTED}">'
+                   f'{RISK_TAG_HTML if _is_risk_sentence(s) else ""}{_esc(s)}</p>')
     out.append(_cta(blog_url))
     out.append(_p("本页所有数字由揽宝投研计算，文章由它生成后自动发布。", S_GAP))
     return "\n".join(out)
