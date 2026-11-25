@@ -35,10 +35,20 @@ SITE_TITLE = "揽宝.复盘"
 BRAND_SITE = "https://phoenixtree.ai/"
 # 站点自己的清单：只清理这个文件里记过的、我们自己生成的页面
 MANIFEST = "astock-deploy.json"
+RISK_SENTENCE = "模型输出可能出错，请沿证据链自行核实并独立决策，风险自担。"
 DISCLAIMER = (
     f"{PRODUCT_NAME} 只客观呈现公开数据与榜单，不推荐个股、不预测涨跌、不构成投资建议。"
-    "模型输出可能出错，请沿证据链自行核实并独立决策，风险自担。"
+    + RISK_SENTENCE
 )
+
+# 风险提示句的醒目前缀：橙色 + 较大字体（博客与公众号共用同一措辞）
+RISK_TAG_HTML = ('<strong class="va-risk-tag" style="color:#e8710a;font-size:17px;'
+                 'font-weight:bold;">风险警示：</strong>')
+
+
+def _is_risk_sentence(text: str) -> bool:
+    return str(text or "").strip() == RISK_SENTENCE
+
 
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -1073,9 +1083,91 @@ def _block_tier_tiers(payload: dict, prev_reviews: dict) -> str:
         note += "前一交易日报告不在库里，只按今天只数分档。"
     return '<div class="va-grid va-grid-wide">' + "".join(cards) + '</div><p class="va-mini">' + note + "</p>"
 
+# ---- 标题：借鉴 Seaway「亮明态度 + 可操作」的写法，守住不荐股边界 ----
+# 旧标题（如「2026-11-24 每日复盘 · 情绪档位退潮」）是标签堆砌，AI 味浓、
+# 观点不明确、没有操作性。新标题改成「市况 + 判断 + 观察动作」三段式：
+#   11月24日个股普跌：退潮未完，别急着抢反弹
+# 动作一律用「等信号 / 别急着 / 看确认」等观察纪律措辞，不出现买卖/仓位指令。
+_PHASE_STANCE = {
+    "退潮": ("退潮未完", "别急着抢反弹"),
+    "冰点": ("情绪冰点", "别接飞刀"),
+    "修复": ("修复待确认", "等信号再动手"),
+    "发酵": ("热度在上", "让信号说话"),
+    "高潮": ("情绪高涨", "别追高"),
+}
+_DEFAULT_STANCE = ("分歧未明", "先看验证再动")
+
+
+def _breadth_hook(payload: dict) -> str:
+    """从涨跌家数取市况钩子：涨多→个股普涨，跌多→个股普跌。"""
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    up, down = breadth.get("up"), breadth.get("down")
+    if isinstance(up, int) and isinstance(down, int) and up + down > 0:
+        return "个股普涨" if up > down else ("个股普跌" if down > up else "涨跌各半")
+    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
+    return f"情绪{phase}" if phase else "市场分化"
+
+
+def stance_title(payload: dict, date: str) -> str:
+    """「亮明态度 + 可操作」式标题：市况 + 判断 + 观察动作，合规无买卖建议。"""
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(date or ""))
+    cn = f"{int(m.group(2))}月{int(m.group(3))}日" if m else str(date or "")
+    phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
+    stance, action = _PHASE_STANCE.get(phase, _DEFAULT_STANCE)
+    return f"{cn}{_breadth_hook(payload)}：{stance}，{action}"
+
+
 def post_title(payload: dict, date: str) -> str:
-    phase = (payload.get("focus") or {}).get("emotion_phase")
-    return f"{date} 每日复盘" + (f" · 情绪档位{phase}" if phase else "")
+    """博客标题：与公众号共用 Seaway 式「态度 + 动作」标题。"""
+    return stance_title(payload, date)
+
+
+def _conclusion_table_md(payload: dict, date: str) -> str:
+    """Seaway 式「先说结论」表（博客版）：问题/答案/依据，数据来自复盘产物。"""
+    focus = payload.get("focus") or {}
+    phase = str(focus.get("emotion_phase") or "").strip()
+    stance, action = _PHASE_STANCE.get(phase, _DEFAULT_STANCE)
+    breadth = (payload.get("market_facts") or {}).get("breadth") or {}
+    up, down = breadth.get("up"), breadth.get("down")
+    ratio = _pct(up / (up + down)) if isinstance(up, int) and isinstance(down, int) and up + down > 0 else "—"
+    em = payload.get("emotion_metrics") or {}
+    money = em.get("money_effect") or {}
+    promo = (em.get("promotion") or {}).get("overall") or {}
+    rows: list[tuple[str, str, str]] = [
+        ("今天怎么看", stance, f"情绪档位「{phase or '—'}」，上涨占比 {ratio}"),
+    ]
+    if money.get("available"):
+        rows.append(("昨日强势股反馈",
+                     "正反馈" if (money.get("median") or 0) >= 0 else "转弱",
+                     f"昨日涨停样本今日中位 {_sign(money.get('median'), 2, '%')}，翻红率 {_pct(money.get('positive_rate'))}"))
+    rows.append(("接力强不强",
+                 "偏弱" if (promo.get("rate") or 0) < 0.3 else "尚可",
+                 f"整体晋级率 {_pct(promo.get('rate'))}（{promo.get('promoted', '—')}/{promo.get('base', '—')}）"))
+    rows.append(("接下来怎么办", action, "下面是可对照的验证条件，出现才谈延续，未出现就是反证"))
+    return _table(["问题", "答案", "依据"],
+                  [[f'<td class="va-tier">{html.escape(q)}</td>', html.escape(a), html.escape(b)]
+                   for q, a, b in rows])
+
+
+def _stance_checklist_md(payload: dict) -> str:
+    """Seaway 式「观察清单」表（博客版）：验证条件做成可逐日对照的条件/动作表。"""
+    items = (payload.get("focus") or {}).get("verification_items") or []
+    valid = [it for it in items if isinstance(it, dict) and it.get("metric")]
+    if not valid:
+        return ""
+    name_map = {
+        "limit_up_count": "涨停家数", "promotion_1to2": "1进2晋级率",
+        "money_effect_median": "昨日涨停样本中位表现", "broken_rate": "炸板率",
+        "market_limit_down": "跌停家数", "highest_board": "最高连板高度",
+    }
+    rows = []
+    for it in valid:
+        label = name_map.get(str(it.get("metric")), str(it.get("metric")))
+        rows.append([f'<td class="va-tier">{html.escape(label)}</td>',
+                     html.escape(str(it.get("direction") or "")),
+                     html.escape(str(it.get("reason") or ""))])
+    return _table(["盯什么", "看什么变化", "说明"], rows,
+                  "这是验证条件，不是涨跌预测，也不构成操作建议。")
 
 
 def post_filename(date: str) -> str:
@@ -1103,10 +1195,24 @@ def _inline_md(text: str) -> str:
     return out
 
 
+def _split_sentences(text: str) -> list[str]:
+    """按中文句号「。」拆成短段，每段保留句末句号（手机阅读友好）。
+
+    只拆正文叙述；小数点的英文句点「.」不受影响。空段丢弃。
+    """
+    parts = str(text or "").split("。")
+    out = [p.strip() + "。" for p in parts[:-1] if p.strip()]
+    tail = parts[-1].strip()
+    if tail:
+        out.append(tail)
+    return out
+
+
 def _md_blocks(md: str) -> list[str]:
     """把 _text_to_md 产出的块转成 HTML 片段。
 
     块之间空行分隔；块只有三种形态：> 引用、### 小标题、普通段落。
+    普通段落与引用按「。」拆成短段，每段独立成段。
     """
     out: list[str] = []
     for block in [b.strip() for b in (md or "").split("\n\n") if b.strip()]:
@@ -1117,9 +1223,11 @@ def _md_blocks(md: str) -> list[str]:
             continue
         if block.startswith(">"):
             text = " ".join(ln.lstrip("> ").strip() for ln in block.splitlines())
-            out.append("<blockquote>" + _inline_md(text) + "</blockquote>")
+            for s in _split_sentences(text):
+                out.append("<blockquote>" + _inline_md(s) + "</blockquote>")
             continue
-        out.append("<p>" + _inline_md(block) + "</p>")
+        for s in _split_sentences(block):
+            out.append("<p>" + _inline_md(s) + "</p>")
     return out
 
 
@@ -1302,7 +1410,10 @@ def promotion_html() -> str:
         '<div class="va-promo-head"><h2>把这些数字交给程序算</h2>',
         "<p>本页所有数字都由揽宝投研计算，文章由它生成后自动发布。点卡片进对应功能。</p></div>",
         '<div class="va-promo-grid">' + v1 + v2 + "</div>",
-        '<p class="va-promo-foot">开源、本机运行：' + html.escape(DISCLAIMER) + "</p>",
+        '<div class="va-promo-foot"><p>开源、本机运行：</p>'
+        + "".join(f"<p>{RISK_TAG_HTML if _is_risk_sentence(s) else ''}{html.escape(s)}</p>"
+                  for s in _split_sentences(DISCLAIMER))
+        + "</div>",
         "</section>",
     ])
 
@@ -1332,10 +1443,21 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     ]
     # 版式照本机复盘页：先一块「当日一句话 + 四只读数」方框卡，再逐个分区面板
     md: list[str] = []
-    lead = [f'<p class="va-leadline">{html.escape(one)}</p>' if one else "",
+    lead = (["".join(f'<p class="va-leadline">{html.escape(s)}</p>'
+                     for s in _split_sentences(one))] if one else []) + [
             '<div class="va-grid">' + "".join(_stat_cards(payload)) + "</div>"]
     md.append(f'<section class="va-panel va-lead">{"".join(lead)}</section>')
-    md.append(f'<p class="va-foot-note">{html.escape(DISCLAIMER)}</p>')
+    # Seaway 式「先说结论」：问题 / 答案 / 依据，压成一张可扫读的表
+    conclusion = _conclusion_table_md(payload, date)
+    if conclusion:
+        md.append(_section("先说结论：今天怎么看、该盯什么", [conclusion]))
+    # Seaway 式「观察清单」：验证条件做成可逐日对照的条件/变化/说明表
+    checklist = _stance_checklist_md(payload)
+    if checklist:
+        md.append(_section("观察清单：几个条件，逐日对照", [checklist]))
+    md.append("".join(f'<p class="va-foot-note">'
+                      f'{RISK_TAG_HTML if _is_risk_sentence(s) else ""}{html.escape(s)}</p>'
+                      for s in _split_sentences(DISCLAIMER)))
     if warnings:
         md.append('<div class="va-note">口径提示：' + html.escape("；".join(warnings)) + "</div>")
     mf = payload.get("market_facts") or {}
