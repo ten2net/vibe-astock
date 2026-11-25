@@ -39,3 +39,6 @@ docs/迁移方案/vibe-astock-secrets-*.zip
 # 系统与日志
 .DS_Store
 *.log
+
+# 第三方采集 skill（SkillHub 安装产物，可重新安装，不入库）
+skills/
