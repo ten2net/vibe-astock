@@ -200,6 +200,204 @@ def fetch_lhb_seats(date: str, top_stocks: int = 10, seats_per_side: int = 3) ->
         return out
     except Exception:  # noqa: BLE001
         return {}
+
+
+# ----------------------------------------------------------------------------
+# 龙虎榜增强：席位身份 / 机构统计 / 行业分类
+# ----------------------------------------------------------------------------
+
+# 席位身份识别：按营业部名称关键词归类。仅作「名称线索」归类，不是交易所披露的
+# 账户身份，不能证明实际资金归属；措辞上保持「疑似/归类」，不写死身份。
+_INSTITUTION_SEAT_HINTS = ("机构专用",)
+_NORTHBOUND_HINTS = ("沪股通", "深股通", "香港中央结算")
+# 知名游资常用营业部（公开资料，仅作线索归类，非确证）。匹配按「包含」判断。
+_HOTMONEY_SEAT_HINTS = (
+    "拉萨", "溧阳路", "延安路", "建国路", "东环路", "江苏路", "仙岳路",
+    "湖里大道", "益田路", "莲花路", "解放路", "武定路", "芳甸路", "世纪大道",
+    "冠军", "宁波桑田路", "三峡", "北京中关村", "上海江苏路", "成都系",
+    "佛山", "撬板", "敢死队",
+)
+
+
+def classify_seat(name: str) -> str:
+    """按营业部名称线索给席位归类，返回中文身份标签。
+
+    归类优先级：机构专用 > 北向 > 知名游资 > 一般营业部。
+    这是名称线索归类，不是交易所披露的账户身份；分析措辞须保留「疑似/线索」。
+    """
+    s = str(name or "")
+    if any(h in s for h in _INSTITUTION_SEAT_HINTS):
+        return "机构专用"
+    if any(h in s for h in _NORTHBOUND_HINTS):
+        return "北向资金"
+    if any(h in s for h in _HOTMONEY_SEAT_HINTS):
+        return "知名游资席位"
+    return "一般营业部"
+
+
+# 当日席位明细缓存（按 date），避免同一天多只股票逐次请求重复数据
+_LHB_SEAT_DETAIL_CACHE: dict = {}
+
+
+def fetch_lhb_seat_identity(date: str, codes: list[str], top_seats: int = 5) -> dict:
+    """上榜个股的席位明细 + 身份归类（东财 stock_lhb_stock_detail_em）。
+
+    返回 {code: {"buy": [{seat, identity, net_yi}, ...],
+                 "sell": [...], "inst_buy_yi": float|None, "inst_sell_yi": float|None}}
+    - code 为 6 位代码；买卖两侧各取净额绝对值居前 top_seats 个
+    - inst_* 为该股机构专用席位的买卖金额（亿），无机构席位时为 0
+    - 接口不可达 / 无数据返回 {}；按日期缓存整批结果
+    """
+    key = str(date)
+    if _LHB_SEAT_DETAIL_CACHE.get("date") == key:
+        cached = _LHB_SEAT_DETAIL_CACHE.get("data", {})
+        return {c: cached[c] for c in codes if c in cached}
+
+    out: dict = {}
+    try:
+        import akshare as ak
+
+        def _side(code: str, flag: str) -> list[dict]:
+            try:
+                df = ak.stock_lhb_stock_detail_em(symbol=code, date=date, flag=flag)
+            except Exception:  # noqa: BLE001
+                return []
+            if df is None or not len(df):
+                return []
+            seats = []
+            for _, r in df.iterrows():
+                name = str(r.get("交易营业部名称", ""))
+                net = r.get("净额")
+                net_yi = round(float(net) / YI, 3) if net is not None and net == net else None
+                seats.append({"seat": name[:28],
+                              "identity": classify_seat(name),
+                              "net_yi": net_yi})
+            # 按净额绝对值取前 N，买侧偏正、卖侧偏负都保留原符号
+            seats = [s for s in seats if s["net_yi"] is not None]
+            seats.sort(key=lambda s: abs(s["net_yi"]), reverse=True)
+            return seats[:top_seats]
+
+        for code in codes:
+            c6 = str(code).split(".")[0][-6:]
+            if not c6 or c6 in out:
+                continue
+            buy = _side(c6, "买入")
+            sell = _side(c6, "卖出")
+            inst_buy = round(sum(s["net_yi"] for s in buy if s["identity"] == "机构专用"
+                                 and s["net_yi"] > 0), 3)
+            inst_sell = round(sum(-s["net_yi"] for s in sell if s["identity"] == "机构专用"
+                                  and s["net_yi"] < 0), 3)
+            out[c6] = {"buy": buy, "sell": sell,
+                       "inst_buy_yi": inst_buy, "inst_sell_yi": inst_sell}
+    except Exception:  # noqa: BLE001
+        return {}
+    _LHB_SEAT_DETAIL_CACHE.update(date=key, data=out)
+    return {c: out[c] for c in codes if c in out}
+
+
+_LHB_INST_CACHE: dict = {}
+
+
+def fetch_lhb_inst_summary(date: str) -> dict:
+    """机构买卖统计（东财 stock_lhb_jgmmtj_em）：{code6: {买/卖方机构数, 机构净买额亿, 占比}}。"""
+    key = str(date)
+    if _LHB_INST_CACHE.get("date") == key:
+        return _LHB_INST_CACHE.get("data", {})
+    data: dict = {}
+    try:
+        import akshare as ak
+        df = ak.stock_lhb_jgmmtj_em(start_date=date, end_date=date)
+        if df is not None and len(df):
+            for _, r in df.iterrows():
+                code6 = str(r.get("代码", "")).strip()[-6:]
+                net = r.get("机构买入净额")
+                data[code6] = {
+                    "name": str(r.get("名称", "")),
+                    "buy_inst": int(r.get("买方机构数") or 0),
+                    "sell_inst": int(r.get("卖方机构数") or 0),
+                    "inst_net_yi": round(float(net) / YI, 3) if net is not None and net == net else None,
+                    "inst_ratio": r.get("机构净买额占总成交额比"),
+                }
+    except Exception:  # noqa: BLE001
+        return {}
+    _LHB_INST_CACHE.update(date=key, data=data)
+    return data
+
+
+_LHB_EXPLAIN_CACHE: dict = {}
+
+
+def fetch_lhb_em_explain(date: str, top: int = 15) -> dict:
+    """东财龙虎榜官方解读字段：{code6: {explain, turnover, deal_ratio}}。
+
+    explain 形如「2家机构买入，成功率38.54%」「买一主买，成功率46.66%」，
+    是东财龙虎榜页面的核心解读，直接借鉴其口径。成功率是东财历史统计，
+    不代表本次必然成功，措辞上须保留「东财口径/历史成功率」。
+    deal_ratio = 龙虎榜成交额占市场总成交额比例；turnover = 换手率。
+    """
+    key = str(date)
+    if _LHB_EXPLAIN_CACHE.get("date") == key:
+        return _LHB_EXPLAIN_CACHE.get("data", {})
+    data: dict = {}
+    try:
+        import sys
+        if _REPO_ROOT not in sys.path:
+            sys.path.insert(0, _REPO_ROOT)
+        vr_path = os.path.join(_REPO_ROOT, "vr")
+        if vr_path not in sys.path:
+            sys.path.insert(0, vr_path)
+        from astock import eastmoney_datacenter  # noqa: PLC0415
+        ymd_dash = f"{date[:4]}-{date[4:6]}-{date[6:8]}" if len(date) == 8 else date
+        rows = eastmoney_datacenter(
+            "RPT_DAILYBILLBOARD_DETAILSNEW",
+            filter_str=f"(TRADE_DATE='{ymd_dash}')",
+            page_size=max(top * 4, 50),
+            sort_columns="BILLBOARD_NET_AMT", sort_types="-1")
+        for r in rows:
+            code6 = str(r.get("SECURITY_CODE", "")).strip()[-6:]
+            if not code6 or code6 in data:
+                continue
+            data[code6] = {
+                "explain": str(r.get("EXPLAIN") or ""),
+                "turnover": r.get("TURNOVERRATE"),
+                "deal_ratio": r.get("DEAL_AMOUNT_RATIO"),
+            }
+            if len(data) >= top:
+                break
+    except Exception:  # noqa: BLE001
+        return {}
+    _LHB_EXPLAIN_CACHE.update(date=key, data=data)
+    return data
+
+
+_INDUSTRY_CACHE: dict = {}
+
+
+def fetch_industry_map() -> dict:
+    """股票代码 → 行业（Tushare stock_basic.industry），带进程内缓存。
+
+    返回 {code6: industry}；未配置 token / 无数据 / 报错返回 {}。
+    行业名来自申万口径的行业字段，仅作行业分布统计，不等于题材归属。
+    """
+    if _INDUSTRY_CACHE.get("data"):
+        return _INDUSTRY_CACHE["data"]
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        return {}
+    try:
+        import tushare as ts
+        pro = ts.pro_api(token)
+        df = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name,industry")
+        if df is None or not len(df):
+            return {}
+        data = {str(r["ts_code"]).split(".")[0][-6:]: str(r.get("industry") or "")
+                for _, r in df.iterrows()}
+        _INDUSTRY_CACHE["data"] = data
+        return data
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 # ----------------------------------------------------------------------------
 # 常量
 # ----------------------------------------------------------------------------

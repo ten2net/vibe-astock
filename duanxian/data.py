@@ -324,33 +324,70 @@ def get_dragon_tiger_data(date: str) -> str:
             if code6:
                 seen.add(code6)
             uniq.append(r)
+        codes6 = [str(r.get("code", "")).split(".")[0][-6:] for r in uniq]
+
+        # 行业分布（Tushare stock_basic 行业字段）：按上榜个股统计，非题材归属
+        try:
+            ind = dr.fetch_industry_map()
+        except Exception:  # noqa: BLE001
+            ind = {}
+        # 东财官方解读（买一主买/机构买入/成功率等），借鉴其龙虎榜解读口径
+        try:
+            explains = dr.fetch_lhb_em_explain(ymd, top=15)
+        except Exception:  # noqa: BLE001
+            explains = {}
         for r in uniq:
             nb = r.get("net_buy")
             nb_s = f"{nb:+.2f}" if nb is not None else "—"
-            lines.append(f"  {r['name']} 净买{nb_s}亿 [{r.get('reason', '')}]")
-        # 席位明细：Tushare top_inst，按 6 位代码对齐（EM 榜 000525 ↔ TS 000525.SZ）
+            c6 = str(r.get("code", "")).split(".")[0][-6:]
+            tag = f"（行业：{ind.get(c6)}）" if ind.get(c6) else ""
+            ex = explains.get(c6, {}).get("explain", "")
+            ex_s = f" 东财解读：{ex}" if ex else ""
+            lines.append(f"  {r['name']} 净买{nb_s}亿 [{r.get('reason', '')}]{tag}{ex_s}")
+        if ind:
+            from collections import Counter
+            inds = Counter(ind.get(c, "") for c in codes6 if ind.get(c))
+            if inds:
+                lines.append("上榜个股行业分布（Tushare 行业字段，非题材归属）："
+                             + "、".join(f"{k}×{v}" for k, v in inds.most_common(8)))
+
+        # 机构买卖统计（东财）：买方/卖方机构数 + 机构净买额
         try:
-            seats = dr.fetch_lhb_seats(ymd)
+            inst = dr.fetch_lhb_inst_summary(ymd)
         except Exception:  # noqa: BLE001
-            seats = {}
-        if seats:
-            by6 = {code.split(".")[0]: v for code, v in seats.items()}
-            lines.append("席位明细（每只净买/净卖前3营业部，亿）：")
+            inst = {}
+        inst_hit = [(r, inst.get(str(r.get("code", "")).split(".")[0][-6:]))
+                    for r in uniq]
+        inst_hit = [(r, v) for r, v in inst_hit if v and v.get("inst_net_yi") is not None]
+        if inst_hit:
+            lines.append("机构专用席位参与（东财机构统计，亿；仅名单内样本）：")
+            for r, v in inst_hit[:8]:
+                ratio = v.get("inst_ratio")
+                ratio_s = f"{float(ratio):.2f}%" if isinstance(ratio, (int, float)) else "—"
+                lines.append(f"  {r['name']}：买方机构{v['buy_inst']}家/卖方{v['sell_inst']}家，"
+                             f"机构净买{v['inst_net_yi']:+.3f}亿，占比{ratio_s}")
+
+        # 席位身份明细（东财）：机构专用/北向/知名游资/一般营业部
+        try:
+            identity = dr.fetch_lhb_seat_identity(ymd, codes6, top_seats=3)
+        except Exception:  # noqa: BLE001
+            identity = {}
+        if identity:
+            lines.append("席位明细与身份线索（名称线索归类，非确证身份；净额亿）：")
             shown = 0
             for r in uniq:
-                v = by6.get(str(r.get("code", "")).split(".")[0][-6:])
+                c6 = str(r.get("code", "")).split(".")[0][-6:]
+                v = identity.get(c6)
                 if not v or (not v.get("buy") and not v.get("sell")):
                     continue
                 shown += 1
                 lines.append(f"  {r['name']}：")
                 for s in v.get("buy", []):
-                    lines.append(f"    买 {s['seat']} 净{s['net_buy']:+.2f}")
+                    lines.append(f"    买 {s['identity']}·{s['seat']} 净{s['net_yi']:+.3f}")
                 for s in v.get("sell", []):
-                    lines.append(f"    卖 {s['seat']} 净{s['net_buy']:+.2f}")
-                if shown >= 8:
+                    lines.append(f"    卖 {s['identity']}·{s['seat']} 净{s['net_yi']:+.3f}")
+                if shown >= 6:
                     break
-            if not shown:
-                lines.pop()
         return "\n".join(lines)
     except Exception as exc:  # noqa: BLE001
         return _degrade("龙虎榜游资", date, exc)
