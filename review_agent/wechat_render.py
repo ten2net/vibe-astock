@@ -591,6 +591,16 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
     if macro.strip():
         out.append(_heading("板块与宏观：资金流向与大赛道跟踪"))
         out.extend(_blocks_to_html(macro))
+    # 两融叠加图 + 观察指引：图片用占位标记，发布前由 wechat_publish 上传并替换
+    margin = ((payload.get("market_facts") or {}).get("margin_chart") or {})
+    if margin.get("guidance"):
+        out.append(_heading("两融杠杆观察：近20天余额与净买入叠加"))
+        out.append('<p style="' + S_MUTED + '">红柱=融资净买入（加杠杆），绿柱=融资净偿还（去杠杆）；'
+                   '蓝线=融资余额（右轴）。</p>')
+        out.append('<p style="text-align:center;margin:10px 0;">'
+                   '<img data-margin-chart="1" src="" alt="近20交易日两融叠加图" '
+                   'style="max-width:100%;height:auto;"/></p>')
+        out.extend(_blocks_to_html(margin["guidance"]))
     # 尾：互动提问 + 话题标签 → 免责 + 醒目「阅读原文」导流
     out.append(_rule())
     out.append(_interaction_and_tags(payload))

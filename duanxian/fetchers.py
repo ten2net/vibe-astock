@@ -1179,6 +1179,46 @@ def fetch_margin_summary(date: str) -> dict:
     return out
 
 
+def fetch_margin_history(date: str, days: int = 20) -> list[dict]:
+    """近 N 个交易日两融余额与融资净买入（Tushare margin，三所合计，亿）。
+
+    返回按日期升序的 [{date, margin_bal_yi, net_buy_yi}]：
+    - margin_bal_yi = 三所融资余额(rzye)合计 / 1e8
+    - net_buy_yi   = 三所(融资买入 rzmre - 融资偿还 rzche)合计 / 1e8，正=加杠杆
+    口径：两融余额用融资余额（与东财"两融余额"略有差异，输出标注口径）。
+    未配置 token / 无数据 / 报错 → []，由调用方降级说明。
+    """
+    key = f"marginhist:{date}:{days}"
+    if key in _FUND_CACHE:
+        return _FUND_CACHE[key]
+    pro = _ts_pro()
+    if pro is None:
+        return []
+    try:
+        import datetime
+        end = datetime.datetime.strptime(date, "%Y-%m-%d").date() if "-" in date \
+            else datetime.datetime.strptime(date, "%Y%m%d").date()
+        start = (end - datetime.timedelta(days=days * 2)).strftime("%Y%m%d")
+        df = pro.margin(start_date=start, end_date=end.strftime("%Y%m%d"))
+        if df is None or not len(df):
+            return []
+        g = df.groupby("trade_date").agg(
+            rzye=("rzye", "sum"), rzmre=("rzmre", "sum"), rzche=("rzche", "sum")).sort_index()
+        g = g.tail(days)
+        out = []
+        for d, r in g.iterrows():
+            try:
+                net = round(float(r["rzmre"] - r["rzche"]) / 1e8, 2)
+                bal = round(float(r["rzye"]) / 1e8, 2)
+            except (TypeError, ValueError):
+                continue
+            out.append({"date": str(d), "margin_bal_yi": bal, "net_buy_yi": net})
+        _FUND_CACHE[key] = out
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def fetch_hsgt_money(date: str) -> dict:
     """沪深港通资金（Tushare moneyflow_hsgt，单位亿元）：北向/南向净买。"""
     key = f"hsgt:{date}"

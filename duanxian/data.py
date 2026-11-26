@@ -114,6 +114,25 @@ def get_market_facts(date: str) -> tuple[str, dict]:
             "event_ledger": mf.event_ledger(date),
             "by_board": mf.by_board(date),
         }
+        # 两融叠加图（近20交易日融资净买入柱 + 融资余额线）+ 基于图的观察指引。
+        # 图写到 blog/static/cards/margin-<date>.png；失败不影响主复盘（降级为空）。
+        try:
+            from pathlib import Path as _Path
+            from .fetchers import fetch_margin_history
+            from review_agent.margin_chart import render_margin_chart, margin_guidance
+            _series = fetch_margin_history(date, days=20)
+            if _series:
+                _cards = _Path(__file__).resolve().parents[1] / "blog" / "static" / "cards"
+                _img = render_margin_chart(_series, _cards / f"margin-{date}.png")
+                if _img:
+                    facts["margin_chart"] = {
+                        "image": f"/cards/margin-{date}.png",
+                        "file": str(_img),
+                        "guidance": margin_guidance(_series),
+                        "dates": [s["date"] for s in _series],
+                    }
+        except Exception:  # noqa: BLE001  增强项：失败不阻断复盘
+            pass
         return render_market_facts(facts), facts
     except Exception as exc:  # noqa: BLE001
         return _degrade("市场事实表", date, exc), {}

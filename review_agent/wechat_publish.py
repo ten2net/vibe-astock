@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import time
 import urllib.parse
@@ -376,6 +377,23 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
             )
 
     token = get_access_token()
+    # 两融叠加图：上传正文图片，替换渲染时的占位标记（失败则移除占位，不阻断草稿）
+    margin = ((payload.get("market_facts") or {}).get("margin_chart") or {})
+    if 'data-margin-chart="1"' in content:
+        img_url = ""
+        img_file = Path(margin.get("file") or "")
+        if img_file.is_file():
+            try:
+                img_url = upload_content_image(token, img_file)
+                log(f"{date}：两融叠加图已上传 {img_url[:50]}...")
+            except Exception as exc:  # noqa: BLE001  图片增强项失败不阻断
+                log(f"{date}：两融图上传失败已跳过（{type(exc).__name__}）")
+        if img_url:
+            content = content.replace('data-margin-chart="1" src=""',
+                                      f'data-margin-chart="1" src="{img_url}"')
+        else:
+            # 上传失败：去掉 img 占位，保留图注与指引文字
+            content = re.sub(r'<p style="text-align:center[^>]*><img data-margin-chart="1"[^>]*></p>', "", content)
     thumb = upload_cover(token, cover or card_cover(date))
     # 摘要也带核心词（日期+档位+关键读数），利于搜一搜与分享卡片
     digest = _digest_focus(payload, date)

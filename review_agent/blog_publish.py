@@ -1502,6 +1502,15 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     macro = strip_citations(str(payload.get("macro_sector") or ""))
     if macro.strip():
         md.append(_section("板块与宏观", [_text_to_md(macro)]))
+    # 两融叠加图：近20交易日融资净买入（柱）+ 融资余额（线）+ 观察指引
+    margin = ((payload.get("market_facts") or {}).get("margin_chart") or {})
+    if margin.get("image") and margin.get("guidance"):
+        md.append(_section("两融杠杆观察", [
+            f'![近20交易日两融余额与融资净买入叠加图]({margin["image"]})\n',
+            "上图：红柱=融资净买入（加杠杆），绿柱=融资净偿还（去杠杆）；"
+            "蓝线=融资余额（右轴）。两者叠加观察杠杆资金的方向与持续性。\n",
+            _text_to_md(margin["guidance"]),
+        ], "近20交易日融资净买入柱与融资余额线叠加；仅作方向描述与验证条件"))
     if ext.get("hist"):
         md.append(_section("主要指数 · 中长期位置", [_block_index_hist(ext["hist"])],
                            "5/20/60/250 日涨跌、年初至今、离一年高点与均线位置"))
