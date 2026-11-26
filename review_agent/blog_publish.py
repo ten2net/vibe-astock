@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .product_policy import has_trade_recommendation
+from .name_highlight import collect_names, highlight_markdown
 
 PRODUCT_NAME = "揽宝投研"
 SITE_TITLE = "揽宝.复盘"
@@ -1524,7 +1525,8 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
                   + chr(10) + chr(10) + '</div>' + chr(10) + chr(10)
                   + '</details>' + chr(10) + chr(10))
     md.append(promotion_html())
-    return "\n".join(fm + md).strip() + "\n"
+    # 股票名/行业名/概念名高亮（博客 Markdown）；frontmatter 由高亮函数跳过
+    return highlight_markdown("\n".join(fm + md).strip() + "\n", collect_names(payload))
 
 
 def split_body(text: str) -> tuple[str, str]:

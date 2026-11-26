@@ -11,6 +11,8 @@ from __future__ import annotations
 import html
 import re
 
+from .name_highlight import collect_names, highlight_html
+
 from .blog_publish import (
     DISCLAIMER,
     _hhmmss,
@@ -597,7 +599,8 @@ def article_html(payload: dict, date: str, blog_url: str) -> str:
                    f'{RISK_TAG_HTML if _is_risk_sentence(s) else ""}{_esc(s)}</p>')
     out.append(_cta(blog_url))
     out.append(_p("本页所有数字由揽宝投研计算，文章由它生成后自动发布。", S_GAP))
-    return "\n".join(out)
+    # 股票名/行业名/概念名高亮：只处理文本节点，三类不同颜色；名称来自结构化字段
+    return highlight_html("\n".join(out), collect_names(payload))
 
 
 def _cta(blog_url: str) -> str:

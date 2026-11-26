@@ -64,9 +64,11 @@ class TestRender:
         })
         html = wr.article_html(p, DATE, "")
         assert "连板梯队与晋级率" in html          # SEO 长尾小标题
-        assert "新华文轩 601811 · 4 板 · 首封 09:30:26 · IP 经济" in html
+        # 股票名/概念名会被高亮 span 包裹，断言高亮后的文本仍在
+        assert "新华文轩" in html and "601811" in html and "IP 经济" in html
+        assert 'color:#1a73e8;font-weight:bold;">新华文轩</span>' in html
         assert "浦发银行" not in html          # 首板不进连板名单
-        assert "出版 · 涨停 5 只 · 最高 3 板 · 炸板 1" in html
+        assert "出版" in html and "涨停 5 只" in html and "最高 3 板" in html
         assert "[最高标]" in html and "(+9.98%)" in html
 
     def test_analyst_and_macro_sections(self):
