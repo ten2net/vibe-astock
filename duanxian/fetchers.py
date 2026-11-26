@@ -1044,4 +1044,90 @@ def clean_sector(s):
 
 
 # ----------------------------------------------------------------------------
+# 6b. 概念/行业资金流替代源 (akshare datacenter 口径)
+#     push2delay 的 clist (/api/qt/clist/get) 在本机被掐, 概念板块('3')取不到;
+#     akshare 的 stock_fund_flow_concept/industry 走 datacenter, 实测可用。
+#     口径: 即时净额(亿)/涨跌幅/领涨股, 无5日/10日累计(不拿今日值充数)。
+# ----------------------------------------------------------------------------
+_FLOW_AK_CACHE: dict = {}
+
+
+def _flow_ak(kind: str) -> list[dict]:
+    """akshare 即时板块资金流 → 统一结构；带进程内缓存，取不到返回 []。
+
+    kind: 'concept' 概念 / 'industry' 行业。
+    字段: name / change_pct / inflow_today(亿) / lead_stock / source。
+    """
+    key = f"{kind}:{_market_day_key()}"
+    if _FLOW_AK_CACHE.get(key) is not None:
+        return _FLOW_AK_CACHE[key]
+    out: list[dict] = []
+    try:
+        import akshare as ak
+        df = (ak.stock_fund_flow_concept(symbol="即时") if kind == "concept"
+              else ak.stock_fund_flow_industry(symbol="即时"))
+        if df is not None and len(df):
+            for _, r in df.iterrows():
+                net = r.get("净额")
+                pct = r.get("行业-涨跌幅")
+                out.append({
+                    "name": str(r.get("行业", "")),
+                    "change_pct": float(pct) if pct is not None and pct == pct else None,
+                    "inflow_today": round(float(net), 3)
+                    if net is not None and net == net else None,
+                    "lead_stock": str(r.get("领涨股", "") or ""),
+                    "source": "akshare:" + kind,
+                })
+            out.sort(key=lambda x: x["inflow_today"] or 0, reverse=True)
+    except Exception:  # noqa: BLE001
+        out = []
+    _FLOW_AK_CACHE[key] = out
+    return out
+
+
+def _market_day_key() -> str:
+    """缓存键用的交易日（当天日期即可，资金流是即时快照）。"""
+    from .util import china_today
+    return china_today()
+
+
+def fetch_concept_flow_ak() -> list[dict]:
+    """东财概念板块即时资金流（akshare datacenter 口径，亿）。"""
+    return _flow_ak("concept")
+
+
+def fetch_industry_flow_ak() -> list[dict]:
+    """东财行业板块即时资金流（akshare datacenter 口径，亿）。"""
+    return _flow_ak("industry")
+
+
+_SW_INDUSTRY_CACHE: dict = {}
+
+
+def fetch_sw_industry_map() -> dict:
+    """个股代码 → 申万行业代码（akshare stock_industry_clf_hist_sw）。
+
+    申万分类历史表同一股票有多条（按 start_date 区间），取 start_date 最新
+    那条作为当前行业。接口只返回 6 位行业代码、无中文名，因此这里返回代码；
+    中文行业名优先用 Tushare（fetch_industry_map）。申万源取不到返回 {}。
+    """
+    if _SW_INDUSTRY_CACHE.get("data"):
+        return _SW_INDUSTRY_CACHE["data"]
+    try:
+        import akshare as ak
+        df = ak.stock_industry_clf_hist_sw()
+        if df is None or not len(df):
+            return {}
+        df = df.copy()
+        df["_sd"] = df["start_date"].astype(str)
+        latest = df.sort_values("_sd").groupby("symbol", as_index=False).last()
+        data = {str(r["symbol"]).split(".")[0][-6:]: str(r["industry_code"])
+                for _, r in latest.iterrows()}
+        _SW_INDUSTRY_CACHE["data"] = data
+        return data
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+# ----------------------------------------------------------------------------
 # 7. watchlist 交叉 (home-pool.json)

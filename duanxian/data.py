@@ -18,9 +18,10 @@ socket.setdefaulttimeout(45)
 _LEADER_DIR = data_path("leaders")
 
 _MACRO_GROUPS = {
-    "AI算力": ["算力", "CPO", "光模块", "光通信", "液冷", "PCB", "铜连接", "服务器"],
-    "人形机器人": ["机器人", "减速器", "丝杠", "灵巧手", "人形"],
-    "商业航天": ["航天", "火箭", "卫星"],
+    "AI算力": ["算力", "CPO", "共封装", "光模块", "光通信", "光器件", "液冷",
+             "PCB", "铜连接", "服务器", "数据中心", "东数西算", "AI", "chiplet", "存储"],
+    "人形机器人": ["机器人", "减速器", "丝杠", "灵巧手", "人形", "机器人概念", "空心杯"],
+    "商业航天": ["航天", "火箭", "卫星", "卫星导航", "商业航天", "北斗"],
 }
 
 
@@ -255,33 +256,86 @@ def get_capital_data(date: str) -> str:
         return _degrade("资金面", date, exc)
 
 
-# ============ 大板块本周 ============
+# ============ 大赛道跟踪（概念 / 行业资金流）============
+def _dedup_sector(rows: list[dict]) -> list[dict]:
+    """按板块名去重（akshare 概念榜存在同名重复行），保留净额最大的一条。"""
+    seen: dict[str, dict] = {}
+    for r in rows:
+        name = str(r.get("name") or "").strip()
+        if not name:
+            continue
+        cur = seen.get(name)
+        if cur is None or (r.get("inflow_today") or 0) > (cur.get("inflow_today") or 0):
+            seen[name] = r
+    return list(seen.values())
+
+
+def _match_groups(rows: list[dict]) -> dict[str, list[dict]]:
+    """按 _MACRO_GROUPS 关键词把板块归入大赛道（概念名/行业名匹配）。"""
+    matched: dict[str, list[dict]] = {g: [] for g in _MACRO_GROUPS}
+    for r in rows:
+        name = str(r.get("name") or "")
+        for grp, kws in _MACRO_GROUPS.items():
+            if any(k in name for k in kws):
+                matched[grp].append(r)
+    return matched
+
+
 def get_macro_sector_data(date: str) -> str:
     from .trade_calendar import live_quotes_are_close_of
     matched, reason = live_quotes_are_close_of(date)
     if not matched:
+        # 非当日：用历史补源（历史活动口径）
         try:
             from .historical_sources import historical_activity
             return historical_activity(date, _MACRO_GROUPS)
         except Exception as exc:
             return _degrade("大板块历史补源", date, exc)
     try:
-        concept = dr.fetch_sector_flow("3")  # 概念
-        dr.enrich_trend(concept)
-        lines = ["大赛道跟踪（概念板块口径，近5交易日不等于本周）："]
-        for grp, kws in _MACRO_GROUPS.items():
-            ms = [c for c in concept if any(k in c["name"] for k in kws)]
-            if not ms:
-                lines.append(f"  {grp}：无匹配概念板块")
+        # 主源：东财概念资金流（akshare datacenter 口径，绕开被掐的 push2 clist）
+        concept = _dedup_sector(dr.fetch_concept_flow_ak() or [])
+        industry = _dedup_sector(dr.fetch_industry_flow_ak() or [])
+        # 新源为空时回退旧 clist 源（部分环境 akshare 可用而 clist 可用，互为补充）
+        if not concept:
+            legacy = _dedup_sector(dr.fetch_sector_flow("3") or [])
+            dr.enrich_trend(legacy)
+            concept = legacy
+
+        # 取数后二次核对行情日期：跨场整批作废（产品安全约束，数据空也照样校验）
+        matched2, reason2 = live_quotes_are_close_of(date)
+        if not matched2:
+            return _degrade_msg("实时资金与板块", date, "取数期间行情日期已变化，本批未使用：" + reason2)
+
+        if not concept and not industry:
+            # 数据空也保留口径说明（参考行情对应日 + 端点时间戳未核实），
+            # 不能让读者误以为这份输出可以不带时间前提地解读。
+            return ("大赛道跟踪：当日概念与行业资金流均未取到（东财 clist 被掐且无替代），"
+                    "本分项无板块资金数据可用；资料缺失只说明缺口，不代表市场无该现象。\n"
+                    + _asof_note(date))
+
+        lines = ["大赛道跟踪（概念/行业资金流即时口径，净额单位亿，非5日累计；"
+                 "概念成分有重叠，逐项看不合计）："]
+        by_concept = _match_groups(concept)
+        by_industry = _match_groups(industry)
+        for grp in _MACRO_GROUPS:
+            hits = by_concept.get(grp, []) + by_industry.get(grp, [])
+            if not hits:
+                lines.append(f"  {grp}：当日概念/行业资金流榜未见该方向成分，"
+                             "可能因该板块当日净额未进榜或名称不在关键词表；不代表市场无该方向")
                 continue
+            # 每条标注来源（概念/行业），按净额降序
+            tagged = []
+            for c in hits:
+                c = dict(c)
+                c["_kind"] = "概念" if c.get("source", "").endswith("concept") else "行业"
+                tagged.append(c)
+            tagged.sort(key=lambda x: x.get("inflow_today") or 0, reverse=True)
             lines.append(f"  {grp}（概念成分有重叠，逐项看，不合计）：")
-            for c in sorted(ms, key=lambda x: x.get("inflow_5d") or 0, reverse=True):
-                chg = f"{c['change_pct']:+.2f}%" if c.get('change_pct') is not None else '未覆盖'
-                flow = f"{c['inflow_5d']:+.2f}亿" if c.get('inflow_5d') is not None else '未覆盖'
-                lines.append(f"    {c['name']}：当日涨幅{chg}，近5交易日净额{flow}")
-        matched, reason = live_quotes_are_close_of(date)
-        if not matched:
-            return _degrade_msg("实时资金与板块", date, "取数期间行情日期已变化，本批未使用：" + reason)
+            for c in tagged[:8]:
+                chg = f"{c['change_pct']:+.2f}%" if c.get("change_pct") is not None else "未覆盖"
+                flow = f"{c['inflow_today']:+.2f}" if c.get("inflow_today") is not None else "未覆盖"
+                lead = f"，领涨 {c['lead_stock']}" if c.get("lead_stock") else ""
+                lines.append(f"    [{c['_kind']}] {c['name']}：当日涨幅{chg}，净额{flow}亿{lead}")
         return "\n".join(lines) + _asof_note(date)
     except Exception as exc:  # noqa: BLE001
         return _degrade("大板块本周", date, exc)
