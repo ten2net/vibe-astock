@@ -209,6 +209,66 @@ def render_market_facts(f: dict) -> str:
     return "\n".join(lines)
 
 
+
+
+def _fund_extras_lines(date: str) -> list[str]:
+    """资金面附加数据（融资余额/沪深港通/同口径历史资金/时间戳），当日与历史补源共用。"""
+    lines: list[str] = []
+    # 融资融券余额（Tushare margin，按交易所分列，单位亿；口径不同不加总）
+    ymd8 = _ymd(date)
+    try:
+        margin = dr.fetch_margin_summary(ymd8)
+    except Exception:  # noqa: BLE001
+        margin = {}
+    if margin:
+        lines.append("融资融券余额（Tushare，亿；按交易所分列不合计）：")
+        for ex, v in margin.items():
+            lines.append(f"  {ex}：融资余额{v['rzye']}亿，融资买入{v['rzmre']}亿，"
+                         f"融券余额{v['rqye']}亿，两融余额{v['rzrqye']}亿")
+
+    # 沪深港通资金（Tushare moneyflow_hsgt，单位亿；按字段口径折算）
+    try:
+        hsgt = dr.fetch_hsgt_money(ymd8)
+    except Exception:  # noqa: BLE001
+        hsgt = {}
+    if hsgt and any(v is not None for v in hsgt.values()):
+        lines.append("沪深港通（Tushare，亿；按字段原值折算，非独立快照）："
+                     f"北向{hsgt.get('north_money')}，南向{hsgt.get('south_money')}，"
+                     f"沪股通{hsgt.get('hgt')}，深股通{hsgt.get('sgt')}")
+
+    # 同口径历史行业资金序列（Tushare moneyflow 近 N 日，可跨日对照）
+    try:
+        hist = dr.fetch_industry_moneyflow_hist(ymd8, days=5)
+    except Exception:  # noqa: BLE001
+        hist = {}
+    if hist:
+        from collections import defaultdict
+        by_ind: dict[str, list[dict]] = defaultdict(list)
+        for h in hist:
+            by_ind[h["industry"]].append(h)
+        # 列出目标日附近（序列最后一天）净额绝对值最大的几个行业
+        last_day = max(h["date"] for h in hist)
+        ranked = sorted(
+            [(name, sum(x["net_yi"] for x in rows[-3:])) for name, rows in by_ind.items()],
+            key=lambda x: abs(x[1]), reverse=True)
+        lines.append(f"同口径行业资金近3日累计（Tushare moneyflow，截至{last_day}，亿；"
+                     "非主力口径，不与东财主力净额混算）：")
+        for name, val in ranked[:6]:
+            lines.append(f"  {name}：近3日{val:+.2f}亿")
+
+    # 接口时间戳核验：实际返回交易日 vs 目标日
+    try:
+        asof = dr.fetch_moneyflow_asof(ymd8)
+    except Exception:  # noqa: BLE001
+        asof = {}
+    if asof:
+        flag = ("一致" if asof.get("matched") is True
+                else ("不一致" if asof.get("matched") is False else "未核实"))
+        lines.append(f"接口时间戳核验（{asof.get('source', 'Tushare')}）："
+                     f"目标日{asof.get('target')}，实际返回{asof.get('actual') or '未取得'}，{flag}")
+    return lines
+
+
 # ============ ② 资金面 ============
 def get_capital_data(date: str) -> str:
     from .trade_calendar import live_quotes_are_close_of
@@ -216,7 +276,7 @@ def get_capital_data(date: str) -> str:
     if not matched:
         try:
             from .historical_sources import historical_activity
-            return historical_activity(date)
+            return historical_activity(date) + "\n" + "\n".join(_fund_extras_lines(date))
         except Exception as exc:
             return _degrade("资金面历史补源", date, exc)
     try:
@@ -248,59 +308,8 @@ def get_capital_data(date: str) -> str:
                 lines.append(f"  {t['name']} {t['amount']}亿 涨{t['change_pct']}% {t.get('sector') or ''}")
         except Exception as exc:
             lines.append(f"（成交额榜获取失败已跳过：{type(exc).__name__}）")
+        lines.extend(_fund_extras_lines(date))
 
-        # 融资融券余额（Tushare margin，按交易所分列，单位亿；口径不同不加总）
-        ymd8 = _ymd(date)
-        try:
-            margin = dr.fetch_margin_summary(ymd8)
-        except Exception:  # noqa: BLE001
-            margin = {}
-        if margin:
-            lines.append("融资融券余额（Tushare，亿；按交易所分列不合计）：")
-            for ex, v in margin.items():
-                lines.append(f"  {ex}：融资余额{v['rzye']}亿，融资买入{v['rzmre']}亿，"
-                             f"融券余额{v['rqye']}亿，两融余额{v['rzrqye']}亿")
-
-        # 沪深港通资金（Tushare moneyflow_hsgt，单位亿；按字段口径折算）
-        try:
-            hsgt = dr.fetch_hsgt_money(ymd8)
-        except Exception:  # noqa: BLE001
-            hsgt = {}
-        if hsgt and any(v is not None for v in hsgt.values()):
-            lines.append("沪深港通（Tushare，亿；按字段原值折算，非独立快照）："
-                         f"北向{hsgt.get('north_money')}，南向{hsgt.get('south_money')}，"
-                         f"沪股通{hsgt.get('hgt')}，深股通{hsgt.get('sgt')}")
-
-        # 同口径历史行业资金序列（Tushare moneyflow 近 N 日，可跨日对照）
-        try:
-            hist = dr.fetch_industry_moneyflow_hist(ymd8, days=5)
-        except Exception:  # noqa: BLE001
-            hist = {}
-        if hist:
-            from collections import defaultdict
-            by_ind: dict[str, list[dict]] = defaultdict(list)
-            for h in hist:
-                by_ind[h["industry"]].append(h)
-            # 列出目标日附近（序列最后一天）净额绝对值最大的几个行业
-            last_day = max(h["date"] for h in hist)
-            ranked = sorted(
-                [(name, sum(x["net_yi"] for x in rows[-3:])) for name, rows in by_ind.items()],
-                key=lambda x: abs(x[1]), reverse=True)
-            lines.append(f"同口径行业资金近3日累计（Tushare moneyflow，截至{last_day}，亿；"
-                         "非主力口径，不与东财主力净额混算）：")
-            for name, val in ranked[:6]:
-                lines.append(f"  {name}：近3日{val:+.2f}亿")
-
-        # 接口时间戳核验：实际返回交易日 vs 目标日
-        try:
-            asof = dr.fetch_moneyflow_asof(ymd8)
-        except Exception:  # noqa: BLE001
-            asof = {}
-        if asof:
-            flag = ("一致" if asof.get("matched") is True
-                    else ("不一致" if asof.get("matched") is False else "未核实"))
-            lines.append(f"接口时间戳核验（{asof.get('source', 'Tushare')}）："
-                         f"目标日{asof.get('target')}，实际返回{asof.get('actual') or '未取得'}，{flag}")
         matched, reason = live_quotes_are_close_of(date)
         if not matched:
             return _degrade_msg("实时资金与板块", date, "取数期间行情日期已变化，本批未使用：" + reason)
