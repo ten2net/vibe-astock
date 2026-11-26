@@ -1510,6 +1510,15 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     macro = strip_citations(str(payload.get("macro_sector") or ""))
     if macro.strip():
         md.append(_section("板块与宏观", [_text_to_md(macro)]))
+    if ext.get("hist"):
+        md.append(_section("主要指数 · 中长期位置", [_block_index_hist(ext["hist"])],
+                           "5/20/60/250 日涨跌、年初至今、离一年高点与均线位置"))
+    if ext.get("index") or ext.get("overseas"):
+        md.append(_section("主要指数与隔夜外围", [_block_index(ext.get("index") or {}, ext.get("overseas") or {})],
+                           "当日快照 + 外围各自交易日；历史区间这一路没取"))
+    if ext.get("dist"):
+        md.append(_section("两融余额", [_block_margin(ext["dist"])],
+                           "Tushare 日度汇总：当日读数 + 近 20 个交易日走势"))
     # 两融叠加图：近20交易日融资净买入（柱）+ 融资余额（线）+ 观察指引
     margin = ((payload.get("market_facts") or {}).get("margin_chart") or {})
     if margin.get("image") and margin.get("guidance"):
@@ -1526,15 +1535,6 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
             "蓝线=融资余额（右轴）。两者叠加观察杠杆资金的方向与持续性。",
             _text_to_md(margin["guidance"]),
         ], "近20交易日融资净买入柱与融资余额线叠加；仅作方向描述与验证条件"))
-    if ext.get("hist"):
-        md.append(_section("主要指数 · 中长期位置", [_block_index_hist(ext["hist"])],
-                           "5/20/60/250 日涨跌、年初至今、离一年高点与均线位置"))
-    if ext.get("index") or ext.get("overseas"):
-        md.append(_section("主要指数与隔夜外围", [_block_index(ext.get("index") or {}, ext.get("overseas") or {})],
-                           "当日快照 + 外围各自交易日；历史区间这一路没取"))
-    if ext.get("dist"):
-        md.append(_section("两融余额", [_block_margin(ext["dist"])],
-                           "Tushare 日度汇总：当日读数 + 近 20 个交易日走势"))
     md.append(_section("资金去了哪",
                        [_block_capital(ext.get("capital") or {"available": False, "reason": "未取数"})],
                        "申万二级行业主力净流入前 10 / 净流出前 5，按成分股资金流汇总"))
