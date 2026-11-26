@@ -1230,6 +1230,14 @@ def _md_blocks(md: str) -> list[str]:
             for s in _split_sentences(text):
                 out.append("<blockquote>" + _inline_md(s) + "</blockquote>")
             continue
+        # markdown 图片块 ![alt](src) → <img>，避免被当纯文本包进 <p>
+        im = re.fullmatch(r"!\[([^\]]*)\]\(([^)]+)\)", block)
+        if im:
+            alt, src = html.escape(im.group(1)), html.escape(im.group(2))
+            out.append(f'<img src="{src}" alt="{alt}" style="width:100%;max-width:941px;'
+                       'height:auto;display:block;margin:4px auto 10px;border-radius:8px" '
+                       'loading="lazy">')
+            continue
         for s in _split_sentences(block):
             out.append("<p>" + _inline_md(s) + "</p>")
     return out
@@ -1243,7 +1251,7 @@ def _section(title: str, body_md: str, hint: str = "") -> str:
     """
     sub = f"<span>{html.escape(hint)}</span>" if hint else ""
     body = "".join(
-        part if re.match(r"^\s*<(section|div|table|details|ul|ol|p|h[1-6]|blockquote|span|a|strong|em|br)", part)
+        part if re.match(r"^\s*<(section|div|table|details|ul|ol|p|h[1-6]|blockquote|span|a|strong|em|br|img)", part)
         else "".join(_md_blocks(part))
         for part in body_md if part.strip())
     return (f'<section class="va-sec"><div class="va-sec-h"><h2>{html.escape(title)}</h2>{sub}</div>'
@@ -1505,10 +1513,17 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
     # 两融叠加图：近20交易日融资净买入（柱）+ 融资余额（线）+ 观察指引
     margin = ((payload.get("market_facts") or {}).get("margin_chart") or {})
     if margin.get("image") and margin.get("guidance"):
+        # 用原始 <img> HTML：_section 对以标签开头的块原样保留；
+        # markdown 的 ![](...) 会被 _md_blocks 包成 <p>字面量</p>，图片渲染不出来。
+        img_html = ('<img src="' + html.escape(margin["image"]) + '" '
+                    'alt="近20交易日两融余额与融资净买入叠加图" '
+                    'style="width:100%;max-width:941px;height:auto;display:block;'
+                    'margin:4px auto 10px;border:1px solid var(--va-border,#e4e6ea);'
+                    'border-radius:8px" loading="lazy">')
         md.append(_section("两融杠杆观察", [
-            f'![近20交易日两融余额与融资净买入叠加图]({margin["image"]})\n',
+            img_html,
             "上图：红柱=融资净买入（加杠杆），绿柱=融资净偿还（去杠杆）；"
-            "蓝线=融资余额（右轴）。两者叠加观察杠杆资金的方向与持续性。\n",
+            "蓝线=融资余额（右轴）。两者叠加观察杠杆资金的方向与持续性。",
             _text_to_md(margin["guidance"]),
         ], "近20交易日融资净买入柱与融资余额线叠加；仅作方向描述与验证条件"))
     if ext.get("hist"):
