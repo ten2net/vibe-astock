@@ -1130,4 +1130,141 @@ def fetch_sw_industry_map() -> dict:
 
 
 # ----------------------------------------------------------------------------
+# 6c. 资金面增强：融资余额 / 沪深港通 / 同口径历史资金序列（Tushare）
+#     全部带进程内缓存；未配置 token / 无数据 / 报错 → 空，由调用方降级说明。
+# ----------------------------------------------------------------------------
+_FUND_CACHE: dict = {}
+
+
+def _ts_pro():
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        return None
+    try:
+        import tushare as ts
+        return ts.pro_api(token)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def fetch_margin_summary(date: str) -> dict:
+    """融资融券汇总（Tushare margin，单位亿元）：{交易所: {融资余额, 融资买入, 融券余额}}。
+
+    融资余额=rzye、融资买入额=rzmre、融券余额=rqye、融资融券余额=rzrqye，
+    原始单位元 → 亿。返回按交易所分列，不先加总（口径不同不混算）。
+    """
+    key = f"margin:{date}"
+    if key in _FUND_CACHE:
+        return _FUND_CACHE[key]
+    pro = _ts_pro()
+    if pro is None:
+        return {}
+    out: dict = {}
+    try:
+        df = pro.margin(trade_date=date)
+        if df is not None and len(df):
+            for _, r in df.iterrows():
+                ex = str(r.get("exchange_id") or "未知")
+                def _yi(v):
+                    return round(float(v) / YI, 2) if v is not None and v == v else None
+                out[ex] = {
+                    "rzye": _yi(r.get("rzye")),
+                    "rzmre": _yi(r.get("rzmre")),
+                    "rqye": _yi(r.get("rqye")),
+                    "rzrqye": _yi(r.get("rzrqye")),
+                }
+    except Exception:  # noqa: BLE001
+        return {}
+    _FUND_CACHE[key] = out
+    return out
+
+
+def fetch_hsgt_money(date: str) -> dict:
+    """沪深港通资金（Tushare moneyflow_hsgt，单位亿元）：北向/南向净买。"""
+    key = f"hsgt:{date}"
+    if key in _FUND_CACHE:
+        return _FUND_CACHE[key]
+    pro = _ts_pro()
+    if pro is None:
+        return {}
+    out: dict = {}
+    try:
+        df = pro.moneyflow_hsgt(trade_date=date)
+        if df is not None and len(df):
+            r = df.iloc[0]
+            def _v(name):
+                v = r.get(name)
+                try:
+                    return round(float(v) / 1e4, 2)  # 万元 → 亿
+                except (TypeError, ValueError):
+                    return None
+            out = {"north_money": _v("north_money"), "south_money": _v("south_money"),
+                   "hgt": _v("hgt"), "sgt": _v("sgt")}
+    except Exception:  # noqa: BLE001
+        return {}
+    _FUND_CACHE[key] = out
+    return out
+
+
+def fetch_industry_moneyflow_hist(end_date: str, days: int = 5) -> list[dict]:
+    """近 N 个交易日「同口径」行业资金流序列（Tushare moneyflow 按行业聚合）。
+
+    口径统一：逐日 net_mf_amount（万元）→ 亿，按 Tushare 行业字段分组求和；
+    与当日行业资金流降级源 `_tushare_sector_flow` 同口径，可跨日对照。
+    返回 [{date, industry, net_yi}]，按日期升序；无数据返回 []。
+    """
+    key = f"mfhist:{end_date}:{days}"
+    if key in _FUND_CACHE:
+        return _FUND_CACHE[key]
+    pro = _ts_pro()
+    if pro is None:
+        return []
+    # 交易日列表：取 end_date 往前 N 个自然日内 Tushare 返回的 trade_date
+    start = f"{int(end_date[:4]):04d}{int(end_date[4:6]):02d}{int(end_date[6:8]):02d}"
+    try:
+        import datetime
+        s = datetime.datetime.strptime(end_date, "%Y%m%d").date()
+        start = (s - datetime.timedelta(days=days * 2)).strftime("%Y%m%d")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        basic = pro.stock_basic(exchange="", list_status="L", fields="ts_code,industry")
+        if basic is None or not len(basic):
+            return []
+        ind_map = {str(r["ts_code"]): str(r.get("industry") or "")
+                   for _, r in basic.iterrows()}
+        mf = pro.moneyflow(start_date=start, end_date=end_date,
+                           fields="ts_code,trade_date,net_mf_amount")
+        if mf is None or not len(mf):
+            return []
+        mf = mf.copy()
+        mf["industry"] = mf["ts_code"].map(ind_map)
+        mf = mf[mf["industry"] != ""]
+        g = mf.groupby(["trade_date", "industry"], as_index=False)["net_mf_amount"].sum()
+        g = g.sort_values("trade_date")
+        dates = sorted(g["trade_date"].unique())[-days:]
+        out = [{"date": str(r["trade_date"]), "industry": str(r["industry"]),
+                "net_yi": round(float(r["net_mf_amount"]) / YI * 1e4, 3)}
+               for _, r in g[g["trade_date"].isin(dates)].iterrows()]
+        _FUND_CACHE[key] = out
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def fetch_moneyflow_asof(date: str) -> dict:
+    """接口时间戳核验：实际返回的交易日 vs 目标日，供输出标注来源与偏差。"""
+    pro = _ts_pro()
+    if pro is None:
+        return {"target": date, "actual": None, "matched": None, "source": "tushare"}
+    try:
+        df = pro.moneyflow(trade_date=date, fields="trade_date")
+        actual = str(df.iloc[0]["trade_date"]) if df is not None and len(df) else None
+        return {"target": date, "actual": actual,
+                "matched": (actual == date) if actual else None, "source": "tushare.moneyflow"}
+    except Exception:  # noqa: BLE001
+        return {"target": date, "actual": None, "matched": None, "source": "tushare.moneyflow"}
+
+
+# ----------------------------------------------------------------------------
 # 7. watchlist 交叉 (home-pool.json)
