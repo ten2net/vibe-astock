@@ -1100,14 +1100,31 @@ _PHASE_STANCE = {
 _DEFAULT_STANCE = ("分化", "看验证")
 
 
-def _breadth_hook(payload: dict) -> str:
-    """从涨跌家数取市况钩子：涨多→普涨，跌多→普跌（压到 2 字，给标题留长度）。"""
+def _breadth_direction(payload: dict) -> str:
+    """市况方向：up / down / flat，用于判断市况与情绪档位是否背离。"""
     breadth = (payload.get("market_facts") or {}).get("breadth") or {}
     up, down = breadth.get("up"), breadth.get("down")
     if isinstance(up, int) and isinstance(down, int) and up + down > 0:
-        return "普涨" if up > down else ("普跌" if down > up else "分化")
+        return "up" if up > down else ("down" if down > up else "flat")
+    return "flat"
+
+
+def _breadth_hook(payload: dict) -> str:
+    """从涨跌家数取市况钩子：涨多→普涨，跌多→普跌（压到 2 字，给标题留长度）。"""
+    direction = _breadth_direction(payload)
+    if direction == "up":
+        return "普涨"
+    if direction == "down":
+        return "普跌"
     phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
     return f"情绪{phase}" if phase else "分化"
+
+
+# 情绪档位的冷暖方向：与市况方向相反即为背离，标题里加「却」字强调。
+_PHASE_DIRECTION = {
+    "退潮": "down", "冰点": "down",
+    "修复": "up", "发酵": "up", "高潮": "up",
+}
 
 
 def stance_title(payload: dict, date: str) -> str:
@@ -1122,9 +1139,13 @@ def stance_title(payload: dict, date: str) -> str:
     phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
     stance, action = _PHASE_STANCE.get(phase, _DEFAULT_STANCE)
     hook = _breadth_hook(payload)
-    # 核心词前置：日期 + A股复盘 + 「市况+判断」+ 动作。
-    # 市况与判断合并为一段（省一个逗号），把总长压到 20 字内。
-    return f"{cn}A股复盘：{hook}{stance}，{action}"
+    # 核心词前置：日期 + A股复盘 + 市况 + 判断 + 动作。
+    # 市况与情绪档位背离时（如「普跌却发酵」）加「却」字，读起来更顺，
+    # 冲突感也更强；同向时（如「普跌退潮」）不加，保持 20 字内。
+    breadth_dir = _breadth_direction(payload)
+    phase_dir = _PHASE_DIRECTION.get(phase)
+    turn = "却" if (phase_dir and breadth_dir != "flat" and phase_dir != breadth_dir) else ""
+    return f"{cn}A股复盘：{hook}{turn}{stance}，{action}"
 
 
 def post_title(payload: dict, date: str) -> str:

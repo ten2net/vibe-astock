@@ -157,10 +157,22 @@ class TestSeoRewrite:
         title = wr.seo_title(payload(), DATE)
         assert title.startswith("9月23日A股复盘")      # 核心词前置 + 中文日期
         assert "2026-09-23" not in title              # 不用 ISO 日期
-        assert "，" in title and "普跌退潮" in title  # 市况 + 判断合并 + 观察动作
+        assert "，" in title and "普跌退潮" in title  # 市况+判断同向，不加「却」
+        assert "却" not in title
         assert len(title) <= 20                      # 标题压在 20 字内
         assert "意味着什么？" not in title            # 不用无结论问句
         assert len(title) <= 64
+
+    def test_title_turn_word_on_divergence(self):
+        """市况与情绪档位背离时加「却」字（如普跌却发酵）。"""
+        from review_agent import blog_publish as bp
+        p = payload()
+        p["focus"]["emotion_phase"] = "发酵"        # 普跌 + 发酵 = 背离
+        title = wr.seo_title(p, DATE)
+        assert "普跌却发酵" in title, title
+        # 同向时仍不加
+        p["focus"]["emotion_phase"] = "退潮"
+        assert "却" not in wr.seo_title(p, DATE)
 
     def test_lead_has_keyword_conclusion_and_plain_numbers(self):
         html = wr.article_html(payload(), DATE, "")
