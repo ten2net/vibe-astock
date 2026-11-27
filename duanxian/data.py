@@ -130,6 +130,9 @@ def get_market_facts(date: str) -> tuple[str, dict]:
                         "file": str(_img),
                         "guidance": margin_guidance(_series),
                         "dates": [s["date"] for s in _series],
+                        # 把原始数据一并落盘：发布/公众号在另一个进程或容器，
+                        # 读不到写图那台容器的本地文件，需要据这份 series 重生成。
+                        "series": _series,
                     }
         except Exception:  # noqa: BLE001  增强项：失败不阻断复盘
             pass

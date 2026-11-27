@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from .emotion_card import _load_font  # 复用中文字体加载（Noto CJK SC）
 
@@ -176,3 +177,48 @@ def margin_guidance(series: list[dict]) -> str:
     parts.append("以上仅为公开数据的方向描述与后续验证条件，不构成操作指引；"
                  "余额为融资余额口径，不等同于全市场两融余额。")
     return "\n".join(parts)
+
+
+def ensure_margin_chart(payload: dict, site_dir: str | Path,
+                        log: Callable[[str], None] = lambda _m: None) -> bool:
+    """确保复盘引用的两融图真实存在于 site_dir，并更新 file/image 指向它。
+
+    复盘阶段图只写到「生成复盘那台容器」的本地文件系统；发布（Hugo 构建）与
+    公众号上传在另一个进程/容器，读不到那个文件（复盘命中缓存时更不会重新生成），
+    于是文章里有 img 标签、线上/草稿里却没有图。这里按复盘落盘的同一份 series
+    在发布侧动态重生成；series 缺失时按 target_date 重新取数（Tushare）。
+    不依赖写图容器的本地文件，因此跨容器/命中缓存也不会缺图。返回是否成功。
+    """
+    facts = payload.get("market_facts") or {}
+    mc = facts.get("margin_chart") or {}
+    if not mc:
+        return False
+    # 文件名以文章里已写死的 image 为准，保证与 HTML 引用完全一致
+    img_name = Path(str(mc.get("image") or "")).name
+    if not img_name.startswith("margin-") or not img_name.endswith(".png"):
+        return False
+    series = mc.get("series") or []
+    if len(series) < 3:
+        date = str(payload.get("target_date") or payload.get("trade_date") or "")
+        if not date:
+            dates = mc.get("dates") or []
+            date = str(dates[-1]) if dates else ""
+        try:
+            from duanxian.fetchers import fetch_margin_history
+            series = fetch_margin_history(date, days=20) if date else []
+        except Exception as exc:  # noqa: BLE001  取数失败 → 降级
+            log(f"两融图取数失败（{type(exc).__name__}: {exc}）")
+            series = []
+    if len(series) < 3:
+        return False
+    out = Path(site_dir) / "static" / "cards" / img_name
+    try:
+        img = render_margin_chart(series, out)
+    except Exception as exc:  # noqa: BLE001  生成失败 → 降级
+        log(f"两融图生成失败（{type(exc).__name__}: {exc}）")
+        return False
+    if not img:
+        return False
+    mc["series"] = series
+    mc["file"] = str(out)
+    return True

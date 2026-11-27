@@ -1602,6 +1602,14 @@ def write_sources(site_dir: Path | str, reviews_dir: Path | str, dates: list[str
             log(f"跳过 {d}：{exc}")
             skipped.append(d)
             continue
+        # 两融叠加图：发布侧的 Hugo 构建只认 site_dir/static/cards 下的文件。
+        # 复盘写图发生在另一容器/进程，这里据同一份 series 重生成，避免文章引用了
+        # 图、线上却 404。失败只是缺图，不阻断正文发布。
+        try:
+            from .margin_chart import ensure_margin_chart
+            ensure_margin_chart(payload, site_dir, log)
+        except Exception as exc:  # noqa: BLE001  增强项失败不阻断
+            log(f"{d}：两融图就绪检查异常（{type(exc).__name__}: {exc}）")
         path = post_dir / post_filename(d)
         text = post_markdown(payload, d, ext=_external(d, log), prev_reviews=prev_reviews)
         if not path.exists() or path.read_text(encoding="utf-8") != text:

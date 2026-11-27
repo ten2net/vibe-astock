@@ -353,6 +353,14 @@ def publish_review(reviews_dir: Path | str, date: str, *, draft_only: bool = Tru
     """一篇复盘 → 公众号草稿（可选直接发布）。微信侧失败抛 WechatError。"""
     payload = load_review(reviews_dir, date)   # 缺文件/没正文如实报错
     check_public_text(payload)                 # 与博客同一道不荐股闸门
+    # 公众号上传正文图片需要本地真实文件；复盘写图在另一容器/进程，这里据同一份
+    # series 在发布侧重生成，避免占位被删掉、草稿里没图。失败不阻断草稿发布。
+    try:
+        from .margin_chart import ensure_margin_chart
+        if ensure_margin_chart(payload, Path(__file__).resolve().parents[1] / "blog", log):
+            log(f"{date}：两融叠加图已就绪")
+    except Exception as exc:  # noqa: BLE001  增强项失败不阻断
+        log(f"{date}：两融图就绪检查异常（{type(exc).__name__}: {exc}）")
     focus = payload.get("focus") or {}
     one = str(focus.get("market_oneliner") or "")
     title = seo_title(payload, date)          # SEO：中文日期 + A股复盘核心词 + 问句钩子
