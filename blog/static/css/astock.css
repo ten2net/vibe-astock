@@ -669,3 +669,25 @@ article>.container{max-width:1240px;margin:0 auto}
 [data-theme="dark"] .va-risk{
   background:rgba(0,0,0,.45);border-top-color:rgba(251,146,60,.5);color:#fde8dd;
 }
+
+/* ---- 文章顶部：扫码关注揽宝投研公众号 ---- */
+.va-follow{
+  display:flex;align-items:center;gap:16px;
+  background:var(--va-muted);border:1px solid var(--va-border);
+  border-left:3px solid var(--va-primary);
+  border-radius:var(--va-radius);padding:14px 16px;margin:0 0 16px;
+}
+.va-follow-copy{flex:1;min-width:0}
+.va-follow-h{font-size:16px;font-weight:700;margin:0 0 6px;color:var(--va-fg)}
+.va-follow-p{font-size:13px;line-height:1.7;color:var(--va-muted-fg);margin:0 0 5px}
+.va-follow-cta{color:var(--va-primary);font-weight:600;margin-bottom:0}
+.va-follow-qr{
+  width:108px;height:108px;flex:0 0 108px;
+  border:1px solid var(--va-border);border-radius:6px;background:#fff;
+}
+@media (max-width:560px){
+  .va-follow{gap:10px;padding:12px}
+  .va-follow-qr{width:88px;height:88px;flex-basis:88px}
+  .va-follow-h{font-size:15px}
+  .va-follow-p{font-size:12px}
+}

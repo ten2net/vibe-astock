@@ -1181,6 +1181,21 @@ def _yaml_str(value: str) -> str:
 
 
 
+# 每篇博客文章顶部的公众号引导：扫码关注 + 品牌定位 + 合规口径。
+# 二维码用站点静态目录里的 assets/lanbao.png（blog/static/img/lanbao.png），
+# img 在 Pages 同步白名单内，线上地址 /img/lanbao.png。
+FOLLOW_BANNER_HTML = (
+    '<section class="va-follow">'
+    '<div class="va-follow-copy">'
+    '<p class="va-follow-h">关注「揽宝投研」公众号</p>'
+    '<p class="va-follow-p">每个交易日收盘后，用公开数据复盘 A 股：涨跌分布、资金流向、龙虎榜与题材线索都沿着证据链整理。</p>'
+    '<p class="va-follow-p va-follow-cta">扫码获取每日复盘，一起用数据说话。这里不荐股、不预测涨跌、不构成投资建议。</p>'
+    '</div>'
+    '<img class="va-follow-qr" src="/img/lanbao.png" alt="揽宝投研公众号二维码" loading="lazy">'
+    '</section>'
+)
+
+
 def _stat_cards(payload: dict) -> list[str]:
     """当日读数：v1 复盘页那种方框卡（标签 / 等宽大数字 / 一行说明）。"""
     return [f'<div class="va-stat"><p class="va-stat-k">{html.escape(k)}</p>'
@@ -1453,8 +1468,9 @@ def post_markdown(payload: dict, date: str, ext: dict | None = None,
         "---",
         "",
     ]
-    # 版式照本机复盘页：先一块「当日一句话 + 四只读数」方框卡，再逐个分区面板
-    md: list[str] = []
+    # 版式照本机复盘页：顶部先放公众号引导卡，再一块「当日一句话 + 四只读数」
+    # 方框卡，然后逐个分区面板。
+    md: list[str] = [FOLLOW_BANNER_HTML]
     lead = (["".join(f'<p class="va-leadline">{html.escape(s)}</p>'
                      for s in _split_sentences(one))] if one else []) + [
             '<div class="va-grid">' + "".join(_stat_cards(payload)) + "</div>"]
