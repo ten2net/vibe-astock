@@ -54,7 +54,7 @@ class TestPost:
     def test_front_matter_and_body(self):
         md = bp.post_markdown(payload(), DATE)
         assert md.startswith("---\n")
-        assert 'title: "2026-09-23 每日复盘 · 情绪档位退潮"' in md
+        assert 'title: "9月23日A股复盘：普跌退潮，别抢反弹"' in md
         assert "date: 2026-09-23T20:23:00+08:00" in md
         assert 'tags: ["每日复盘"]' in md and "draft: false" in md
         assert 'class="va-stat"' in md and "汇总研判" in md and "情绪面" in md

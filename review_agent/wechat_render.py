@@ -487,19 +487,17 @@ def _seo_analyst_title(title: str) -> str:
 
 
 def _dynamic_tags(payload: dict) -> list[str]:
-    """按当日盘面生成 2 个动态话题，与固定基础标签组合成 5 个精准话题。
+    """生成 5 个话题：4 个固定领域词 + 1 个当日动态词。
 
-    固定 3 个锚定账号领域（A股复盘/每日复盘/情绪档位），动态 2 个让系统
-    拿到更细的当日内容信号：一个来自情绪档位，一个来自盘面特征
-    （晋级率 / 连板高度 / 主线题材），便于推荐给对应细分兴趣的读者。
+    账号标签靠「稳定重复」才能被系统识别。固定锚点换成 4 个领域词
+    （A股复盘/涨停复盘/情绪周期/晋级率），每天不变；动态只留 1 个，
+    且优先落在领域词上（情绪档位/连板梯队/资金流向），避免原来的
+    「情绪退潮/情绪修复」轮换让系统误判成不同领域。
     """
-    focus = payload.get("focus") or {}
     em = payload.get("emotion_metrics") or {}
-    phase = str(focus.get("emotion_phase") or "").strip()
+    phase_tag = "情绪周期"  # 兜底：领域词，比「情绪退潮/修复」更稳定
 
-    phase_tag = f"情绪{phase}" if phase else "市场分化"
-
-    # 盘面特征优先级：晋级率高 > 连板高度高 > 主线题材 > 资金流向
+    # 盘面特征优先级：晋级率高的日子标晋级率，否则用连板梯队/资金流向
     feature_tag = "资金流向"  # 兜底
     promo = (em.get("promotion") or {}).get("overall") or {}
     rate = promo.get("rate")
@@ -508,14 +506,9 @@ def _dynamic_tags(payload: dict) -> list[str]:
         feature_tag = "晋级率"
     elif isinstance(highest, (int, float)) and highest >= 5:
         feature_tag = "连板梯队"
-    else:
-        themes = (((payload.get("market_facts") or {}).get("theme_structure") or {}).get("themes") or [])
-        sector = str(themes[0].get("sector") or "").strip() if themes and isinstance(themes[0], dict) else ""
-        if sector:
-            feature_tag = sector
 
-    base = ["A股复盘", "每日复盘", "情绪档位"]
-    # 去重且保序，最多 5 个
+    base = ["A股复盘", "涨停复盘", "情绪周期", "晋级率"]
+    # 去重且保序，最多 5 个；第 5 个用动态词补充当日信号
     picked: list[str] = []
     for t in base + [phase_tag, feature_tag]:
         if t and t not in picked:

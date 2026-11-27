@@ -109,12 +109,11 @@ class TestRender:
         assert "background:#fff8e6" in html        # 浅橙底 + 橙色粗边，非灰色小字
 
     def test_dynamic_tags_default(self):
-        """默认 payload：3 个固定 + 情绪退潮 + 兜底资金流向，共 5 个。"""
+        """默认 payload：4 个固定领域词 + 兜底资金流向，共 5 个。"""
         tags = wr._dynamic_tags(payload())
         assert len(tags) == 5
-        assert tags[:3] == ["A股复盘", "每日复盘", "情绪档位"]
-        assert "情绪退潮" in tags
-        assert "资金流向" in tags  # rate<30% 且 highest<5 且无题材 → 兜底
+        assert tags[:4] == ["A股复盘", "涨停复盘", "情绪周期", "晋级率"]
+        assert "资金流向" in tags  # rate<30% 且 highest<5 → 兜底
 
     def test_dynamic_tags_high_promotion(self):
         p = payload()
@@ -129,24 +128,26 @@ class TestRender:
         assert "连板梯队" in tags
 
     def test_dynamic_tags_leading_theme(self):
+        """题材不再作为独立标签：只保留领域词，避免每天换标签稀释账号识别。"""
         p = payload()
         p["market_facts"]["theme_structure"] = {"themes": [
             {"sector": "半导体", "limit_up": 8, "highest": 3},
         ]}
         tags = wr._dynamic_tags(p)
-        assert "半导体" in tags
+        assert "半导体" not in tags
+        assert tags[:4] == ["A股复盘", "涨停复盘", "情绪周期", "晋级率"]
 
     def test_dynamic_tags_dedup(self):
         """固定标签与动态标签重名时去重，仍返回至多 5 个。"""
         p = payload()
-        p["focus"]["emotion_phase"] = "档位"  # 动态 phase_tag = 情绪档位，与固定重名
+        p["focus"]["emotion_phase"] = "晋级率"  # 动态词与固定重名场景
         tags = wr._dynamic_tags(p)
         assert len(tags) == len(set(tags))
         assert len(tags) <= 5
 
     def test_tags_rendered_in_html(self):
         html = wr.article_html(payload(), DATE, "")
-        assert "#A股复盘" in html and "#情绪退潮" in html
+        assert "#A股复盘" in html and "#涨停复盘" in html
 
 
 class TestSeoRewrite:
@@ -156,7 +157,9 @@ class TestSeoRewrite:
         title = wr.seo_title(payload(), DATE)
         assert title.startswith("9月23日A股复盘")      # 核心词前置 + 中文日期
         assert "2026-09-23" not in title              # 不用 ISO 日期
-        assert "意味着什么？" in title                # 问句钩子
+        assert "，" in title and "普跌退潮" in title  # 市况 + 判断合并 + 观察动作
+        assert len(title) <= 20                      # 标题压在 20 字内
+        assert "意味着什么？" not in title            # 不用无结论问句
         assert len(title) <= 64
 
     def test_lead_has_keyword_conclusion_and_plain_numbers(self):
@@ -202,9 +205,11 @@ class TestSeoRewrite:
     def test_interaction_question_and_topic_tags(self):
         html = wr.article_html(payload(), DATE, "")
         assert "评论区聊聊你的判断依据" in html
-        assert "#A股复盘" in html and "#每日复盘" in html
-        # 话题按当日盘面动态生成：固定 3 个 + 情绪退潮 + 兜底资金流向
-        assert "#情绪退潮" in html and "#资金流向" in html
+        # 4 个固定领域词每天不变，帮账号稳定打上「A股投研」标签
+        assert "#A股复盘" in html and "#涨停复盘" in html
+        assert "#情绪周期" in html and "#晋级率" in html
+        # 第 5 个为兜底动态词；不再每天换「情绪退潮/修复」稀释标签
+        assert "#资金流向" in html
 
     def test_disclaimer_and_read_original_kept(self):
         html = wr.article_html(payload(), DATE, "https://ten2net.github.io/post/x/")

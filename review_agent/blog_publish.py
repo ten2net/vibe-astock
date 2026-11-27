@@ -1090,32 +1090,40 @@ def _block_tier_tiers(payload: dict, prev_reviews: dict) -> str:
 #   11月24日个股普跌：退潮未完，别急着抢反弹
 # 动作一律用「等信号 / 别急着 / 看确认」等观察纪律措辞，不出现买卖/仓位指令。
 _PHASE_STANCE = {
-    "退潮": ("退潮未完", "别急着抢反弹"),
-    "冰点": ("情绪冰点", "别接飞刀"),
-    "修复": ("修复待确认", "等信号再动手"),
-    "发酵": ("热度在上", "让信号说话"),
-    "高潮": ("情绪高涨", "别追高"),
+    "退潮": ("退潮", "别抢反弹"),
+    "冰点": ("冰点", "别接飞刀"),
+    "修复": ("修复", "等信号"),
+    "发酵": ("发酵", "看信号"),
+    "高潮": ("高潮", "别追高"),
 }
-_DEFAULT_STANCE = ("分歧未明", "先看验证再动")
+_DEFAULT_STANCE = ("分化", "看验证")
 
 
 def _breadth_hook(payload: dict) -> str:
-    """从涨跌家数取市况钩子：涨多→个股普涨，跌多→个股普跌。"""
+    """从涨跌家数取市况钩子：涨多→普涨，跌多→普跌（压到 2 字，给标题留长度）。"""
     breadth = (payload.get("market_facts") or {}).get("breadth") or {}
     up, down = breadth.get("up"), breadth.get("down")
     if isinstance(up, int) and isinstance(down, int) and up + down > 0:
-        return "个股普涨" if up > down else ("个股普跌" if down > up else "涨跌各半")
+        return "普涨" if up > down else ("普跌" if down > up else "分化")
     phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
-    return f"情绪{phase}" if phase else "市场分化"
+    return f"情绪{phase}" if phase else "分化"
 
 
 def stance_title(payload: dict, date: str) -> str:
-    """「亮明态度 + 可操作」式标题：市况 + 判断 + 观察动作，合规无买卖建议。"""
+    """「亮明态度 + 可操作」式标题：核心词 + 市况 + 判断 + 观察动作，合规无买卖建议。
+
+    标题是微信识别账号领域最强的信号位，固定嵌入「A股复盘」核心词，
+    让用户搜「11月24日复盘 / A股复盘」时也能命中，而不是把领域识别
+    全压在正文上。控制在 20 字左右：核心词 + 市况 + 态度 + 动作。
+    """
     m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(date or ""))
     cn = f"{int(m.group(2))}月{int(m.group(3))}日" if m else str(date or "")
     phase = str((payload.get("focus") or {}).get("emotion_phase") or "").strip()
     stance, action = _PHASE_STANCE.get(phase, _DEFAULT_STANCE)
-    return f"{cn}{_breadth_hook(payload)}：{stance}，{action}"
+    hook = _breadth_hook(payload)
+    # 核心词前置：日期 + A股复盘 + 「市况+判断」+ 动作。
+    # 市况与判断合并为一段（省一个逗号），把总长压到 20 字内。
+    return f"{cn}A股复盘：{hook}{stance}，{action}"
 
 
 def post_title(payload: dict, date: str) -> str:
