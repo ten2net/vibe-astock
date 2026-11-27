@@ -4,7 +4,8 @@
 零外部依赖、可离线验证。产物落 ``blog/static/go/``（Hugo staticDir → public/go/），
 由 ``OWNED_DIRS`` 同步到 Pages。
 
-平台：x / tg / xueqiu / xiaohongshu。UTM：utm_source=<platform>&utm_medium=social&utm_campaign=<date>。
+平台：x / tg / xueqiu / xiaohongshu / dongfang（东财股吧）。UTM：utm_source=<platform>&utm_medium=social&utm_campaign=<date>。
+注：导流平台（xueqiu / dongfang）的图文包文案不放 URL，二维码直接指向公众号；跳页产物仅为运营侧保留 UTM 入口。
 注：小红书图文包正文不放外链（平台限流/营销判定），但平台枚举与跳页保持一致，
 便于台账、caption 生成器统一处理；跳页产物给运营侧留 UTM 入口，不进小红书文案。
 """
@@ -16,7 +17,7 @@ from typing import Callable
 from urllib.parse import quote
 
 BASE_URL = "https://ten2net.github.io"
-PLATFORMS = ("x", "tg", "xueqiu", "xiaohongshu")
+PLATFORMS = ("x", "tg", "xueqiu", "xiaohongshu", "dongfang")
 
 
 def post_url(date: str) -> str:

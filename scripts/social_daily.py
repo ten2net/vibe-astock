@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 from duanxian.paths import data_path  # noqa: E402
 from review_agent import blog_publish as bp  # noqa: E402
 from review_agent import emotion_card as ec  # noqa: E402
+from review_agent import platform_adapters as pa  # noqa: E402
 from review_agent import social_links, social_publish as sp  # noqa: E402
 
 
@@ -60,6 +61,35 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_vertical:
         need_xhs = "xiaohongshu" in platforms
         ec.generate(reviews, args.cards, dates=dates, vertical=True, xhs=need_xhs, log=log)
+
+    # 导流卡片（人工发图文包用），生成失败只记 log 并跳过，不影响其它平台分发：
+    # - 雪球长文：横版无二维码 -lead-h.png（竖图会被长文截断，二维码图可能被拒传）
+    # - 东财股吧：公众号二维码竖版 -lead.png（信息流发图）
+    need_xq = "xueqiu" in platforms
+    need_df = "dongfang" in platforms
+    if need_xq or need_df:
+        for date in dates:
+            try:
+                payload = bp.load_review(reviews, date)
+                metrics = ec.extract_metrics(payload, date)
+                if need_xq:
+                    out = Path(args.cards) / f"{date}-lead-h.png"
+                    pa.render_lead_card_horizontal(metrics, out)
+                    log(f"雪球横版导流图已生成：{out}")
+                    # 长文封面：实测显示区 840×336，横版 OG 图会被上下裁。
+                    # 出无码/带码两版，用户按平台实际接受情况选。
+                    cover = Path(args.cards) / f"{date}-cover.png"
+                    cover_qr = Path(args.cards) / f"{date}-cover-qr.png"
+                    pa.render_lead_cover(metrics, cover, with_qr=False)
+                    pa.render_lead_cover(metrics, cover_qr, with_qr=True)
+                    log(f"雪球长文封面已生成：{cover} / {cover_qr}")
+                if need_df:
+                    # 财富号发文规范禁止二维码/公众号水印，东财用纯合规配图
+                    out = Path(args.cards) / f"{date}-lead.png"
+                    pa.render_eastmoney_card(metrics, out)
+                    log(f"东财合规配图已生成：{out}")
+            except Exception as exc:  # noqa: BLE001  增强项，失败不影响分发
+                log(f"导流卡片生成失败（{date}）：{type(exc).__name__}: {exc}")
 
     for date in dates:
         payload = bp.load_review(reviews, date)

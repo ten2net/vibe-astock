@@ -7,6 +7,14 @@
 # 头条自动发布运行产物（发布进度），不入库
 wechat-article/publish_state.json
 
+# 社媒导流产物（由 scripts/social_daily.py 生成，可随时重出）：
+# 公众号二维码导流卡片 *-lead.png、雪球/东财股吧图文包、UTM 跳页。
+# 注：cards/social/go 下历史产物已被 git 跟踪，本规则只让「新生成的」文件不入库。
+blog/static/cards/*-lead.png
+blog/static/cards/latest*-lead.png
+blog/static/social/packs/
+blog/static/go/
+
 # Python
 # 不带斜杠：`.venv` 可能是符号链接，带斜杠只匹配目录会让符号链接漏网被当成 gitlink。
 .venv

@@ -4,7 +4,8 @@
 - **小红书为主**（用户确认）：目标用户在国内，小红书无官方开放发帖 API，且正文
   外链/二维码会被限流或判营销 → **半自动图文包**（程序生成竖图 + 文案 + 话题标签，
   人工在 App 粘贴发布），文案**不放任何 URL/二维码/引流 CTA**。
-- **雪球**：同样是半自动图文包（无官方发帖 API，不做浏览器自动化）。
+- **雪球 / 东财股吧**：半自动图文包（无官方发帖 API，不做浏览器自动化），文案
+  引导关注公众号揽宝投研；雪球为主阵地、东财股吧为流量入口。
 - **X / Telegram 停用但保留代码**：默认分发不再触发（``DEFAULT_PLATFORMS`` 不含），
   显式传 ``platforms=("x","tg")`` 仍可用自动发帖 sender，便于日后恢复。
 - **合规硬约束**：caption 与原始复盘都过不荐股闸门；产品政策不因社媒放宽
@@ -27,16 +28,17 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable
 
-from . import emotion_card, social_links
+from . import emotion_card, platform_adapters, social_links
 from .blog_publish import DISCLAIMER, check_public_text
 from .product_policy import has_trade_recommendation
 
-PLATFORMS = ("x", "tg", "xueqiu", "xiaohongshu")
+PLATFORMS = ("x", "tg", "xueqiu", "xiaohongshu", "dongfang")
 # 默认分发集合：面向国内，小红书为主 + 雪球，两者都半自动出图文包。
 # X/TG 从默认集合移除（停用但保留代码），显式指定 platforms 仍可触发自动发帖。
 DEFAULT_PLATFORMS = ("xiaohongshu", "xueqiu")
 # 半自动图文包平台（程序生成素材、人工发布）
-PACK_PLATFORMS = ("xiaohongshu", "xueqiu")
+# 小红书（无码）、雪球（导流到公众号）、东财股吧（导流到公众号）都出图文包。
+PACK_PLATFORMS = ("xiaohongshu", "xueqiu", "dongfang")
 # 会被自动发帖的平台（X/TG 保留，仅显式指定时生效）
 AUTO_PLATFORMS = ("x", "tg")
 
@@ -58,10 +60,16 @@ def build_caption(platform: str, metrics: "emotion_card.CardMetrics",
                   go_url: str) -> Caption:
     """平台专属 caption：日期 + 档位 + 三读数 + 免责声明（+ 短链，小红书除外）。
 
-    X 限 280 字符，故用紧凑版；TG 可长；雪球偏长并带数据口径；小红书干货数据向，
-    **不放任何 URL/二维码/引流 CTA**（平台限流/营销判定），只留话题标签。
+    X 限 280 字符，故用紧凑版；TG 可长；小红书干货数据向，**不放任何 URL/二维码/
+    引流 CTA**（平台限流/营销判定），只留话题标签。
+    雪球 / 东财股吧是**导流平台**：文案改由 ``platform_adapters.build_lead_caption``
+    生成，引导关注公众号揽宝投研（不放 URL，二维码在卡片图上）。
     **只陈述已统计读数，不写任何操作/点位/预测**（合规红线）。
     """
+    if platform in platform_adapters.LEAD_PLATFORMS:
+        lead = platform_adapters.build_lead_caption(platform, metrics)
+        return Caption(platform=platform, text=lead.text, go_url=lead.go_url)
+
     head = f"{metrics.date} A股情绪档位：{metrics.phase}"
     stats = f"涨停 {metrics.limit_up} 家 · 晋级率 {metrics.promote_rate} · 炸板率 {metrics.broken_rate}"
     source = "（数据来源：公开榜单与程序统计）"
@@ -102,7 +110,16 @@ def compliance_ok(caption: Caption, payload: dict) -> bool:
         return False
     scan = caption.text.replace(DISCLAIMER, "").replace(
         "仅呈现公开数据与统计，不构成投资建议。", "")
-    return not has_trade_recommendation(scan)
+    if has_trade_recommendation(scan):
+        return False
+    # 第三道闸：导流平台（雪球/东财股吧）额外过导流文案门禁
+    if caption.platform in platform_adapters.LEAD_PLATFORMS:
+        if not platform_adapters.lead_gate(caption.text):
+            return False
+        # 东财（财富号）另按《发文规范（修订版）》2.1 拦截公众号/二维码/推广表达
+        if caption.platform == "dongfang":
+            return platform_adapters.eastmoney_gate(caption.text)
+    return True
 
 
 # ---------------------------------------------------------------- 台账
@@ -228,16 +245,30 @@ class DistResult:
 
 
 def _pack_card(cards_dir: Path, date: str, platform: str) -> Path:
-    """半自动图文包用的竖版卡片路径：小红书用无码/无外链的 ``-xhs.png``，
-    其余（雪球）沿用带二维码的 ``-vertical.png``。"""
-    name = f"{date}-xhs.png" if platform == "xiaohongshu" else f"{date}-vertical.png"
+    """半自动图文包用的竖版卡片路径：
+
+    - 小红书：无码/无外链的 ``-xhs.png``
+    - 雪球（长文配图）：横版无二维码 ``-lead-h.png``（竖图会被长文截断，二维码图可能被拒传）
+    - 东财股吧（信息流配图）：公众号二维码竖版 ``-lead.png``
+    - 其余（X/TG 历史契约）：带博客短链二维码的 ``-vertical.png``
+    """
+    if platform == "xiaohongshu":
+        name = f"{date}-xhs.png"
+    elif platform == "xueqiu":
+        name = f"{date}-lead-h.png"
+    elif platform == "dongfang":
+        name = f"{date}-lead.png"
+    else:
+        name = f"{date}-vertical.png"
     return cards_dir / name
 
 
 def _pack_dir(packs_dir: Path, date: str, platform: str) -> Path:
-    """图文包目录。雪球保持既有 ``packs/<date>/`` 契约；小红书单独分目录避免覆盖。"""
+    """图文包目录。雪球保持既有 ``packs/<date>/`` 契约；小红书与东财股吧单独分目录避免覆盖。"""
     if platform == "xiaohongshu":
         return packs_dir / "xiaohongshu" / date
+    if platform == "dongfang":
+        return packs_dir / "dongfang" / date
     return packs_dir / date
 
 
@@ -287,6 +318,13 @@ def distribute(date: str, payload: dict, *, reviews_dir: Path | str,
                 card = _pack_card(cards, date, platform)
                 if card.is_file():
                     (pack / "card.png").write_bytes(card.read_bytes())
+                # 雪球长文封面上额外附 840×336 两版（无码 / 带码），
+                # 用户按平台实际接受情况选一张上传。
+                if platform == "xueqiu":
+                    for suffix in ("cover", "cover-qr"):
+                        src = cards / f"{date}-{suffix}.png"
+                        if src.is_file():
+                            (pack / f"{suffix}.png").write_bytes(src.read_bytes())
                 if not dry_run:
                     record(ledger, date, platform, status="pack", url=str(pack))
                 outcomes[platform] = "pack"

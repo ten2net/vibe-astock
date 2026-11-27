@@ -99,8 +99,9 @@ def test_captions_contain_link_and_disclaimer():
         cap = sp.build_caption(plat, m, sl.go_url(plat, DATE))
         assert "不构成投资建议" in cap.text or "不推荐个股" in cap.text
         assert m.phase in cap.text and "32" in cap.text
-        # 小红书文案不放任何 URL（平台限流/营销判定）；其余平台带各自短链
-        if plat == "xiaohongshu":
+        # 小红书 + 导流平台（雪球/东财股吧）文案不放任何 URL：
+        # 小红书为规避限流，导流平台二维码在卡片图上、文案只留关注话术。
+        if plat in ("xiaohongshu", "xueqiu", "dongfang"):
             assert cap.go_url == "" and "http" not in cap.text
         else:
             assert cap.go_url in cap.text
@@ -175,6 +176,8 @@ def _cards(tmp_path):
     cards.mkdir()
     Image.new("RGB", (1080, 1350), (20, 20, 28)).save(cards / f"{DATE}-vertical.png")
     Image.new("RGB", (1080, 1350), (24, 24, 32)).save(cards / f"{DATE}-xhs.png")
+    Image.new("RGB", (1080, 1350), (28, 28, 36)).save(cards / f"{DATE}-lead.png")
+    Image.new("RGB", (1200, 630), (32, 32, 40)).save(cards / f"{DATE}-lead-h.png")
     return cards
 
 
@@ -275,8 +278,11 @@ def test_xueqiu_writes_pack_with_caption_and_card(tmp_path):
     pack = tmp_path / "packs" / DATE
     assert r.outcomes["xueqiu"] == "pack"
     assert (pack / "caption.md").is_file() and (pack / "card.png").is_file()
-    # caption 里是 /go/ 跳页短链（UTM 参数在跳页内部，不在文案里）
-    assert "/go/xueqiu/" in (pack / "caption.md").read_text(encoding="utf-8")
+    # 雪球已改为导流版：文案引导关注公众号，不再放 /go/ 跳页短链
+    cap = (pack / "caption.md").read_text(encoding="utf-8")
+    assert "公众号：揽宝投研" in cap and "/go/" not in cap and "http" not in cap
+    # 雪球长文配图用横版无二维码 -lead-h.png（竖图会被长文截断、二维码图可能被拒传）
+    assert (pack / "card.png").read_bytes() == (tmp_path / "cards" / f"{DATE}-lead-h.png").read_bytes()
 
 
 # ---------------------------------------------------------------- 小红书
