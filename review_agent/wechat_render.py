@@ -95,7 +95,7 @@ def cn_date(date: str) -> str:
 def seo_title(payload: dict, date: str) -> str:
     """微信公众号标题：中文日期 + 市况 + 明确态度 + 观察动作（Seaway 式改写）。
 
-    - 20 字左右、无震惊体，核心词（日期 / 个股普跌 / A股复盘）仍在标题里；
+    - 20 字左右、无震惊体，核心词（日期 / 普跌 / A股复盘）仍在标题里；
     - 态度与动作由当日档位驱动，读者一眼看到观点和纪律；
     - 措辞为观察纪律而非交易指令，符合产品政策。
     博客标题走 blog_publish.post_title（同样改用 stance_title），两处保持一致。
